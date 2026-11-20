@@ -1,0 +1,405 @@
+package main
+
+// SSH (terminal) menu: everything about the panel itself lives here, so the
+// installer asks nothing and the user changes things whenever they like.
+
+import (
+	"bufio"
+	crand "crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
+	"fmt"
+	"io"
+	"math/rand"
+	"net/http"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
+	"strconv"
+	"strings"
+	"time"
+
+	"golang.org/x/crypto/bcrypt"
+	"golang.org/x/term"
+)
+
+const repo = "sahandfarshad/xray-one"
+
+var stdin = bufio.NewReader(os.Stdin)
+
+func prompt(q, def string) string {
+	if def != "" {
+		fmt.Printf("%s [%s]: ", q, def)
+	} else {
+		fmt.Printf("%s: ", q)
+	}
+	s, _ := stdin.ReadString('\n')
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return def
+	}
+	return s
+}
+
+func yes(q string) bool {
+	a := strings.ToLower(prompt(q+" (y/N)", ""))
+	return a == "y" || a == "yes"
+}
+
+func readSecret(q string) string {
+	fmt.Print(q + ": ")
+	if term.IsTerminal(int(os.Stdin.Fd())) {
+		b, _ := term.ReadPassword(int(os.Stdin.Fd()))
+		fmt.Println()
+		return string(b)
+	}
+	s, _ := stdin.ReadString('\n')
+	return strings.TrimSpace(s)
+}
+
+func randPassword(n int) string {
+	const chars = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+	b := make([]byte, n)
+	_, _ = crand.Read(b)
+	for i := range b {
+		b[i] = chars[int(b[i])%len(chars)]
+	}
+	return string(b)
+}
+
+// suggestPort returns a random port that is free on the system and unused
+// by any Xray inbound.
+func suggestPort() int {
+	used := map[string]bool{}
+	if root, _, err := (&ConfigStore{}).Load(); err == nil {
+		used = usedPorts(root)
+	}
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	for i := 0; i < 200; i++ {
+		p := 20000 + r.Intn(40000)
+		if !used[strconv.Itoa(p)] && portFree(p) {
+			return p
+		}
+	}
+	return 0
+}
+
+func publicIP() string {
+	c := &http.Client{Timeout: 5 * time.Second}
+	for _, u := range []string{"https://api.ipify.org", "https://ifconfig.me/ip", "https://icanhazip.com"} {
+		resp, err := c.Get(u)
+		if err != nil {
+			continue
+		}
+		b, _ := io.ReadAll(io.LimitReader(resp.Body, 64))
+		resp.Body.Close()
+		if ip := strings.TrimSpace(string(b)); ip != "" && resp.StatusCode == 200 {
+			return ip
+		}
+	}
+	return ""
+}
+
+func setPassword(st *Store, pass string) {
+	h, _ := bcrypt.GenerateFromPassword([]byte(pass), bcrypt.DefaultCost)
+	st.Cfg.PassHash = string(h)
+}
+
+// initDefaults gives a fresh install working settings without questions.
+func initDefaults(dir string, verbose bool) {
+	st, err := OpenStore(dir)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	if st.Cfg.User != "" && st.Cfg.PassHash != "" {
+		if verbose {
+			fmt.Println("Existing settings kept.")
+		}
+		return
+	}
+	port := suggestPort()
+	pass := randPassword(12)
+	st.Cfg.User = "admin"
+	setPassword(st, pass)
+	st.Cfg.Listen = fmt.Sprintf("0.0.0.0:%d", port)
+	st.Cfg.BasePath = "/" + randHex(6) + "/"
+	if st.Cfg.PublicHost == "" {
+		st.Cfg.PublicHost = publicIP()
+	}
+	if err := st.SaveCfg(); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	app := &App{store: st}
+	fmt.Println()
+	fmt.Println("  XRay One is ready")
+	fmt.Println("  ─────────────────────────────────────────")
+	fmt.Println("  URL:      " + app.PanelURL())
+	fmt.Println("  Username: admin")
+	fmt.Println("  Password: " + pass)
+	fmt.Println("  ─────────────────────────────────────────")
+	fmt.Println("  Save the password now. Change it any time with: xray-one")
+	fmt.Println()
+}
+
+func svc(args ...string) string {
+	out, _ := run(30*time.Second, "systemctl", args...)
+	return out
+}
+
+func restartPanel() {
+	if _, err := exec.LookPath("systemctl"); err == nil {
+		svc("restart", "xray-one")
+		fmt.Println("Panel restarted.")
+	}
+}
+
+func runMenu(dir string) {
+	initDefaults(dir, false)
+	for {
+		st, err := OpenStore(dir)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		app := &App{store: st}
+		c := DetectCore()
+		core := "not installed"
+		if c.Installed {
+			core = c.Version + " (" + orDefault(c.Active, "unknown") + ")"
+		}
+		ssl := "off (plain HTTP)"
+		if st.Cfg.CertFile != "" {
+			ssl = "on · " + st.Cfg.Domain
+			if exp, _, err := certExpiry(st.Cfg.CertFile); err == nil {
+				ssl += " · expires " + exp.Format("2006-01-02")
+			}
+		}
+		fmt.Println()
+		fmt.Println("  ╭─ XRay One " + version + " ─────────────────────────")
+		fmt.Println("  │ Panel:  " + app.PanelURL() + "  [" + orDefault(svc("is-active", "xray-one"), "?") + "]")
+		fmt.Println("  │ User:   " + st.Cfg.User)
+		fmt.Println("  │ SSL:    " + ssl)
+		fmt.Println("  │ Xray:   " + core)
+		fmt.Println("  ╰──────────────────────────────────────────────")
+		fmt.Println("   1) Change username / password")
+		fmt.Println("   2) Change panel port")
+		fmt.Println("   3) Change secret path")
+		fmt.Println("   4) SSL certificate (get new / use existing / turn off)")
+		fmt.Println("   5) Server address used in client links")
+		fmt.Println("   6) Install / update Xray core")
+		fmt.Println("   7) Restart panel")
+		fmt.Println("   8) Panel logs")
+		fmt.Println("   9) Update XRay One")
+		fmt.Println("  10) Uninstall XRay One")
+		fmt.Println("   0) Exit")
+		switch prompt("Choose", "") {
+		case "1":
+			st.Cfg.User = prompt("Username", st.Cfg.User)
+			p := readSecret("New password (empty = keep, min 8 chars)")
+			if p != "" {
+				if len(p) < 8 || readSecret("Repeat password") != p {
+					fmt.Println("Too short or not matching. Password not changed.")
+				} else {
+					setPassword(st, p)
+				}
+			}
+			saveAndRestart(st)
+		case "2":
+			cur := strings.TrimPrefix(portOf(st.Cfg.Listen), ":")
+			sug := suggestPort()
+			p, err := strconv.Atoi(prompt(fmt.Sprintf("New port (current %s, free suggestion)", cur), strconv.Itoa(sug)))
+			if err != nil || p < 1 || p > 65535 {
+				fmt.Println("Invalid port.")
+				continue
+			}
+			if strconv.Itoa(p) != cur && !portFree(p) {
+				fmt.Printf("Port %d is already in use by another program. Nothing changed.\n", p)
+				continue
+			}
+			host := "0.0.0.0"
+			if strings.HasPrefix(st.Cfg.Listen, "127.0.0.1") {
+				host = "127.0.0.1"
+			}
+			st.Cfg.Listen = fmt.Sprintf("%s:%d", host, p)
+			saveAndRestart(st)
+		case "3":
+			st.Cfg.BasePath = normBase(prompt("Secret path", "/"+randHex(6)+"/"))
+			saveAndRestart(st)
+		case "4":
+			sslMenu(dir, st)
+		case "5":
+			st.Cfg.PublicHost = prompt("Domain or IP for client links", orDefault(st.Cfg.PublicHost, publicIP()))
+			saveAndRestart(st)
+		case "6":
+			v := prompt("Version (empty = latest)", "")
+			if v != "" && !strings.HasPrefix(v, "v") {
+				v = "v" + v
+			}
+			coreInstallCLI(v)
+		case "7":
+			restartPanel()
+		case "8":
+			cmd := exec.Command("journalctl", "-u", "xray-one", "-n", "40", "--no-pager")
+			cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
+			_ = cmd.Run()
+		case "9":
+			if err := selfUpdate(); err != nil {
+				fmt.Println("Update failed:", err)
+			} else {
+				fmt.Println("Updated. Run `xray-one` again to open the new menu.")
+				return
+			}
+		case "10":
+			uninstall(dir)
+			return
+		case "0", "q", "exit":
+			return
+		}
+	}
+}
+
+func saveAndRestart(st *Store) {
+	if err := st.SaveCfg(); err != nil {
+		fmt.Println("Save failed:", err)
+		return
+	}
+	fmt.Println("Saved.")
+	restartPanel()
+}
+
+func sslMenu(dir string, st *Store) {
+	found := FindCerts(dir)
+	fmt.Println()
+	fmt.Println("  SSL for the panel and subscription links")
+	fmt.Println("   1) Get a new certificate from Let's Encrypt (needs a domain pointing here and port 80)")
+	if len(found) > 0 {
+		fmt.Println("   2) Use a certificate already on this server:")
+		for i, f := range found {
+			fmt.Printf("        %c) %s  [%s, expires %s]\n", 'a'+i, f.Domain, f.Source, f.Expires.Format("2006-01-02"))
+		}
+	}
+	fmt.Println("   3) Turn SSL off")
+	fmt.Println("   0) Back")
+	switch prompt("Choose", "") {
+	case "1":
+		dom := strings.ToLower(prompt("Domain", st.Cfg.Domain))
+		if dom == "" {
+			return
+		}
+		email := prompt("Email for Let's Encrypt notices (optional)", st.Cfg.AcmeEmail)
+		// if this panel is on port 80 it must step aside for a moment
+		cf, kf, err := ObtainCert(dir, dom, email, func(f string, a ...any) { fmt.Printf("  "+f+"\n", a...) })
+		if err != nil {
+			fmt.Println("Could not get a certificate:", err)
+			return
+		}
+		st.Cfg.Domain, st.Cfg.AcmeEmail, st.Cfg.CertFile, st.Cfg.KeyFile, st.Cfg.Managed = dom, email, cf, kf, true
+		if st.Cfg.PublicHost == "" {
+			st.Cfg.PublicHost = dom
+		}
+		fmt.Println("Done. The panel renews it automatically before it expires.")
+		saveAndRestart(st)
+	case "2":
+		if len(found) == 0 {
+			return
+		}
+		ch := prompt("Which one (a, b, …)", "a")
+		i := int(ch[0] - 'a')
+		if i < 0 || i >= len(found) {
+			fmt.Println("Invalid choice.")
+			return
+		}
+		f := found[i]
+		st.Cfg.Domain, st.Cfg.CertFile, st.Cfg.KeyFile, st.Cfg.Managed = f.Domain, f.CertFile, f.KeyFile, f.Source == "xray-one"
+		fmt.Printf("Using %s. When %s renews it, the panel picks up the new file by itself.\n", f.Domain, f.Source)
+		saveAndRestart(st)
+	case "3":
+		st.Cfg.CertFile, st.Cfg.KeyFile, st.Cfg.Managed = "", "", false
+		saveAndRestart(st)
+	}
+}
+
+func coreInstallCLI(v string) {
+	line := "curl -fsSL " + installScript + " -o /tmp/xray-install.sh && bash /tmp/xray-install.sh install"
+	if v != "" {
+		line += " --version " + v
+	}
+	cmd := exec.Command("bash", "-c", line)
+	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
+	if err := cmd.Run(); err != nil {
+		fmt.Println("Xray install/update failed:", err)
+		return
+	}
+	svc("enable", "xray")
+	svc("restart", "xray")
+	fmt.Println("Xray is ready:", DetectCore().Version)
+}
+
+// selfUpdate downloads the latest release, checks its SHA256 and swaps the binary.
+func selfUpdate() error {
+	arch := runtime.GOARCH
+	name := "xray-one-linux-" + arch
+	base := "https://github.com/" + repo + "/releases/latest/download/"
+	get := func(u string) ([]byte, error) {
+		c := &http.Client{Timeout: 2 * time.Minute}
+		resp, err := c.Get(u)
+		if err != nil {
+			return nil, err
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != 200 {
+			return nil, fmt.Errorf("%s: %s", u, resp.Status)
+		}
+		return io.ReadAll(resp.Body)
+	}
+	fmt.Println("Downloading", name, "…")
+	bin, err := get(base + name)
+	if err != nil {
+		return err
+	}
+	sums, err := get(base + "SHA256SUMS")
+	if err != nil {
+		return err
+	}
+	sum := sha256.Sum256(bin)
+	if !strings.Contains(string(sums), hex.EncodeToString(sum[:])+"  "+name) {
+		return errors.New("checksum mismatch, update cancelled")
+	}
+	exe, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	exe, _ = filepath.EvalSymlinks(exe)
+	tmp := exe + ".new"
+	if err := os.WriteFile(tmp, bin, 0o755); err != nil {
+		return err
+	}
+	if err := os.Rename(tmp, exe); err != nil {
+		return err
+	}
+	out, _ := run(5*time.Second, exe, "version")
+	fmt.Println("Installed:", out)
+	restartPanel()
+	return nil
+}
+
+func uninstall(dir string) {
+	fmt.Println("This removes the XRay One panel only. Xray and its config stay exactly as they are.")
+	if !yes("Uninstall XRay One?") {
+		return
+	}
+	svc("disable", "--now", "xray-one")
+	os.Remove("/etc/systemd/system/xray-one.service")
+	svc("daemon-reload")
+	if yes("Also delete panel data (" + dir + ": login, client limits, backups, certificates)?") {
+		os.RemoveAll(dir)
+	}
+	if exe, err := os.Executable(); err == nil {
+		os.Remove(exe)
+	}
+	fmt.Println("XRay One removed.")
+}

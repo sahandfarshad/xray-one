@@ -13,7 +13,7 @@ const T = {
     addInbound: "اینباند جدید", addClient: "کلاینت جدید", del: "حذف", save: "ذخیره", cancel: "انصراف", create: "ساختن",
     protocol: "پروتکل", port: "پورت", tag: "تگ (اختیاری)", network: "شبکه", security: "امنیت",
     path: "مسیر (path)", serviceName: "serviceName", serverName: "SNI / serverName", dest: "مقصد REALITY",
-    certFile: "فایل گواهی", keyFile: "فایل کلید",
+    certFile: "فایل گواهی", keyFile: "فایل کلید", pickCert: "گواهی موجود روی سرور",
     name: "نام (ایمیل)", expiryDays: "اعتبار (روز، ۰ = نامحدود)", limitGB: "حجم (GB، ۰ = نامحدود)",
     unlimited: "نامحدود", never: "بدون انقضا", daysLeft: "روز مانده", expired: "منقضی", overLimit: "حجم تمام",
     paused: "متوقف شده", link: "لینک", sub: "سابسکریپشن", copy: "کپی", copied: "کپی شد",
@@ -23,7 +23,7 @@ const T = {
     confirmApi: "یک اینباند API روی 127.0.0.1 و قانون روتینگش به کانفیگ اضافه می‌شود. ادامه؟",
     confirmRestore: "کانفیگ فعلی با این بکاپ جایگزین شود؟ (از فعلی هم بکاپ گرفته می‌شود)",
     linksTitle: "آدرس لینک‌ها", publicHost: "دامنه یا IP سرور برای لینک‌ها", subBase: "آدرس پایه‌ی سابسکریپشن (اختیاری)",
-    sslHint: "SSL پنل و سابسکریپشن از طریق `xray-one setup` تنظیم می‌شود (Let's Encrypt خودکار یا فایل گواهی).",
+    sslHint: "SSL پنل و سابسکریپشن از منوی SSH تنظیم می‌شود: دستور xray-one و گزینه‌ی ۴.",
     backups: "بکاپ‌ها", restore: "بازگردانی", rawConfig: "کانفیگ خام (فقط خواندنی)", show: "نمایش",
     saved: "ذخیره شد", done: "انجام شد", jobRunning: "در حال اجرا…", jobOk: "با موفقیت تمام شد", jobFail: "خطا خورد",
     up: "آپلود", down: "دانلود", edit: "ویرایش", setExpiry: "تغییر اعتبار", setLimit: "تغییر حجم",
@@ -41,7 +41,7 @@ const T = {
     addInbound: "New inbound", addClient: "New client", del: "Delete", save: "Save", cancel: "Cancel", create: "Create",
     protocol: "Protocol", port: "Port", tag: "Tag (optional)", network: "Network", security: "Security",
     path: "Path", serviceName: "serviceName", serverName: "SNI / serverName", dest: "REALITY dest",
-    certFile: "Certificate file", keyFile: "Key file",
+    certFile: "Certificate file", keyFile: "Key file", pickCert: "Certificate on this server",
     name: "Name (email)", expiryDays: "Valid for (days, 0 = forever)", limitGB: "Traffic (GB, 0 = unlimited)",
     unlimited: "Unlimited", never: "No expiry", daysLeft: "days left", expired: "Expired", overLimit: "Out of traffic",
     paused: "Paused", link: "Link", sub: "Subscription", copy: "Copy", copied: "Copied",
@@ -51,7 +51,7 @@ const T = {
     confirmApi: "This adds an API inbound on 127.0.0.1 and its routing rule to the config. Continue?",
     confirmRestore: "Replace the current config with this backup? (the current one is backed up too)",
     linksTitle: "Link address", publicHost: "Server domain or IP for links", subBase: "Subscription base URL (optional)",
-    sslHint: "Panel and subscription SSL are set with `xray-one setup` (automatic Let's Encrypt or certificate files).",
+    sslHint: "Panel and subscription SSL are set in the SSH menu: run xray-one, option 4.",
     backups: "Backups", restore: "Restore", rawConfig: "Raw config (read-only)", show: "Show",
     saved: "Saved", done: "Done", jobRunning: "Running…", jobOk: "Finished successfully", jobFail: "Failed",
     up: "Up", down: "Down", edit: "Edit", setExpiry: "Change validity", setLimit: "Change traffic",
@@ -220,11 +220,13 @@ function openModal(html) { $("#modalBody").innerHTML = html; $("#modal").classLi
 function closeModal() { $("#modal").classList.add("hidden"); $("#modalBody").innerHTML = ""; }
 $("#modal").addEventListener("click", (e) => { if (e.target.id === "modal" || e.target.dataset.close !== undefined) closeModal(); });
 
-$("#addInboundBtn").onclick = () => {
+$("#addInboundBtn").onclick = guard(async () => {
+  const [fp, certs] = await Promise.all([api("GET", "api/freeport"), api("GET", "api/certs")]);
+  const certOpts = certs.map((c, i) => `<option value="${i}">${esc(c.domain)} · ${esc(c.source)}</option>`).join("");
   openModal(`<h3>${t("addInbound")}</h3>
   <form id="ibForm" class="form">
     <label>${t("protocol")}<select name="protocol"><option>vless</option><option>vmess</option><option>trojan</option><option value="shadowsocks">shadowsocks 2022</option></select></label>
-    <label>${t("port")}<input name="port" type="number" min="1" max="65535" value="${10000 + Math.floor(Math.random() * 50000)}" required></label>
+    <label>${t("port")}<input name="port" type="number" min="1" max="65535" value="${fp.port || ""}" required></label>
     <label>${t("network")}<select name="network"><option>tcp</option><option>ws</option><option>grpc</option><option>xhttp</option><option>httpupgrade</option></select></label>
     <label>${t("security")}<select name="security"><option>reality</option><option>tls</option><option>none</option></select></label>
     <label>${t("tag")}<input name="tag"></label>
@@ -232,6 +234,7 @@ $("#addInboundBtn").onclick = () => {
     <label data-show="grpc">${t("serviceName")}<input name="serviceName"></label>
     <label data-show="sni">${t("serverName")}<input name="serverName" placeholder="www.microsoft.com"></label>
     <label data-show="reality">${t("dest")}<input name="dest" placeholder="www.microsoft.com:443"></label>
+    ${certs.length ? `<label data-show="tls">${t("pickCert")}<select name="certPick"><option value="">—</option>${certOpts}</select></label>` : ""}
     <label data-show="tls">${t("certFile")}<input name="certFile" placeholder="/etc/letsencrypt/live/…/fullchain.pem"></label>
     <label data-show="tls">${t("keyFile")}<input name="keyFile" placeholder="/etc/letsencrypt/live/…/privkey.pem"></label>
   </form>
@@ -245,13 +248,20 @@ $("#addInboundBtn").onclick = () => {
     [...f.security.options].forEach((o) => (o.disabled = o.value === "reality" && !["vless", "trojan"].includes(proto)));
     if (f.security.selectedOptions[0].disabled) f.security.value = "tls";
   };
-  f.addEventListener("change", sync); sync();
+  f.addEventListener("change", (e) => {
+    if (e.target.name === "certPick" && e.target.value !== "") {
+      const c = certs[+e.target.value];
+      f.certFile.value = c.certFile; f.keyFile.value = c.keyFile; f.serverName.value = c.domain;
+    }
+    sync();
+  });
+  sync();
   $("#ibCreate").onclick = async () => {
-    const d = Object.fromEntries(new FormData(f)); d.port = +d.port;
+    const d = Object.fromEntries(new FormData(f)); d.port = +d.port; delete d.certPick;
     try { await api("POST", "api/inbounds", d); closeModal(); toast(t("done")); refreshInbounds(); }
     catch (e) { $("#ibErr").textContent = e.message; }
   };
-};
+});
 
 function openAddClient(ib) {
   openModal(`<h3>${t("addClient")} · <span class="mono">${esc(ib.tag || ib.id)}</span></h3>
@@ -272,7 +282,8 @@ function openAddClient(ib) {
 }
 
 function subURL(m) {
-  const base = state.status.settings.subBase || (location.origin + location.pathname.replace(/[^/]*$/, "").replace(/\/$/, ""));
+  const s = state.status.settings;
+  const base = (s.subBase || s.panelURL || (location.origin + location.pathname.replace(/[^/]*$/, ""))).replace(/\/$/, "");
   return base + "/sub/" + m.subToken;
 }
 

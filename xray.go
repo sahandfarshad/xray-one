@@ -68,6 +68,7 @@ func DetectCore() Core {
 		}
 	}
 	c.Active, _ = run(5*time.Second, "systemctl", "is-active", c.Service)
+	procCfg, procDir := runningXrayArgs()
 	c.ConfigPath = defaultConfig
 	if exe, err := run(5*time.Second, "systemctl", "show", c.Service, "-p", "ExecStart", "--value"); err == nil {
 		if m := reArgv.FindStringSubmatch(exe); m != nil {
@@ -92,6 +93,10 @@ func DetectCore() Core {
 				}
 			}
 		}
+	}
+	// a running xray process is the most reliable source (custom units, Muse99, screen…)
+	if procCfg != "" || procDir != "" {
+		c.ConfigPath, c.ConfDir = orDefault(procCfg, c.ConfigPath), procDir
 	}
 	if p := os.Getenv("XRAY_ONE_XRAY_CONFIG"); p != "" {
 		c.ConfigPath = p
@@ -629,4 +634,45 @@ func statsQuery(core Core, addr string) (map[string][2]int64, error) {
 		m[p[1]] = cur
 	}
 	return m, nil
+}
+
+// runningXrayArgs reads -config / -confdir from a running xray process.
+func runningXrayArgs() (cfg, dir string) {
+	procs, _ := filepath.Glob("/proc/[0-9]*/cmdline")
+	for _, p := range procs {
+		data, err := os.ReadFile(p)
+		if err != nil || len(data) == 0 {
+			continue
+		}
+		args := strings.Split(strings.TrimRight(string(data), "\x00"), "\x00")
+		if filepath.Base(args[0]) != "xray" {
+			continue
+		}
+		for i := 1; i < len(args); i++ {
+			a := args[i]
+			next := ""
+			if i+1 < len(args) {
+				next = args[i+1]
+			}
+			switch {
+			case a == "-config" || a == "-c" || a == "--config":
+				cfg = next
+			case strings.HasPrefix(a, "-config="):
+				cfg = strings.TrimPrefix(a, "-config=")
+			case a == "-confdir" || a == "--confdir":
+				dir = next
+			case strings.HasPrefix(a, "-confdir="):
+				dir = strings.TrimPrefix(a, "-confdir=")
+			}
+		}
+		if cfg != "" || dir != "" {
+			if cfg != "" && !filepath.IsAbs(cfg) {
+				if cwd, err := os.Readlink(filepath.Join(filepath.Dir(p), "cwd")); err == nil {
+					cfg = filepath.Join(cwd, cfg)
+				}
+			}
+			return
+		}
+	}
+	return "", ""
 }

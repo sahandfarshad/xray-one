@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/fs"
 	"log"
 	"net"
@@ -169,6 +170,10 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("GET /api/backups", a.api(func(w http.ResponseWriter, r *http.Request) { writeJSONResp(w, 200, a.cfg.Backups()) }))
 	mux.HandleFunc("POST /api/backups/restore", a.api(a.handleRestore))
 	mux.HandleFunc("POST /api/settings", a.api(a.handleSettings))
+	mux.HandleFunc("GET /api/freeport", a.api(func(w http.ResponseWriter, r *http.Request) {
+		writeJSONResp(w, 200, map[string]int{"port": suggestPort()})
+	}))
+	mux.HandleFunc("GET /api/certs", a.api(func(w http.ResponseWriter, r *http.Request) { writeJSONResp(w, 200, FindCerts(a.store.dir)) }))
 	mux.HandleFunc("GET /sub/{token}", a.handleSub)
 
 	var h http.Handler = mux
@@ -221,7 +226,7 @@ func (a *App) handleStatus(w http.ResponseWriter, r *http.Request) {
 	cfg := a.store.Cfg
 	writeJSONResp(w, 200, map[string]any{
 		"core": DetectCore(), "version": version, "job": a.job.Snapshot(),
-		"settings": map[string]string{"publicHost": cfg.PublicHost, "subBase": cfg.SubBase, "domain": cfg.Domain, "listen": cfg.Listen},
+		"settings": map[string]string{"publicHost": cfg.PublicHost, "subBase": cfg.SubBase, "domain": cfg.Domain, "listen": cfg.Listen, "panelURL": a.PanelURL()},
 	})
 }
 
@@ -280,6 +285,10 @@ func (a *App) handleAddInbound(w http.ResponseWriter, r *http.Request) {
 	var n NewInbound
 	if err := json.NewDecoder(r.Body).Decode(&n); err != nil {
 		fail(w, 400, err)
+		return
+	}
+	if !portFree(n.Port) {
+		fail(w, 400, fmt.Errorf("port %d is already in use on this server", n.Port))
 		return
 	}
 	err := a.cfg.Mutate(func(root *OMap) error {

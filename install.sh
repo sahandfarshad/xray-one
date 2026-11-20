@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# XRay One installer: installs the panel only. It never installs, replaces or
-# reconfigures Xray itself; the panel can install Xray later from its UI.
+# XRay One installer. Asks nothing: it installs the panel with a free random
+# port, a secret path and a random password, then opens the SSH menu.
+# It never installs, replaces or reconfigures Xray itself.
 set -euo pipefail
 REPO="sahandfarshad/xray-one"
 BIN=/usr/local/bin/xray-one
@@ -11,14 +12,15 @@ case "$(uname -m)" in
   *) echo "Unsupported architecture: $(uname -m)"; exit 1 ;;
 esac
 VER="${1:-latest}"
-if [ "$VER" = "latest" ]; then
-  URL="https://github.com/$REPO/releases/latest/download/xray-one-linux-$ARCH"
-else
-  URL="https://github.com/$REPO/releases/download/$VER/xray-one-linux-$ARCH"
-fi
-echo "Downloading $URL"
-curl -fL "$URL" -o "$BIN.tmp"
-chmod +x "$BIN.tmp" && mv "$BIN.tmp" "$BIN"
+if [ "$VER" = "latest" ]; then BASE="https://github.com/$REPO/releases/latest/download"
+else BASE="https://github.com/$REPO/releases/download/$VER"; fi
+
+TMP=$(mktemp -d)
+curl -fsSL "$BASE/xray-one-linux-$ARCH" -o "$TMP/xray-one-linux-$ARCH"
+curl -fsSL "$BASE/SHA256SUMS" -o "$TMP/SHA256SUMS"
+(cd "$TMP" && grep " xray-one-linux-$ARCH\$" SHA256SUMS | sha256sum -c --quiet -) || { echo "Checksum mismatch"; exit 1; }
+install -m 755 "$TMP/xray-one-linux-$ARCH" "$BIN"
+rm -rf "$TMP"
 
 cat > /etc/systemd/system/xray-one.service <<'UNIT'
 [Unit]
@@ -37,11 +39,10 @@ WantedBy=multi-user.target
 UNIT
 
 systemctl daemon-reload
-if [ ! -f /etc/xray-one/panel.json ] || ! grep -q passHash /etc/xray-one/panel.json; then
-  "$BIN" setup
-fi
-systemctl enable --now xray-one
+"$BIN" init
+systemctl enable xray-one >/dev/null 2>&1
 systemctl restart xray-one
-echo
-"$BIN" detect || true
-echo "XRay One is running. Check: systemctl status xray-one"
+sleep 1
+if [ -t 0 ] || [ -e /dev/tty ]; then
+  "$BIN" menu </dev/tty || true
+fi

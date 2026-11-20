@@ -37,6 +37,8 @@ type PanelConfig struct {
 	Domain     string `json:"domain"`
 	CertFile   string `json:"certFile"`
 	KeyFile    string `json:"keyFile"`
+	Managed    bool   `json:"managed"` // certificate issued and renewed by XRay One
+	AcmeEmail  string `json:"acmeEmail"`
 }
 
 type Store struct {
