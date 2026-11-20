@@ -174,6 +174,13 @@ func (a *App) Routes() http.Handler {
 		writeJSONResp(w, 200, map[string]int{"port": suggestPort()})
 	}))
 	mux.HandleFunc("GET /api/certs", a.api(func(w http.ResponseWriter, r *http.Request) { writeJSONResp(w, 200, FindCerts(a.store.dir)) }))
+	mux.HandleFunc("GET /api/presets", a.api(a.handlePresets))
+	mux.HandleFunc("POST /api/presets", a.api(a.handleCreatePresets))
+	mux.HandleFunc("POST /api/relays", a.api(a.handleAddRelay))
+	mux.HandleFunc("DELETE /api/relays", a.api(a.handleDelRelay))
+	mux.HandleFunc("POST /api/allsub/reset", a.api(func(w http.ResponseWriter, r *http.Request) {
+		writeJSONResp(w, 200, map[string]string{"allToken": a.store.ResetAllToken()})
+	}))
 	mux.HandleFunc("GET /sub/{token}", a.handleSub)
 
 	var h http.Handler = mux
@@ -227,6 +234,7 @@ func (a *App) handleStatus(w http.ResponseWriter, r *http.Request) {
 	writeJSONResp(w, 200, map[string]any{
 		"core": DetectCore(), "version": version, "job": a.job.Snapshot(),
 		"settings": map[string]string{"publicHost": cfg.PublicHost, "subBase": cfg.SubBase, "domain": cfg.Domain, "listen": cfg.Listen, "panelURL": a.PanelURL()},
+		"allToken": a.store.GetAllToken(),
 	})
 }
 
@@ -249,6 +257,9 @@ func (a *App) handleInbounds(w http.ResponseWriter, r *http.Request) {
 		iv := InboundView{ID: inboundID(ib, i), Tag: asStr(ib.Get("tag")), Protocol: asStr(ib.Get("protocol")),
 			Port: asStr(ib.Get("port")), Listen: asStr(ib.Get("listen")), Network: network, Security: security,
 			Managed: supportsClients(ib), System: atag != "" && asStr(ib.Get("tag")) == atag, Clients: []ClientView{}}
+		relays := a.store.RelaysOf(iv.ID)
+		iv.Relays = relays
+		iv.Single = singleUserSS(ib, host, Relay{})
 		for _, cv := range clientsOf(ib) {
 			c := asMap(cv)
 			if c == nil {
@@ -261,8 +272,9 @@ func (a *App) handleInbounds(w http.ResponseWriter, r *http.Request) {
 				meta.Saved = nil
 				seen[email] = true
 			}
+			link, rl := ClientLinks(ib, c, host, relays)
 			iv.Clients = append(iv.Clients, ClientView{Email: email, Secret: clientSecret(iv.Protocol, c),
-				Flow: asStr(c.Get("flow")), Link: ClientLink(ib, c, host), Meta: meta})
+				Flow: asStr(c.Get("flow")), Link: link, Relays: rl, Meta: meta})
 		}
 		// clients XRay One paused (expired / over limit) are kept in state
 		for _, m := range a.store.All() {
@@ -325,6 +337,7 @@ func (a *App) handleDelInbound(w http.ResponseWriter, r *http.Request) {
 		fail(w, 400, err)
 		return
 	}
+	_ = a.store.EditRelays(func(m map[string][]Relay) { delete(m, id) })
 	writeJSONResp(w, 200, map[string]bool{"ok": true})
 }
 
@@ -547,7 +560,12 @@ func (a *App) handleSettings(w http.ResponseWriter, r *http.Request) {
 
 // handleSub serves a client's subscription: every inbound the name is on.
 func (a *App) handleSub(w http.ResponseWriter, r *http.Request) {
-	m := a.store.ByToken(r.PathValue("token"))
+	tok := r.PathValue("token")
+	if tok != "" && tok == a.store.GetAllToken() {
+		a.handleAllSub(w, r)
+		return
+	}
+	m := a.store.ByToken(tok)
 	if m == nil {
 		http.NotFound(w, r)
 		return
@@ -565,7 +583,8 @@ func (a *App) handleSub(w http.ResponseWriter, r *http.Request) {
 			for _, cv := range clientsOf(ib) {
 				c := asMap(cv)
 				if asStr(c.Get("email")) == m.Email {
-					links = append(links, ClientLink(ib, c, host))
+					l, rl := ClientLinks(ib, c, host, a.store.RelaysOf(asStr(ib.Get("tag"))))
+					links = append(append(links, l), rl...)
 				}
 			}
 		}
@@ -574,6 +593,46 @@ func (a *App) handleSub(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Profile-Title", "base64:"+base64.StdEncoding.EncodeToString([]byte("XRay One · "+m.Email)))
 	w.Header().Set("Profile-Update-Interval", "12")
 	w.Header().Set("Subscription-Userinfo", "upload="+itoa(m.Up)+"; download="+itoa(m.Down)+"; total="+itoa(m.LimitBytes)+"; expire="+itoa(m.ExpiryUnix))
+	_, _ = w.Write([]byte(base64.StdEncoding.EncodeToString([]byte(strings.Join(links, "\n")))))
+}
+
+// handleAllSub serves every config on the server (all inbounds, all active
+// clients, plus relay variants) in one subscription.
+func (a *App) handleAllSub(w http.ResponseWriter, r *http.Request) {
+	root, _, err := a.cfg.Load()
+	if err != nil {
+		http.Error(w, "unavailable", 503)
+		return
+	}
+	host := a.host(r)
+	atag := apiTag(root)
+	var links []string
+	for i, v := range asArr(root.Get("inbounds")) {
+		ib := asMap(v)
+		if ib == nil || (atag != "" && asStr(ib.Get("tag")) == atag) {
+			continue
+		}
+		relays := a.store.RelaysOf(inboundID(ib, i))
+		if l := singleUserSS(ib, host, Relay{}); l != "" {
+			links = append(links, l)
+			for _, rl := range relays {
+				links = append(links, singleUserSS(ib, host, rl))
+			}
+		}
+		for _, cv := range clientsOf(ib) {
+			c := asMap(cv)
+			if c == nil {
+				continue
+			}
+			l, rl := ClientLinks(ib, c, host, relays)
+			if l != "" {
+				links = append(append(links, l), rl...)
+			}
+		}
+	}
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("Profile-Title", "base64:"+base64.StdEncoding.EncodeToString([]byte("XRay One · all")))
+	w.Header().Set("Profile-Update-Interval", "12")
 	_, _ = w.Write([]byte(base64.StdEncoding.EncodeToString([]byte(strings.Join(links, "\n")))))
 }
 

@@ -8,7 +8,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"golang.org/x/crypto/curve25519"
@@ -152,18 +154,61 @@ func linkPort(ib *OMap) string {
 
 // ClientLink builds the share link of one client on one inbound.
 func ClientLink(ib *OMap, c *OMap, host string) string {
+	return clientLinkAt(ib, c, host, Relay{})
+}
+
+// ClientLinks returns the direct link followed by one link per relay.
+func ClientLinks(ib *OMap, c *OMap, host string, relays []Relay) (string, []string) {
+	var rl []string
+	for _, r := range relays {
+		rl = append(rl, clientLinkAt(ib, c, host, r))
+	}
+	return clientLinkAt(ib, c, host, Relay{}), rl
+}
+
+// singleUserSS gives the link of a shadowsocks inbound without a clients list.
+func singleUserSS(ib *OMap, host string, r Relay) string {
+	if asStr(ib.Get("protocol")) != "shadowsocks" || len(clientsOf(ib)) > 0 || path(ib, "settings", "clients") != nil {
+		return ""
+	}
+	pass := pathStr(ib, "settings", "password")
+	if pass == "" {
+		return ""
+	}
+	return clientLinkAt(ib, om("password", pass, "email", "", "_single", true), host, r)
+}
+
+// clientLinkAt builds a link that connects to relay r (when set) while TLS
+// SNI / REALITY / host headers stay those of the real server.
+func clientLinkAt(ib *OMap, c *OMap, host string, r Relay) string {
 	if host == "" {
 		host = "SERVER_IP"
 	}
 	proto := asStr(ib.Get("protocol"))
 	email := asStr(c.Get("email"))
-	name := url.PathEscape(email + "-" + asStr(ib.Get("tag")))
+	label := strings.Trim(email+"-"+asStr(ib.Get("tag")), "-")
 	port := linkPort(ib)
-	hp := host + ":" + port
-	if strings.Contains(host, ":") && !strings.HasPrefix(host, "[") {
-		hp = "[" + host + "]:" + port
+	addr := host
+	if r.Address != "" {
+		addr = r.Address
+		if r.Port > 0 {
+			port = strconv.Itoa(r.Port)
+		}
+		label += "-" + orDefault(r.Name, "relay")
+	}
+	name := url.PathEscape(label)
+	hp := addr + ":" + port
+	if strings.Contains(addr, ":") && !strings.HasPrefix(addr, "[") {
+		hp = "[" + addr + "]:" + port
 	}
 	sp := readStream(ib, host)
+	if r.Address != "" && sp.host == "" && (sp.network == "ws" || sp.network == "httpupgrade" || sp.network == "xhttp") {
+		if sp.security == "tls" && sp.sni != "" {
+			sp.host = sp.sni
+		} else if isDomain(host) {
+			sp.host = host
+		}
+	}
 	switch proto {
 	case "vless":
 		q := url.Values{}
@@ -186,7 +231,7 @@ func ClientLink(ib *OMap, c *OMap, host string) string {
 		if sp.network == "grpc" {
 			pth = sp.serviceName
 		}
-		obj := map[string]string{"v": "2", "ps": email + "-" + asStr(ib.Get("tag")), "add": host, "port": port,
+		obj := map[string]string{"v": "2", "ps": label, "add": addr, "port": port,
 			"id": asStr(c.Get("id")), "aid": "0", "scy": "auto", "net": sp.network, "type": orDefault(sp.headerType, "none"),
 			"host": sp.host, "path": pth, "tls": tls, "sni": sp.sni, "fp": sp.fp}
 		b, _ := json.Marshal(obj)
@@ -195,7 +240,7 @@ func ClientLink(ib *OMap, c *OMap, host string) string {
 		method := orDefault(asStr(c.Get("method")), pathStr(ib, "settings", "method"))
 		pass := asStr(c.Get("password"))
 		if strings.HasPrefix(method, "2022-") {
-			if sp := pathStr(ib, "settings", "password"); sp != "" {
+			if sp := pathStr(ib, "settings", "password"); sp != "" && c.Get("_single") == nil {
 				pass = sp + ":" + pass
 			}
 			return "ss://" + url.PathEscape(method) + ":" + url.PathEscape(pass) + "@" + hp + "#" + name
@@ -204,4 +249,8 @@ func ClientLink(ib *OMap, c *OMap, host string) string {
 		return "ss://" + ui + "@" + hp + "#" + name
 	}
 	return ""
+}
+
+func isDomain(h string) bool {
+	return h != "" && h != "SERVER_IP" && net.ParseIP(strings.Trim(h, "[]")) == nil
 }

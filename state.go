@@ -46,6 +46,43 @@ type Store struct {
 	dir     string
 	Cfg     PanelConfig            `json:"-"`
 	Clients map[string]*ClientMeta `json:"clients"`
+	// AllToken is the secret of the subscription that carries every config.
+	AllToken string `json:"allToken"`
+	// Relays: extra addresses (relay / CDN IPs) per inbound tag.
+	Relays map[string][]Relay `json:"relays"`
+}
+
+type Relay struct {
+	Address string `json:"address"`
+	Port    int    `json:"port,omitempty"` // 0 = same as inbound
+	Name    string `json:"name,omitempty"`
+}
+
+func (s *Store) RelaysOf(tag string) []Relay {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]Relay{}, s.Relays[tag]...)
+}
+
+func (s *Store) EditRelays(fn func(m map[string][]Relay)) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	fn(s.Relays)
+	return s.saveLocked()
+}
+
+func (s *Store) GetAllToken() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.AllToken
+}
+
+func (s *Store) ResetAllToken() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.AllToken = randHex(16)
+	_ = s.saveLocked()
+	return s.AllToken
 }
 
 func OpenStore(dir string) (*Store, error) {
@@ -65,6 +102,13 @@ func OpenStore(dir string) (*Store, error) {
 		if s.Clients == nil {
 			s.Clients = map[string]*ClientMeta{}
 		}
+	}
+	if s.Relays == nil {
+		s.Relays = map[string][]Relay{}
+	}
+	if s.AllToken == "" {
+		s.AllToken = randHex(16)
+		_ = s.saveLocked()
 	}
 	return s, nil
 }

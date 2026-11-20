@@ -292,6 +292,7 @@ type ClientView struct {
 	Secret   string      `json:"secret"`
 	Flow     string      `json:"flow,omitempty"`
 	Link     string      `json:"link"`
+	Relays   []string    `json:"relayLinks,omitempty"`
 	Meta     *ClientMeta `json:"meta,omitempty"`
 	Disabled bool        `json:"disabled"`
 }
@@ -307,6 +308,8 @@ type InboundView struct {
 	Managed  bool         `json:"managed"` // supports clients
 	System   bool         `json:"system"`  // api inbound etc.
 	Clients  []ClientView `json:"clients"`
+	Relays   []Relay      `json:"relays"`
+	Single   string       `json:"singleLink,omitempty"` // single-user shadowsocks
 }
 
 func inboundID(ib *OMap, i int) string {
@@ -459,6 +462,8 @@ type NewInbound struct {
 	CertFile    string `json:"certFile"`
 	KeyFile     string `json:"keyFile"`
 	Dest        string `json:"dest"`
+	Method      string `json:"method"` // shadowsocks
+	Flow        string `json:"-"`
 }
 
 func BuildInbound(root *OMap, n NewInbound) (*OMap, error) {
@@ -481,7 +486,16 @@ func BuildInbound(root *OMap, n NewInbound) (*OMap, error) {
 	case "vmess", "trojan":
 		settings = om("clients", []any{})
 	case "shadowsocks":
-		settings = om("method", "2022-blake3-aes-128-gcm", "password", randB64(16), "clients", []any{}, "network", "tcp,udp")
+		method := orDefault(n.Method, "2022-blake3-aes-128-gcm")
+		klen := 32
+		switch method {
+		case "2022-blake3-aes-128-gcm":
+			klen = 16
+		case "2022-blake3-aes-256-gcm", "2022-blake3-chacha20-poly1305":
+		default:
+			return nil, errors.New("unsupported shadowsocks method")
+		}
+		settings = om("method", method, "password", randB64(klen), "clients", []any{}, "network", "tcp,udp")
 	default:
 		return nil, errors.New("unsupported protocol")
 	}

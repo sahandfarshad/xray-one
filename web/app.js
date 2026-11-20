@@ -27,6 +27,13 @@ const T = {
     backups: "بکاپ‌ها", restore: "بازگردانی", rawConfig: "کانفیگ خام (فقط خواندنی)", show: "نمایش",
     saved: "ذخیره شد", done: "انجام شد", jobRunning: "در حال اجرا…", jobOk: "با موفقیت تمام شد", jobFail: "خطا خورد",
     up: "آپلود", down: "دانلود", edit: "ویرایش", setExpiry: "تغییر اعتبار", setLimit: "تغییر حجم",
+    allSub: "سابسکریپشن همه‌ی کانفیگ‌ها", newLink: "لینک جدید", confirmNewLink: "لینک فعلی سابسکریپشن از کار می‌افتد و لینک تازه ساخته می‌شود. ادامه؟",
+    quick: "ساخت خودکار", quickTitle: "ساخت خودکار کانفیگ‌ها", quickHint: "هر نوعی که تیک بزنی روی یک پورت آزاد ساخته می‌شود و یک کلاینت مشترک می‌گیرد، پس سابسکریپشن همان کلاینت همه را دارد.",
+    gReality: "REALITY (بدون دامنه و گواهی)", gTls: "TLS (با گواهی دامنه)", gPlain: "بدون TLS (برای relay یا CDN روی HTTP)",
+    needCert: "اول SSL را از منوی SSH تنظیم کن", exists: "داری", all: "همه", none: "هیچ", clientName: "نام کلاینت مشترک",
+    createN: "ساختن", relay: "Relay", addRelay: "افزودن Relay", relaySel: "Relay برای انتخاب‌شده‌ها", relayAddr: "IP یا دامنه‌ی relay",
+    relayPort: "پورت relay (خالی = همان پورت اینباند)", relayName: "اسم (اختیاری)", relayHint: "لینک‌ها یک نسخه‌ی اضافه با این آدرس می‌گیرند؛ SNI و REALITY همان سرور اصلی می‌ماند.",
+    relayLinks: "لینک‌های relay", singleUser: "تک‌کاربره", confirmDelRelay: "این relay حذف شود؟",
   },
   en: {
     loginHint: "Sign in to manage the Xray core.", user: "Username", pass: "Password", signIn: "Sign in",
@@ -55,13 +62,20 @@ const T = {
     backups: "Backups", restore: "Restore", rawConfig: "Raw config (read-only)", show: "Show",
     saved: "Saved", done: "Done", jobRunning: "Running…", jobOk: "Finished successfully", jobFail: "Failed",
     up: "Up", down: "Down", edit: "Edit", setExpiry: "Change validity", setLimit: "Change traffic",
+    allSub: "Subscription with every config", newLink: "New link", confirmNewLink: "The current subscription link stops working and a new one is made. Continue?",
+    quick: "Quick setup", quickTitle: "Create configs automatically", quickHint: "Every type you tick gets its own free port and one shared client, so that client's subscription carries them all.",
+    gReality: "REALITY (no domain or certificate needed)", gTls: "TLS (uses your domain certificate)", gPlain: "No TLS (for relays or CDN over HTTP)",
+    needCert: "Set SSL in the SSH menu first", exists: "have it", all: "All", none: "None", clientName: "Shared client name",
+    createN: "Create", relay: "Relay", addRelay: "Add relay", relaySel: "Relay for selected", relayAddr: "Relay IP or domain",
+    relayPort: "Relay port (empty = inbound port)", relayName: "Name (optional)", relayHint: "Links get an extra copy with this address; SNI and REALITY stay those of the real server.",
+    relayLinks: "Relay links", singleUser: "single user", confirmDelRelay: "Remove this relay?",
   },
 };
 let lang = localStorage.getItem("xo_lang") || "fa";
 const t = (k) => (T[lang] && T[lang][k]) || T.en[k] || k;
 const $ = (s, el = document) => el.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-let state = { status: null, inbounds: [], host: "", job: null, view: "overview" };
+let state = { status: null, inbounds: [], host: "", job: null, view: "overview", sel: new Set() };
 
 function applyLang() {
   document.documentElement.lang = lang;
@@ -124,7 +138,10 @@ async function boot() {
 
 async function refreshStatus() { state.status = await api("GET", "api/status"); render(); }
 async function refreshInbounds() {
-  try { const r = await api("GET", "api/inbounds"); state.inbounds = r.inbounds; state.host = r.host; }
+  try {
+    const r = await api("GET", "api/inbounds"); state.inbounds = r.inbounds; state.host = r.host;
+    const ids = new Set(r.inbounds.map((i) => i.id)); [...state.sel].forEach((x) => ids.has(x) || state.sel.delete(x));
+  }
   catch (e) { state.inbounds = []; }
   render();
 }
@@ -134,8 +151,33 @@ function render() {
   document.querySelectorAll("#tabs button").forEach((b) => b.classList.toggle("active", b.dataset.view === state.view));
   document.querySelectorAll(".view").forEach((v) => v.classList.toggle("hidden", v.id !== "view-" + state.view));
   if (!state.status) return;
-  renderOverview(); renderInbounds();
+  renderSubBar(); renderOverview(); renderInbounds();
 }
+
+function baseURL() {
+  const s = state.status.settings;
+  return (s.subBase || s.panelURL || (location.origin + location.pathname.replace(/[^/]*$/, ""))).replace(/\/$/, "");
+}
+function allSubURL() { return baseURL() + "/sub/" + state.status.allToken; }
+function renderSubBar() {
+  const ok = state.status.allToken && state.inbounds.some((i) => !i.system);
+  $("#subBar").classList.toggle("hidden", !ok);
+  if (ok) $("#allSubUrl").textContent = allSubURL();
+  const n = state.sel.size;
+  $("#relaySelBtn").textContent = t("relaySel") + (n ? " (" + n + ")" : "");
+  $("#relaySelBtn").disabled = !n;
+}
+async function copyText(v) {
+  try { await navigator.clipboard.writeText(v); }
+  catch { const i = document.createElement("textarea"); i.value = v; document.body.appendChild(i); i.select(); document.execCommand("copy"); i.remove(); }
+  toast(t("copied"));
+}
+$("#allSubCopy").onclick = () => copyText(allSubURL());
+$("#allSubQr").onclick = () => openModal(`<h3>${t("allSub")}</h3>${copyRow(allSubURL())}<img class="qr" alt="QR" src="api/qr?text=${encodeURIComponent(allSubURL())}"><div class="actions"><button class="btn" data-close>${t("cancel")}</button></div>`);
+$("#allSubReset").onclick = guard(async () => {
+  if (!confirm(t("confirmNewLink"))) return;
+  const r = await api("POST", "api/allsub/reset"); state.status.allToken = r.allToken; renderSubBar(); toast(t("done"));
+});
 
 function renderOverview() {
   const c = state.status.core;
@@ -195,17 +237,27 @@ function renderInbounds() {
         }).join("")}</div>`;
     return `<div class="card">
       <div class="ib-head">
-        <div class="ib-title"><b>${esc(ib.tag || ib.id)}</b>${pills}<span class="pill">:${esc(ib.port)}</span>
+        <div class="ib-title">${ib.system ? "" : `<input type="checkbox" data-sel="${esc(ib.id)}" ${state.sel.has(ib.id) ? "checked" : ""}>`}<b>${esc(ib.tag || ib.id)}</b>${pills}<span class="pill">:${esc(ib.port)}</span>
           ${ib.system ? `<span class="pill gray">${t("system")}</span>` : !ib.managed ? `<span class="pill gray">${t("unmanaged")}</span>` : ""}</div>
         <div class="actions">
           ${ib.managed ? `<button class="btn small primary" data-act="addClient" data-i="${idx}">${t("addClient")}</button>` : ""}
+          ${ib.system ? "" : `<button class="btn small" data-act="relay" data-i="${idx}">+ ${t("relay")}</button>`}
           ${ib.system ? "" : `<button class="btn small danger" data-act="delInbound" data-i="${idx}">${t("del")}</button>`}
         </div>
-      </div>${clients}</div>`;
+      </div>
+      ${ib.relays && ib.relays.length ? `<div class="relays"><span class="muted">${t("relay")}:</span>${ib.relays.map((r, ri) =>
+        `<span class="chip">${esc((r.name ? r.name + " · " : "") + r.address + (r.port ? ":" + r.port : ""))}<button title="${t("del")}" data-act="delRelay" data-i="${idx}" data-r="${ri}">×</button></span>`).join("")}</div>` : ""}
+      ${ib.singleLink ? `<div class="clients"><p class="muted">${t("singleUser")}</p>${copyRow(ib.singleLink)}</div>` : ""}
+      ${clients}</div>`;
   }).join("");
 }
 
+$("#inboundList").addEventListener("change", (e) => {
+  const id = e.target.dataset.sel; if (id === undefined) return;
+  e.target.checked ? state.sel.add(id) : state.sel.delete(id); renderSubBar();
+});
 $("#inboundList").addEventListener("click", guard(async (e) => {
+  const cp = e.target.closest("[data-copy]"); if (cp) { copyText(cp.dataset.copy); return; }
   const b = e.target.closest("button[data-act]"); if (!b) return;
   const ib = state.inbounds[+b.dataset.i];
   if (b.dataset.act === "delInbound") {
@@ -213,12 +265,22 @@ $("#inboundList").addEventListener("click", guard(async (e) => {
     await api("DELETE", "api/inbounds?id=" + encodeURIComponent(ib.id)); toast(t("done")); refreshInbounds();
   } else if (b.dataset.act === "addClient") openAddClient(ib);
   else if (b.dataset.act === "client") openClient(ib, ib.clients[+b.dataset.c]);
+  else if (b.dataset.act === "relay") openRelay([ib.id]);
+  else if (b.dataset.act === "delRelay") {
+    const r = ib.relays[+b.dataset.r];
+    if (!confirm(t("confirmDelRelay"))) return;
+    await api("DELETE", `api/relays?tag=${encodeURIComponent(ib.id)}&address=${encodeURIComponent(r.address)}&port=${r.port || 0}`);
+    toast(t("done")); refreshInbounds();
+  }
 }));
 
 // ---------- modals ----------
-function openModal(html) { $("#modalBody").innerHTML = html; $("#modal").classList.remove("hidden"); }
+function openModal(html, wide) { $("#modalBody").innerHTML = html; $("#modalBody").classList.toggle("wide", !!wide); $("#modal").classList.remove("hidden"); }
 function closeModal() { $("#modal").classList.add("hidden"); $("#modalBody").innerHTML = ""; }
-$("#modal").addEventListener("click", (e) => { if (e.target.id === "modal" || e.target.dataset.close !== undefined) closeModal(); });
+$("#modal").addEventListener("click", (e) => {
+  const cp = e.target.closest("[data-copy]"); if (cp) { copyText(cp.dataset.copy); return; }
+  if (e.target.id === "modal" || e.target.dataset.close !== undefined) closeModal();
+});
 
 $("#addInboundBtn").onclick = guard(async () => {
   const [fp, certs] = await Promise.all([api("GET", "api/freeport"), api("GET", "api/certs")]);
@@ -282,9 +344,7 @@ function openAddClient(ib) {
 }
 
 function subURL(m) {
-  const s = state.status.settings;
-  const base = (s.subBase || s.panelURL || (location.origin + location.pathname.replace(/[^/]*$/, ""))).replace(/\/$/, "");
-  return base + "/sub/" + m.subToken;
+  return baseURL() + "/sub/" + m.subToken;
 }
 
 function copyRow(val) {
@@ -298,6 +358,7 @@ function openClient(ib, cl) {
     <p class="muted">${t("up")} ${fmtBytes(m.up)} · ${t("down")} ${fmtBytes(m.down)} · ${m.limitBytes ? fmtBytes(m.limitBytes) : t("unlimited")}</p>
     <label>${t("link")}</label>${copyRow(cl.link)}
     ${sub ? `<label>${t("sub")}</label>${copyRow(sub)}` : ""}
+    ${cl.relayLinks && cl.relayLinks.length ? `<label>${t("relayLinks")}</label><div class="links-list">${cl.relayLinks.map(copyRow).join("")}</div>` : ""}
     <img class="qr" alt="QR" src="api/qr?text=${encodeURIComponent(sub || cl.link)}">
     <form id="edForm" class="form">
       <label>${t("setExpiry")}<input name="expiryDays" type="number" min="0" step="1" placeholder="${t("expiryDays")}"></label>
@@ -310,10 +371,6 @@ function openClient(ib, cl) {
       <button class="btn danger" id="edDel">${t("del")}</button>
       <button class="btn ghost" data-close>${t("cancel")}</button>
     </div>`);
-  $("#modalBody").querySelectorAll("[data-copy]").forEach((b) => (b.onclick = async () => {
-    try { await navigator.clipboard.writeText(b.dataset.copy); } catch { b.previousElementSibling.select(); document.execCommand("copy"); }
-    toast(t("copied"));
-  }));
   const upd = async (extra) => {
     const d = Object.fromEntries(new FormData($("#edForm")));
     const body = { email: cl.email, ...extra };
@@ -330,6 +387,63 @@ function openClient(ib, cl) {
     closeModal(); toast(t("done")); refreshInbounds();
   });
 }
+
+function openRelay(ids) {
+  openModal(`<h3>${t("addRelay")}</h3>
+  <p class="muted">${esc(ids.map((id) => id).join(" · "))}</p>
+  <form id="rlForm" class="form">
+    <label>${t("relayAddr")}<input name="address" required placeholder="1.2.3.4"></label>
+    <label>${t("relayPort")}<input name="port" type="number" min="1" max="65535"></label>
+    <label>${t("relayName")}<input name="name" placeholder="iran-relay"></label>
+  </form>
+  <p class="muted">${t("relayHint")}</p>
+  <p id="rlErr" class="err"></p>
+  <div class="actions"><button class="btn primary" id="rlSave">${t("save")}</button><button class="btn" data-close>${t("cancel")}</button></div>`);
+  $("#rlSave").onclick = async () => {
+    const d = Object.fromEntries(new FormData($("#rlForm")));
+    try {
+      await api("POST", "api/relays", { tags: ids, address: d.address.trim(), port: +d.port || 0, name: d.name.trim() });
+      closeModal(); toast(t("done")); refreshInbounds();
+    } catch (e) { $("#rlErr").textContent = e.message; }
+  };
+}
+$("#relaySelBtn").onclick = () => openRelay([...state.sel]);
+
+$("#quickBtn").onclick = guard(async () => {
+  const r = await api("GET", "api/presets");
+  const groups = [["reality", t("gReality")], ["tls", t("gTls") + (r.certDomain ? " · " + r.certDomain : "")], ["plain", t("gPlain")]];
+  const item = (p) => {
+    const dis = !p.available;
+    const on = !dis && !p.exists;
+    const tag = dis ? t("needCert") : p.exists ? t("exists") : p.note || "";
+    return `<label class="pitem ${dis ? "off" : ""}"><input type="checkbox" value="${p.id}" ${on ? "checked" : ""} ${dis ? "disabled" : ""}>${esc(p.label)}<small>${esc(tag)}</small></label>`;
+  };
+  openModal(`<h3>${t("quickTitle")}</h3>
+    <p class="muted">${t("quickHint")}</p>
+    <div class="actions"><button class="btn small" id="qAll">${t("all")}</button><button class="btn small" id="qNone">${t("none")}</button></div>
+    <div class="presets" id="qList">${groups.map(([g, title]) => `<div class="pgroup"><h4>${esc(title)}</h4><div class="pgrid">${r.presets.filter((p) => p.group === g).map(item).join("")}</div></div>`).join("")}</div>
+    <form id="qForm" class="form" style="grid-template-columns:2fr 1fr 1fr">
+      <label>${t("clientName")}<input name="client" value="user1" pattern="[A-Za-z0-9._@+\\-]{1,64}"></label>
+      <label>${t("expiryDays")}<input name="expiryDays" type="number" min="0" value="30"></label>
+      <label>${t("limitGB")}<input name="limitGB" type="number" min="0" step="0.5" value="0"></label>
+    </form>
+    <p id="qErr" class="err"></p>
+    <div class="actions"><button class="btn primary" id="qCreate"></button><button class="btn" data-close>${t("cancel")}</button></div>`, true);
+  const boxes = () => [...$("#qList").querySelectorAll("input:not(:disabled)")];
+  const count = () => { $("#qCreate").textContent = t("createN") + " (" + boxes().filter((b) => b.checked).length + ")"; };
+  $("#qList").onchange = count; count();
+  $("#qAll").onclick = () => { boxes().forEach((b) => (b.checked = true)); count(); };
+  $("#qNone").onclick = () => { boxes().forEach((b) => (b.checked = false)); count(); };
+  $("#qCreate").onclick = async () => {
+    const ids = boxes().filter((b) => b.checked).map((b) => b.value);
+    const d = Object.fromEntries(new FormData($("#qForm")));
+    $("#qCreate").disabled = true;
+    try {
+      const res = await api("POST", "api/presets", { ids, client: d.client.trim(), expiryDays: +d.expiryDays, limitGB: +d.limitGB });
+      closeModal(); toast(t("done") + " · " + res.created.length); refreshInbounds();
+    } catch (e) { $("#qErr").textContent = e.message; $("#qCreate").disabled = false; }
+  };
+});
 
 // ---------- core actions ----------
 $("#installBtn").onclick = guard(async () => {

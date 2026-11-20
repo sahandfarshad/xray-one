@@ -14,6 +14,11 @@ A light, minimal panel that sits **beside** a headless Xray core. It never repla
 - Safety: every write is backed up, validated with `xray run -test`, and rolled back if Xray rejects it. Key order and unknown fields are preserved, so hand edits survive. Backups can be restored from the UI.
 - Panel login (bcrypt, lockout), secret base path, SSL from the SSH menu. New inbounds get a free port suggested and checked; TLS inbounds can pick a certificate already on the server. Persian and English UI, light and dark.
 
+## v0.3
+- One subscription link with every config on the server (shown at the top of the panel; "New link" rotates it). Per-client subscriptions still work.
+- Quick setup: tick any of 20 ready-made types (REALITY, TLS, plain); each gets a free port and one shared client.
+- Relays: add a relay / CDN IP (and optional port) to one inbound or to all selected ones; links and subscriptions get an extra copy per relay, while SNI / REALITY stay those of the real server.
+
 ## Install / نصب
 
 ```bash
