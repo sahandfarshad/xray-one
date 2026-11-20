@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>XRay One</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="login" class="login hidden">
+  <form id="loginForm" class="card login-card">
+    <div class="brand"><span class="dot"></span>XRay One</div>
+    <p class="muted" data-t="loginHint"></p>
+    <label><span data-t="user"></span><input name="user" autocomplete="username" required></label>
+    <label><span data-t="pass"></span><input name="pass" type="password" autocomplete="current-password" required></label>
+    <button class="btn primary wide" data-t="signIn"></button>
+    <p id="loginErr" class="err"></p>
+  </form>
+</div>
+
+<div id="app" class="hidden">
+  <header class="top">
+    <div class="brand"><span class="dot"></span>XRay One</div>
+    <nav id="tabs">
+      <button data-view="overview" data-t="overview"></button>
+      <button data-view="inbounds" data-t="inbounds"></button>
+      <button data-view="settings" data-t="settings"></button>
+    </nav>
+    <div class="top-actions">
+      <button id="langBtn" class="btn ghost small">EN</button>
+      <button id="logoutBtn" class="btn ghost small" data-t="logout"></button>
+    </div>
+  </header>
+
+  <main>
+    <section id="view-overview" class="view">
+      <div class="grid">
+        <div class="card stat"><div class="label" data-t="coreStatus"></div><div id="sStatus" class="big">—</div><div id="sService" class="muted"></div></div>
+        <div class="card stat"><div class="label" data-t="coreVersion"></div><div id="sVersion" class="big">—</div><div id="sPath" class="muted mono"></div></div>
+        <div class="card stat"><div class="label" data-t="clients"></div><div id="sClients" class="big">—</div><div id="sInbounds" class="muted"></div></div>
+        <div class="card stat"><div class="label" data-t="traffic"></div><div id="sTraffic" class="big">—</div><div id="sApi" class="muted"></div></div>
+      </div>
+
+      <div class="card">
+        <div class="row-between">
+          <div>
+            <h3 data-t="coreTitle"></h3>
+            <p class="muted" id="coreHint"></p>
+          </div>
+          <div class="actions">
+            <input id="verInput" class="small-input" placeholder="latest">
+            <button id="installBtn" class="btn primary"></button>
+            <button id="restartBtn" class="btn" data-t="restart"></button>
+            <button id="apiBtn" class="btn hidden" data-t="enableApi"></button>
+          </div>
+        </div>
+        <pre id="jobLog" class="log hidden"></pre>
+      </div>
+    </section>
+
+    <section id="view-inbounds" class="view hidden">
+      <div class="row-between head">
+        <h2 data-t="inbounds"></h2>
+        <button id="addInboundBtn" class="btn primary" data-t="addInbound"></button>
+      </div>
+      <div id="inboundList" class="stack"></div>
+    </section>
+
+    <section id="view-settings" class="view hidden">
+      <div class="card">
+        <h3 data-t="linksTitle"></h3>
+        <form id="settingsForm" class="form">
+          <label><span data-t="publicHost"></span><input name="publicHost" placeholder="example.com"></label>
+          <label><span data-t="subBase"></span><input name="subBase" placeholder="https://sub.example.com:2096/secret"></label>
+          <button class="btn primary" data-t="save"></button>
+        </form>
+        <p class="muted" data-t="sslHint"></p>
+      </div>
+      <div class="card">
+        <h3 data-t="backups"></h3>
+        <div id="backupList" class="list"></div>
+      </div>
+      <div class="card">
+        <div class="row-between"><h3 data-t="rawConfig"></h3><button id="loadRaw" class="btn small" data-t="show"></button></div>
+        <pre id="rawConfig" class="log hidden"></pre>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div id="modal" class="modal hidden"><div class="card modal-card" id="modalBody"></div></div>
+<div id="toast" class="toast hidden"></div>
+<script src="app.js"></script>
+</body>
+</html>
