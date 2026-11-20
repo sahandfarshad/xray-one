@@ -167,36 +167,10 @@ func runMenu(dir string) {
 		}
 		app := &App{store: st}
 		c := DetectCore()
-		core := "not installed"
-		if c.Installed {
-			core = c.Version + " (" + orDefault(c.Active, "unknown") + ")"
-		}
-		ssl := "off (plain HTTP)"
-		if st.Cfg.CertFile != "" {
-			ssl = "on · " + st.Cfg.Domain
-			if exp, _, err := certExpiry(st.Cfg.CertFile); err == nil {
-				ssl += " · expires " + exp.Format("2006-01-02")
-			}
-		}
+		drawMenu(app, c)
+		choice := prompt("  "+bold("›")+" Choose", "")
 		fmt.Println()
-		fmt.Println("  ╭─ XRay One " + version + " ─────────────────────────")
-		fmt.Println("  │ Panel:  " + app.PanelURL() + "  [" + orDefault(svc("is-active", "xray-one"), "?") + "]")
-		fmt.Println("  │ User:   " + st.Cfg.User)
-		fmt.Println("  │ SSL:    " + ssl)
-		fmt.Println("  │ Xray:   " + core)
-		fmt.Println("  ╰──────────────────────────────────────────────")
-		fmt.Println("   1) Change username / password")
-		fmt.Println("   2) Change panel port")
-		fmt.Println("   3) Change secret path")
-		fmt.Println("   4) SSL certificate (get new / use existing / turn off)")
-		fmt.Println("   5) Server address used in client links")
-		fmt.Println("   6) Install / update Xray core")
-		fmt.Println("   7) Restart panel")
-		fmt.Println("   8) Panel logs")
-		fmt.Println("   9) Update XRay One")
-		fmt.Println("  10) Uninstall XRay One")
-		fmt.Println("   0) Exit")
-		switch prompt("Choose", "") {
+		switch choice {
 		case "1":
 			st.Cfg.User = prompt("Username", st.Cfg.User)
 			p := readSecret("New password (empty = keep, min 8 chars)")
@@ -232,7 +206,21 @@ func runMenu(dir string) {
 		case "4":
 			sslMenu(dir, st)
 		case "5":
-			st.Cfg.PublicHost = prompt("Domain or IP for client links", orDefault(st.Cfg.PublicHost, publicIP()))
+			pub := !strings.HasPrefix(st.Cfg.Listen, "127.0.0.1")
+			def := "1"
+			if !pub {
+				def = "2"
+			}
+			fmt.Println("  1) Public   – open from anywhere (0.0.0.0)")
+			fmt.Println("  2) Private  – only through an SSH tunnel (127.0.0.1)")
+			mode := prompt("  Access", def)
+			port := strings.TrimPrefix(portOf(st.Cfg.Listen), ":")
+			if mode == "2" {
+				st.Cfg.Listen = "127.0.0.1:" + port
+			} else {
+				st.Cfg.Listen = "0.0.0.0:" + port
+			}
+			st.Cfg.PublicHost = prompt("  Domain or IP used in client links", orDefault(st.Cfg.PublicHost, publicIP()))
 			saveAndRestart(st)
 		case "6":
 			v := prompt("Version (empty = latest)", "")
@@ -257,9 +245,88 @@ func runMenu(dir string) {
 			uninstall(dir)
 			return
 		case "0", "q", "exit":
+			clearScreen()
 			return
+		default:
+			continue
+		}
+		fmt.Print("\n  " + dim("Press Enter to go back…"))
+		stdin.ReadString('\n')
+	}
+}
+
+const (
+	cReset = "\033[0m"
+	cBold  = "\033[1m"
+	cDim   = "\033[2m"
+	cCyan  = "\033[36m"
+	cGreen = "\033[32m"
+	cRed   = "\033[31m"
+	cYel   = "\033[33m"
+)
+
+func bold(s string) string { return cBold + s + cReset }
+func dim(s string) string  { return cDim + s + cReset }
+func clearScreen()         { fmt.Print("\033[H\033[2J") }
+
+func dot(ok bool, label string) string {
+	if ok {
+		return cGreen + "● " + label + cReset
+	}
+	return cRed + "● " + label + cReset
+}
+
+func drawMenu(app *App, c Core) {
+	clearScreen()
+	cfg := app.store.Cfg
+	panelState := svc("is-active", "xray-one")
+	access := cYel + "private (SSH tunnel only)" + cReset
+	if !strings.HasPrefix(cfg.Listen, "127.0.0.1") {
+		access = "public"
+	}
+	ssl := cYel + "off" + cReset
+	if cfg.CertFile != "" {
+		ssl = cfg.Domain
+		if exp, _, err := certExpiry(cfg.CertFile); err == nil {
+			ssl += dim("  until " + exp.Format("2006-01-02"))
 		}
 	}
+	core := cRed + "not installed" + cReset
+	if c.Installed {
+		core = c.Version + "  " + dot(c.Active == "active", orDefault(c.Active, "unknown"))
+	}
+	line := dim("  ─────────────────────────────────────────────────")
+	fmt.Println()
+	fmt.Println("  " + cCyan + cBold + "✦ XRay One" + cReset + dim("  v"+version))
+	fmt.Println(line)
+	row := func(k, v string) { fmt.Printf("  %s%-7s%s %s\n", cDim, k, cReset, v) }
+	row("Panel", app.PanelURL()+"  "+dot(panelState == "active", orDefault(panelState, "?")))
+	if panelState != "active" {
+		if out, _ := run(5*time.Second, "journalctl", "-u", "xray-one", "-n", "1", "--no-pager", "-o", "cat"); out != "" {
+			row("", cRed+out+cReset)
+		}
+	}
+	row("Access", access)
+	row("User", cfg.User)
+	if cfg.BasePath == "" || cfg.BasePath == "/" {
+		row("", cYel+"No secret path set: option 3 is recommended"+cReset)
+	}
+	row("SSL", ssl)
+	row("Xray", core)
+	fmt.Println(line)
+	items := [][2]string{
+		{" 1  Username / password", " 6  Install / update Xray"},
+		{" 2  Panel port", " 7  Restart panel"},
+		{" 3  Secret path", " 8  Logs"},
+		{" 4  SSL certificate", " 9  Update XRay One"},
+		{" 5  Access & link address", "10  Uninstall XRay One"},
+	}
+	fmt.Println("  " + dim(fmt.Sprintf("%-28s%s", "PANEL", "SYSTEM")))
+	for _, it := range items {
+		fmt.Printf("  %-28s%s\n", it[0], it[1])
+	}
+	fmt.Println("   0  Exit")
+	fmt.Println()
 }
 
 func saveAndRestart(st *Store) {
