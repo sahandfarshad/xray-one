@@ -33,7 +33,7 @@ const T = {
     needCert: "اول SSL را از منوی SSH تنظیم کن", exists: "داری", all: "همه", none: "هیچ", clientName: "نام کلاینت مشترک",
     createN: "ساختن", relay: "Relay", addRelay: "افزودن Relay", relaySel: "Relay برای انتخاب‌شده‌ها", relayAddr: "IP یا دامنه‌ی relay",
     relayPort: "پورت relay (خالی = همان پورت اینباند)", relayName: "اسم (اختیاری)", relayHint: "لینک‌ها یک نسخه‌ی اضافه با این آدرس می‌گیرند؛ SNI و REALITY همان سرور اصلی می‌ماند.",
-    relayLinks: "لینک‌های relay", singleUser: "تک‌کاربره", confirmDelRelay: "این relay حذف شود؟",
+    selectAll: "انتخاب همه", relayLinks: "لینک‌های relay", singleUser: "تک‌کاربره", confirmDelRelay: "این relay حذف شود؟",
   },
   en: {
     loginHint: "Sign in to manage the Xray core.", user: "Username", pass: "Password", signIn: "Sign in",
@@ -68,7 +68,7 @@ const T = {
     needCert: "Set SSL in the SSH menu first", exists: "have it", all: "All", none: "None", clientName: "Shared client name",
     createN: "Create", relay: "Relay", addRelay: "Add relay", relaySel: "Relay for selected", relayAddr: "Relay IP or domain",
     relayPort: "Relay port (empty = inbound port)", relayName: "Name (optional)", relayHint: "Links get an extra copy with this address; SNI and REALITY stay those of the real server.",
-    relayLinks: "Relay links", singleUser: "single user", confirmDelRelay: "Remove this relay?",
+    selectAll: "Select all", relayLinks: "Relay links", singleUser: "single user", confirmDelRelay: "Remove this relay?",
   },
 };
 let lang = localStorage.getItem("xo_lang") || "fa";
@@ -166,6 +166,9 @@ function renderSubBar() {
   const n = state.sel.size;
   $("#relaySelBtn").textContent = t("relaySel") + (n ? " (" + n + ")" : "");
   $("#relaySelBtn").disabled = !n;
+  const all = state.inbounds.filter((i) => !i.system);
+  $("#selAll").checked = all.length > 0 && n === all.length;
+  $("#selAll").indeterminate = n > 0 && n < all.length;
 }
 async function copyText(v) {
   try { await navigator.clipboard.writeText(v); }
@@ -408,6 +411,10 @@ function openRelay(ids) {
   };
 }
 $("#relaySelBtn").onclick = () => openRelay([...state.sel]);
+$("#selAll").onchange = (e) => {
+  state.sel = new Set(e.target.checked ? state.inbounds.filter((i) => !i.system).map((i) => i.id) : []);
+  render();
+};
 
 $("#quickBtn").onclick = guard(async () => {
   const r = await api("GET", "api/presets");

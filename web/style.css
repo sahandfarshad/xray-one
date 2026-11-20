@@ -109,3 +109,5 @@ label.pitem{flex-direction:row;color:var(--ink);gap:.55rem}
 .modal-card.wide{max-width:760px}
 .ib-title input[type=checkbox]{width:16px;padding:0}
 .presets{max-height:44vh}
+label.selall{flex-direction:row;align-items:center;gap:.4rem;color:var(--ink);font-size:.9rem;padding:0 .3rem;cursor:pointer}
+label.selall input{width:16px;height:16px;padding:0;accent-color:var(--accent)}
