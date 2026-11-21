@@ -69,6 +69,7 @@ type streamParams struct {
 	pbk, sid                string
 	path, host, serviceName string
 	headerType, mode        string
+	seed                    string
 }
 
 func readStream(ib *OMap, host string) streamParams {
@@ -122,7 +123,17 @@ func readStream(ib *OMap, host string) streamParams {
 		}
 		if pathStr(t, "header", "type") == "http" {
 			p.headerType = "http"
+			if ps := asArr(path(t, "header", "request", "path")); len(ps) > 0 {
+				p.path = asStr(ps[0])
+			}
+			if hs := asArr(path(t, "header", "request", "headers", "Host")); len(hs) > 0 {
+				p.host = asStr(hs[0])
+			}
 		}
+	case "kcp", "mkcp":
+		k := asMap(ss.Get("kcpSettings"))
+		p.headerType = orDefault(pathStr(k, "header", "type"), "none")
+		p.seed = asStr(k.Get("seed"))
 	}
 	return p
 }
@@ -145,6 +156,7 @@ func (p streamParams) query(q url.Values) {
 	set("serviceName", p.serviceName)
 	set("headerType", p.headerType)
 	set("mode", p.mode)
+	set("seed", p.seed)
 }
 
 func linkPort(ib *OMap) string {
@@ -168,6 +180,17 @@ func ClientLinks(ib *OMap, c *OMap, host string, relays []Relay) (string, []stri
 
 // singleUserSS gives the link of a shadowsocks inbound without a clients list.
 func singleUserSS(ib *OMap, host string, r Relay) string {
+	if pr := asStr(ib.Get("protocol")); pr == "socks" || pr == "http" {
+		acc := asArr(path(ib, "settings", "accounts"))
+		if len(acc) == 0 {
+			return ""
+		}
+		a := asMap(acc[0])
+		if a == nil {
+			return ""
+		}
+		return clientLinkAt(ib, om("user", asStr(a.Get("user")), "pass", asStr(a.Get("pass")), "email", ""), host, r)
+	}
 	if asStr(ib.Get("protocol")) != "shadowsocks" || len(clientsOf(ib)) > 0 || path(ib, "settings", "clients") != nil {
 		return ""
 	}
@@ -231,11 +254,24 @@ func clientLinkAt(ib *OMap, c *OMap, host string, r Relay) string {
 		if sp.network == "grpc" {
 			pth = sp.serviceName
 		}
+		if sp.network == "kcp" {
+			pth = sp.seed
+		}
 		obj := map[string]string{"v": "2", "ps": label, "add": addr, "port": port,
 			"id": asStr(c.Get("id")), "aid": "0", "scy": "auto", "net": sp.network, "type": orDefault(sp.headerType, "none"),
 			"host": sp.host, "path": pth, "tls": tls, "sni": sp.sni, "fp": sp.fp}
 		b, _ := json.Marshal(obj)
 		return "vmess://" + base64.StdEncoding.EncodeToString(b)
+	case "hysteria":
+		q := url.Values{}
+		q.Set("sni", sp.sni)
+		q.Set("alpn", "h3")
+		q.Set("insecure", "0")
+		return "hysteria2://" + url.PathEscape(asStr(c.Get("auth"))) + "@" + hp + "/?" + q.Encode() + "#" + name
+	case "socks":
+		return "socks://" + base64.StdEncoding.EncodeToString([]byte(asStr(c.Get("user"))+":"+asStr(c.Get("pass")))) + "@" + hp + "#" + name
+	case "http":
+		return "http://" + url.PathEscape(asStr(c.Get("user"))) + ":" + url.PathEscape(asStr(c.Get("pass"))) + "@" + hp + "#" + name
 	case "shadowsocks":
 		method := orDefault(asStr(c.Get("method")), pathStr(ib, "settings", "method"))
 		pass := asStr(c.Get("password"))

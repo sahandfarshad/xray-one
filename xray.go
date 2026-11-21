@@ -392,7 +392,7 @@ func findInbound(root *OMap, id string) (*OMap, int) {
 
 func supportsClients(ib *OMap) bool {
 	switch asStr(ib.Get("protocol")) {
-	case "vless", "vmess", "trojan":
+	case "vless", "vmess", "trojan", "hysteria":
 		return true
 	case "shadowsocks":
 		return path(ib, "settings", "clients") != nil
@@ -403,6 +403,9 @@ func supportsClients(ib *OMap) bool {
 func clientSecret(proto string, c *OMap) string {
 	if proto == "vless" || proto == "vmess" {
 		return asStr(c.Get("id"))
+	}
+	if proto == "hysteria" {
+		return asStr(c.Get("auth"))
 	}
 	return asStr(c.Get("password"))
 }
@@ -524,6 +527,7 @@ type NewInbound struct {
 	KeyFile     string `json:"keyFile"`
 	Dest        string `json:"dest"`
 	Method      string `json:"method"` // shadowsocks
+	HeaderType  string `json:"headerType"`
 	Flow        string `json:"-"`
 }
 
@@ -553,10 +557,28 @@ func BuildInbound(root *OMap, n NewInbound) (*OMap, error) {
 		case "2022-blake3-aes-128-gcm":
 			klen = 16
 		case "2022-blake3-aes-256-gcm", "2022-blake3-chacha20-poly1305":
+		case "aes-128-gcm", "aes-256-gcm", "chacha20-ietf-poly1305", "chacha20-poly1305", "xchacha20-ietf-poly1305":
+			klen = 0
 		default:
 			return nil, errors.New("unsupported shadowsocks method")
 		}
-		settings = om("method", method, "password", randB64(klen), "clients", []any{}, "network", "tcp,udp")
+		if klen == 0 {
+			settings = om("method", method, "clients", []any{}, "network", "tcp,udp")
+		} else {
+			settings = om("method", method, "password", randB64(klen), "clients", []any{}, "network", "tcp,udp")
+		}
+	case "hysteria":
+		settings = om("version", 2, "clients", []any{})
+		n.Network = "hysteria"
+		if n.Security != "tls" {
+			return nil, errors.New("Hysteria2 needs TLS (a domain certificate)")
+		}
+	case "socks":
+		settings = om("auth", "password", "accounts", []any{om("user", "u"+randHex(3), "pass", randHex(8))}, "udp", true)
+		n.Network, n.Security = "tcp", "none"
+	case "http":
+		settings = om("accounts", []any{om("user", "u"+randHex(3), "pass", randHex(8))})
+		n.Network, n.Security = "tcp", "none"
 	default:
 		return nil, errors.New("unsupported protocol")
 	}
@@ -569,6 +591,14 @@ func BuildInbound(root *OMap, n NewInbound) (*OMap, error) {
 	stream := om("network", n.Network, "security", n.Security)
 	switch n.Network {
 	case "tcp", "raw":
+		if n.HeaderType == "http" {
+			stream.Set("tcpSettings", om("header", om("type", "http",
+				"request", om("path", []any{"/"}, "headers", om("Host", []any{"www.bing.com"})))))
+		}
+	case "kcp":
+		stream.Set("kcpSettings", om("header", om("type", "none")))
+	case "hysteria":
+		stream.Set("hysteriaSettings", om("version", 2))
 	case "ws":
 		stream.Set("wsSettings", om("path", orDefault(n.Path, "/"+randHex(4))))
 	case "grpc":
@@ -590,8 +620,12 @@ func BuildInbound(root *OMap, n NewInbound) (*OMap, error) {
 		if err != nil {
 			return nil, fmt.Errorf("cannot prepare certificate for xray: %v", err)
 		}
-		stream.Set("tlsSettings", om("serverName", n.ServerName,
-			"certificates", []any{om("certificateFile", cf, "keyFile", kf)}))
+		tlsS := om("serverName", n.ServerName,
+			"certificates", []any{om("certificateFile", cf, "keyFile", kf)})
+		if n.Network == "hysteria" {
+			tlsS.Set("alpn", []any{"h3"})
+		}
+		stream.Set("tlsSettings", tlsS)
 	case "reality":
 		if n.Protocol != "vless" && n.Protocol != "trojan" {
 			return nil, errors.New("REALITY works with VLESS or Trojan")
@@ -609,6 +643,11 @@ func BuildInbound(root *OMap, n NewInbound) (*OMap, error) {
 			"serverNames", []any{sn}, "privateKey", priv, "shortIds", []any{randHex(4)}))
 	default:
 		return nil, errors.New("unsupported security")
+	}
+	if n.Protocol == "socks" || n.Protocol == "http" {
+		return om("tag", n.Tag, "listen", "0.0.0.0", "port", n.Port, "protocol", n.Protocol,
+			"settings", settings,
+			"sniffing", om("enabled", true, "destOverride", []any{"http", "tls", "quic"})), nil
 	}
 	ib := om("tag", n.Tag, "listen", "0.0.0.0", "port", n.Port, "protocol", n.Protocol,
 		"settings", settings, "streamSettings", stream,
@@ -630,6 +669,8 @@ func NewClient(ib *OMap, email string) (*OMap, error) {
 		return om("id", newUUID(), "email", email, "level", 0), nil
 	case "trojan":
 		return om("password", randHex(12), "email", email, "level", 0), nil
+	case "hysteria":
+		return om("auth", randHex(12), "email", email, "level", 0), nil
 	case "shadowsocks":
 		method := pathStr(ib, "settings", "method")
 		switch method {

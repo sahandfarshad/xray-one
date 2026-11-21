@@ -20,7 +20,7 @@
 
 <div id="app" class="hidden">
   <header class="top">
-    <div class="brand"><span class="dot"></span>XRay One</div>
+    <div class="brand"><span class="dot" id="coreDot"></span>XRay One <span id="panelVer" class="ver"></span></div>
     <nav id="tabs">
       <button data-view="overview" data-t="overview"></button>
       <button data-view="inbounds" data-t="inbounds"></button>
@@ -74,6 +74,7 @@
         <h2 data-t="inbounds"></h2>
         <div class="actions">
           <label class="selall"><input type="checkbox" id="selAll"><span data-t="selectAll"></span></label>
+          <button id="portsBtn" class="btn" data-t="ports"></button>
           <button id="relaySelBtn" class="btn" disabled></button>
           <button id="quickBtn" class="btn" data-t="quick"></button>
           <button id="addInboundBtn" class="btn primary" data-t="addInbound"></button>

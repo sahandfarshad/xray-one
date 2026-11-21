@@ -33,7 +33,7 @@ const T = {
     needCert: "اول SSL را از منوی SSH تنظیم کن", exists: "داری", all: "همه", none: "هیچ", clientName: "نام کلاینت مشترک",
     createN: "ساختن", relay: "Relay", addRelay: "افزودن Relay", relaySel: "Relay برای انتخاب‌شده‌ها", relayAddr: "IP یا دامنه‌ی relay",
     relayPort: "پورت relay (خالی = همان پورت اینباند)", relayName: "اسم (اختیاری)", relayHint: "لینک‌ها یک نسخه‌ی اضافه با این آدرس می‌گیرند؛ SNI و REALITY همان سرور اصلی می‌ماند.",
-    selectAll: "انتخاب همه", relayLinks: "لینک‌های relay", singleUser: "تک‌کاربره", confirmDelRelay: "این relay حذف شود؟",
+    selectAll: "انتخاب همه", ports: "پورت‌ها", portsTitle: "پورت‌های استفاده‌شده", portsHint: "همه‌ی پورت‌های این‌باندها، جدا با کاما؛ برای ساخت relay و تانل.", gSS: "Shadowsocks", gProxy: "پراکسی ساده (SOCKS / HTTP، با یوزر و پسورد جدا)", relayLinks: "لینک‌های relay", singleUser: "تک‌کاربره", confirmDelRelay: "این relay حذف شود؟",
   },
   en: {
     loginHint: "Sign in to manage the Xray core.", user: "Username", pass: "Password", signIn: "Sign in",
@@ -68,7 +68,7 @@ const T = {
     needCert: "Set SSL in the SSH menu first", exists: "have it", all: "All", none: "None", clientName: "Shared client name",
     createN: "Create", relay: "Relay", addRelay: "Add relay", relaySel: "Relay for selected", relayAddr: "Relay IP or domain",
     relayPort: "Relay port (empty = inbound port)", relayName: "Name (optional)", relayHint: "Links get an extra copy with this address; SNI and REALITY stay those of the real server.",
-    selectAll: "Select all", relayLinks: "Relay links", singleUser: "single user", confirmDelRelay: "Remove this relay?",
+    selectAll: "Select all", ports: "Ports", portsTitle: "Used ports", portsHint: "Every inbound port, comma separated, for building relays and tunnels.", gSS: "Shadowsocks", gProxy: "Plain proxies (SOCKS / HTTP, own user and password)", relayLinks: "Relay links", singleUser: "single user", confirmDelRelay: "Remove this relay?",
   },
 };
 let lang = localStorage.getItem("xo_lang") || "fa";
@@ -189,6 +189,10 @@ function renderOverview() {
   $("#sStatus").style.color = c.installed && active ? "var(--ok)" : "var(--warn)";
   $("#sService").textContent = c.installed ? "systemd: " + (c.active || "?") : "";
   $("#sVersion").textContent = c.version || "—";
+  $("#panelVer").textContent = state.status.version ? "v" + state.status.version : "";
+  const dot = $("#coreDot");
+  dot.classList.toggle("bad", !(c.installed && active));
+  dot.title = "Xray: " + (!c.installed ? t("notInstalled") : active ? t("running") : t("stopped"));
   $("#sPath").textContent = c.configPath || "";
   let n = 0, up = 0, down = 0;
   const users = state.inbounds.filter((i) => !i.system);
@@ -290,9 +294,9 @@ $("#addInboundBtn").onclick = guard(async () => {
   const certOpts = certs.map((c, i) => `<option value="${i}">${esc(c.domain)} · ${esc(c.source)}</option>`).join("");
   openModal(`<h3>${t("addInbound")}</h3>
   <form id="ibForm" class="form">
-    <label>${t("protocol")}<select name="protocol"><option>vless</option><option>vmess</option><option>trojan</option><option value="shadowsocks">shadowsocks 2022</option></select></label>
+    <label>${t("protocol")}<select name="protocol"><option>vless</option><option>vmess</option><option>trojan</option><option value="shadowsocks">shadowsocks 2022</option><option value="hysteria">hysteria2</option><option>socks</option><option>http</option></select></label>
     <label>${t("port")}<input name="port" type="number" min="1" max="65535" value="${fp.port || ""}" required></label>
-    <label>${t("network")}<select name="network"><option>tcp</option><option>ws</option><option>grpc</option><option>xhttp</option><option>httpupgrade</option></select></label>
+    <label>${t("network")}<select name="network"><option>tcp</option><option>ws</option><option>grpc</option><option>xhttp</option><option>httpupgrade</option><option>kcp</option></select></label>
     <label>${t("security")}<select name="security"><option>reality</option><option>tls</option><option>none</option></select></label>
     <label>${t("tag")}<input name="tag"></label>
     <label data-show="path">${t("path")}<input name="path" placeholder="/"></label>
@@ -411,6 +415,17 @@ function openRelay(ids) {
   };
 }
 $("#relaySelBtn").onclick = () => openRelay([...state.sel]);
+$("#portsBtn").onclick = () => {
+  const ports = [...new Set(state.inbounds.filter((i) => !i.system).flatMap((i) => String(i.port).split(",")).map((p) => p.trim()).filter(Boolean))]
+    .sort((a, b) => parseInt(a) - parseInt(b));
+  const text = ports.join(",");
+  openModal(`<h3>${t("portsTitle")} (${ports.length})</h3>
+  <p class="muted">${t("portsHint")}</p>
+  <textarea id="portsText" class="mono ports" rows="5" readonly>${esc(text)}</textarea>
+  <div class="actions"><button class="btn primary" id="portsCopy">${t("copy")}</button><button class="btn" data-close>${t("cancel")}</button></div>`);
+  $("#portsText").onclick = (e) => e.target.select();
+  $("#portsCopy").onclick = () => copyText(text);
+};
 $("#selAll").onchange = (e) => {
   state.sel = new Set(e.target.checked ? state.inbounds.filter((i) => !i.system).map((i) => i.id) : []);
   render();
@@ -418,7 +433,7 @@ $("#selAll").onchange = (e) => {
 
 $("#quickBtn").onclick = guard(async () => {
   const r = await api("GET", "api/presets");
-  const groups = [["reality", t("gReality")], ["tls", t("gTls") + (r.certDomain ? " · " + r.certDomain : "")], ["plain", t("gPlain")]];
+  const groups = [["reality", t("gReality")], ["tls", t("gTls") + (r.certDomain ? " · " + r.certDomain : "")], ["plain", t("gPlain")], ["ss", t("gSS")], ["proxy", t("gProxy")]];
   const item = (p) => {
     const dis = !p.available;
     const on = !dis && !p.exists;
@@ -502,3 +517,7 @@ $("#loadRaw").onclick = guard(async () => {
 
 applyLang();
 boot();
+setInterval(async () => {
+  if ($("#app").classList.contains("hidden") || !state.status) return;
+  try { state.status = await api("GET", "api/status"); renderOverview(); } catch {}
+}, 15000);
