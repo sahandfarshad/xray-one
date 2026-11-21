@@ -50,12 +50,17 @@ type Store struct {
 	AllToken string `json:"allToken"`
 	// Relays: extra addresses (relay / CDN IPs) per inbound tag.
 	Relays map[string][]Relay `json:"relays"`
+	// Tunnels: middle servers; TunnelMap: inbound id -> tunnel server ids.
+	Tunnels   []*TunnelServer     `json:"tunnels,omitempty"`
+	TunnelCfg TunnelSettings      `json:"tunnelCfg"`
+	TunnelMap map[string][]string `json:"tunnelMap,omitempty"`
 }
 
 type Relay struct {
 	Address string `json:"address"`
 	Port    int    `json:"port,omitempty"` // 0 = same as inbound
 	Name    string `json:"name,omitempty"`
+	Tunnel  string `json:"tunnel,omitempty"` // set when the address comes from a tunnel server
 }
 
 func (s *Store) RelaysOf(tag string) []Relay {

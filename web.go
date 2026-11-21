@@ -181,6 +181,13 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("POST /api/allsub/reset", a.api(func(w http.ResponseWriter, r *http.Request) {
 		writeJSONResp(w, 200, map[string]string{"allToken": a.store.ResetAllToken()})
 	}))
+	mux.HandleFunc("GET /api/tunnels", a.api(a.handleTunnels))
+	mux.HandleFunc("POST /api/tunnels", a.api(a.handleAddTunnel))
+	mux.HandleFunc("DELETE /api/tunnels/{id}", a.api(a.handleDelTunnel))
+	mux.HandleFunc("POST /api/tunnels/{id}/deploy", a.api(a.handleDeployTunnel))
+	mux.HandleFunc("POST /api/tunnels/{id}/join", a.api(a.handleNewJoin))
+	mux.HandleFunc("POST /api/tunnels/assign", a.api(a.handleTunnelAssign))
+	mux.HandleFunc("POST /api/agent/beat", a.handleBeat)
 	mux.HandleFunc("GET /sub/{token}", a.handleSub)
 
 	var h http.Handler = mux
@@ -256,11 +263,15 @@ func (a *App) handleInbounds(w http.ResponseWriter, r *http.Request) {
 		network, security := streamInfo(ib)
 		iv := InboundView{ID: inboundID(ib, i), Tag: asStr(ib.Get("tag")), Protocol: asStr(ib.Get("protocol")),
 			Port: asStr(ib.Get("port")), Listen: asStr(ib.Get("listen")), Network: network, Security: security,
-			Managed: supportsClients(ib), System: atag != "" && asStr(ib.Get("tag")) == atag, Clients: []ClientView{}}
-		relays := a.store.RelaysOf(iv.ID)
+			Managed: supportsClients(ib), System: (atag != "" && asStr(ib.Get("tag")) == atag) || asStr(ib.Get("tag")) == tunnelTag, Clients: []ClientView{}}
+		relays := a.relaysFor(iv.ID)
 		iv.Relays = relays
 		iv.Single = singleUserSS(ib, host, Relay{})
-		for _, cv := range clientsOf(ib) {
+		cls := clientsOf(ib)
+		if iv.Tag == tunnelTag {
+			iv.Managed, cls = false, nil
+		}
+		for _, cv := range cls {
 			c := asMap(cv)
 			if c == nil {
 				continue
@@ -583,7 +594,7 @@ func (a *App) handleSub(w http.ResponseWriter, r *http.Request) {
 			for _, cv := range clientsOf(ib) {
 				c := asMap(cv)
 				if asStr(c.Get("email")) == m.Email {
-					l, rl := ClientLinks(ib, c, host, a.store.RelaysOf(asStr(ib.Get("tag"))))
+					l, rl := ClientLinks(ib, c, host, a.relaysFor(asStr(ib.Get("tag"))))
 					links = append(append(links, l), rl...)
 				}
 			}
@@ -609,10 +620,10 @@ func (a *App) handleAllSub(w http.ResponseWriter, r *http.Request) {
 	var links []string
 	for i, v := range asArr(root.Get("inbounds")) {
 		ib := asMap(v)
-		if ib == nil || (atag != "" && asStr(ib.Get("tag")) == atag) {
+		if ib == nil || (atag != "" && asStr(ib.Get("tag")) == atag) || asStr(ib.Get("tag")) == tunnelTag {
 			continue
 		}
-		relays := a.store.RelaysOf(inboundID(ib, i))
+		relays := a.relaysFor(inboundID(ib, i))
 		if l := singleUserSS(ib, host, Relay{}); l != "" {
 			links = append(links, l)
 			for _, rl := range relays {

@@ -24,6 +24,7 @@
     <nav id="tabs">
       <button data-view="overview" data-t="overview"></button>
       <button data-view="inbounds" data-t="inbounds"></button>
+      <button data-view="tunnels" data-t="tunnels"></button>
       <button data-view="settings" data-t="settings"></button>
     </nav>
     <div class="top-actions">
@@ -81,6 +82,15 @@
         </div>
       </div>
       <div id="inboundList" class="stack"></div>
+    </section>
+
+    <section id="view-tunnels" class="view hidden">
+      <div class="row-between head">
+        <h2 data-t="tunnels"></h2>
+        <div class="actions"><button id="addTunnelBtn" class="btn primary" data-t="addTunnel"></button></div>
+      </div>
+      <p id="tunnelInfo" class="muted"></p>
+      <div id="tunnelList" class="stack"></div>
     </section>
 
     <section id="view-settings" class="view hidden">

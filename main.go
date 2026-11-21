@@ -12,7 +12,7 @@ import (
 	"golang.org/x/term"
 )
 
-var version = "0.3.5"
+var version = "0.4.0"
 
 func main() {
 	dir := os.Getenv("XRAY_ONE_DIR")
@@ -42,6 +42,8 @@ func main() {
 			fmt.Println("Update failed:", err)
 			os.Exit(1)
 		}
+	case "agent":
+		agentMain(os.Args[2:])
 	case "uninstall":
 		uninstall(dir)
 	case "version", "-v", "--version":
