@@ -602,8 +602,9 @@ func (a *App) handleSub(w http.ResponseWriter, r *http.Request) {
 			for _, cv := range clientsOf(ib) {
 				c := asMap(cv)
 				if asStr(c.Get("email")) == m.Email {
-					l, rl := ClientLinks(ib, c, host, a.relaysFor(inboundID(ib, i)))
-					links = append(append(links, l), rl...)
+					relays := a.relaysFor(inboundID(ib, i))
+					l, rl := ClientLinks(ib, c, host, relays)
+					links = append(links, subLinks(l, rl, relays)...)
 				}
 			}
 		}
@@ -633,10 +634,11 @@ func (a *App) handleAllSub(w http.ResponseWriter, r *http.Request) {
 		}
 		relays := a.relaysFor(inboundID(ib, i))
 		if l := singleUserSS(ib, host, Relay{}); l != "" {
-			links = append(links, l)
+			var rls []string
 			for _, rl := range relays {
-				links = append(links, singleUserSS(ib, host, rl))
+				rls = append(rls, singleUserSS(ib, host, rl))
 			}
+			links = append(links, subLinks(l, rls, relays)...)
 		}
 		for _, cv := range clientsOf(ib) {
 			c := asMap(cv)
@@ -645,7 +647,7 @@ func (a *App) handleAllSub(w http.ResponseWriter, r *http.Request) {
 			}
 			l, rl := ClientLinks(ib, c, host, relays)
 			if l != "" {
-				links = append(append(links, l), rl...)
+				links = append(links, subLinks(l, rl, relays)...)
 			}
 		}
 	}
@@ -746,4 +748,15 @@ func (a *App) Enforce() {
 		}()
 		time.Sleep(60 * time.Second)
 	}
+}
+
+// subLinks: a tunneled inbound is served only through its middle servers
+// (and alt addresses); the direct link is left out of subscriptions.
+func subLinks(direct string, relayLinks []string, relays []Relay) []string {
+	for _, r := range relays {
+		if r.Tunnel != "" {
+			return relayLinks
+		}
+	}
+	return append([]string{direct}, relayLinks...)
 }
