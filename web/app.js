@@ -36,7 +36,7 @@ const T = {
     relayEx: "مثال‌ها: یک ساب‌دامنه‌ی دیگر که به همین IP اشاره می‌کند (اگر دامنه‌ی اول فیلتر شد) · ساب‌دامنه یا IP تمیز Cloudflare برای اینباندهای WS/XHTTP با TLS · IP سروری که خودت با iptables/HAProxy به اینجا فوروارد کرده‌ای.",
     relayBefore: "لینک فعلی", relayAfter: "لینک اضافه با این آدرس", relayNoClient: "این اینباند هنوز کلاینتی ندارد که نمونه‌ی لینک نشان داده شود.",
     delSel: "حذف", tunSel: "⇄ تانل", tbTitle: "تانل گروهی", tbHint: "اینباندهای انتخاب‌شده با همان پورت خودشان روی سرور میانی باز می‌شوند. پورت‌هایی که آنجا اشغال باشند رد می‌شوند و اینجا نشان داده می‌شوند.",
-    tbAdd: "تانل کن", tbRemove: "برداشتن از این سرور", tbSkipped: "رد شدند", tbDone: "{n} اینباند انجام شد",
+    tbAdd: "تانل کن", tbRemove: "برداشتن از این سرور", tbSkipped: "رد شدند", tbDone: "{n} اینباند انجام شد", tbProgress: "{a} از {b} روی سرور میانی آماده شد", tbSlow: "سرور میانی جواب نداد. آنلاین بودنش را در تب تانل چک کنید.",
     stOk: "باز", stBusy: "اشغال روی سرور میانی", stDown: "باز نشد", stOffline: "سرور میانی آفلاین", stUnknown: "ایجنت قدیمی؛ دستور نصب را دوباره اجرا کنید", stPending: "در حال بررسی…", confirmDelSel: "{n} اینباند انتخاب‌شده حذف شود؟ کلاینت‌های داخلشان هم حذف می‌شوند.",
     usersTab: "کلاینت‌ها", addUser: "کلاینت جدید", usersHint: "هر کلاینت یک اسم است که روی چند اینباند می‌نشیند، با یک محدودیت حجم و زمان و یک لینک سابسکریپشن برای همه.",
     noUsers: "هنوز کلاینتی نیست.", pickInbounds: "اینباندهای این کلاینت", editUser: "ویرایش", noInboundsYet: "بدون اینباند", confirmDelUser: "این کلاینت از همه‌ی اینباندها حذف شود؟",
@@ -88,7 +88,7 @@ const T = {
     relayEx: "Examples: a second subdomain pointing to this IP (if the first gets blocked) · a Cloudflare subdomain or clean IP for WS/XHTTP+TLS inbounds · the IP of a server you forward here yourself with iptables/HAProxy.",
     relayBefore: "Current link", relayAfter: "Extra link with this address", relayNoClient: "This inbound has no client yet to preview a link.",
     delSel: "Delete", tunSel: "⇄ Tunnel", tbTitle: "Bulk tunnel", tbHint: "Selected inbounds open on the middle server on their own port. Ports busy there are skipped and shown here.",
-    tbAdd: "Tunnel", tbRemove: "Remove from this server", tbSkipped: "Skipped", tbDone: "{n} inbounds done",
+    tbAdd: "Tunnel", tbRemove: "Remove from this server", tbSkipped: "Skipped", tbDone: "{n} inbounds done", tbProgress: "{a} of {b} ready on the middle server", tbSlow: "The middle server did not answer. Check it is online in the Tunnels tab.",
     stOk: "open", stBusy: "busy on middle server", stDown: "not listening", stOffline: "middle server offline", stUnknown: "old agent; rerun the install command", stPending: "checking…", confirmDelSel: "Delete {n} selected inbounds? Their clients go too.",
     usersTab: "Clients", addUser: "New client", usersHint: "A client is one name that sits on several inbounds, with one traffic/time limit and one subscription link for all of them.",
     noUsers: "No clients yet.", pickInbounds: "Inbounds of this client", editUser: "Edit", noInboundsYet: "no inbound", confirmDelUser: "Remove this client from every inbound?",
@@ -178,6 +178,10 @@ async function refreshInbounds() {
   }
   catch (e) { state.inbounds = []; }
   render();
+  // a middle server is still applying a change: check again shortly
+  clearTimeout(refreshInbounds.timer);
+  if (state.inbounds.some((ib) => (ib.tunnels || []).some((x) => x.state === "pending")))
+    refreshInbounds.timer = setTimeout(() => state.view === "inbounds" && refreshInbounds(), 3000);
 }
 
 // ---------- render ----------
@@ -485,10 +489,26 @@ $("#tunSelBtn").onclick = guard(async () => {
     const server = ($("#tbList").querySelector("input:checked") || {}).value;
     try {
       const r = await api("POST", "api/tunnels/bulk", { ids, server, remove });
-      toast(t("tbDone").replace("{n}", r.done)); refreshInbounds();
-      if (r.skipped.length) {
-        $("#tbOut").innerHTML = `<label>${t("tbSkipped")}</label>` + r.skipped.map((x) => `<p class="err mono">${esc(x.id)}: ${esc(x.reason)}</p>`).join("");
-      } else closeModal();
+      const skipped = r.skipped.length ? `<label>${t("tbSkipped")}</label>` + r.skipped.map((x) => `<p class="err mono">${esc(x.id)}: ${esc(x.reason)}</p>`).join("") : "";
+      $("#tbAdd").disabled = $("#tbRm").disabled = true;
+      // progress: wait until the middle server reports every port
+      const want = ids.filter((id) => !r.skipped.some((x) => x.id === id));
+      const t0 = Date.now();
+      for (;;) {
+        await refreshInbounds();
+        let ready = 0;
+        want.forEach((id) => {
+          const ib = state.inbounds.find((x) => x.id === id);
+          const tl = ib && (ib.tunnels || []).find((x) => x.server === server);
+          if (remove ? !tl : tl && tl.state !== "pending") ready++;
+        });
+        const pct = want.length ? Math.round(ready * 100 / want.length) : 100;
+        if (!$("#tbOut")) break;
+        $("#tbOut").innerHTML = `<p>${t("tbProgress").replace("{a}", ready).replace("{b}", want.length)} · ${pct}%</p><div class="bar"><i style="width:${pct}%"></i></div>` + skipped;
+        if (pct >= 100) { toast(t("tbDone").replace("{n}", r.done)); if (!skipped) setTimeout(closeModal, 800); break; }
+        if (Date.now() - t0 > 120000) { $("#tbOut").insertAdjacentHTML("afterbegin", `<p class="err">${t("tbSlow")}</p>`); break; }
+        await new Promise((ok) => setTimeout(ok, 2000));
+      }
     } catch (e) { $("#tbErr").textContent = e.message; }
   };
   $("#tbAdd").onclick = () => go(false);
