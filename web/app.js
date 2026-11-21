@@ -38,6 +38,8 @@ const T = {
     tnOnline: "متصل", tnOffline: "قطع", tnNever: "هنوز وصل نشده", tnAgo: "پیش", tnQuick: "نصب سریع بدون پسورد: این دستور را روی سرور میانی (با root) بزنید. تا ۲۴ ساعت معتبر است و بعد از اتصال باطل می‌شود.",
     tnNewCmd: "دستور نصب جدید", tnNoSrv: "هنوز سرور میانی اضافه نشده.", tnInfo: "روش WSS: سرور میانی با WebSocket+TLS به پورت {port} روی {domain} وصل می‌شود. کاربر ← سرور میانی ← این سرور ← اینترنت.",
     tnNeedSSL: "برای تانل WSS اول باید دامنه و SSL را از منوی SSH تنظیم کنید.", tnUse: "تانل", tnPick: "این اینباند از کدام سرورهای میانی استفاده کند؟ برای هر کدام یک لینک جدا ساخته می‌شود.",
+    tnTest: "تست اتصال", tnTesting: "در حال تست…", tnTestOk: "وصل است · {ms} میلی‌ثانیه", tnTestBad: "پاسخی از سرور میانی نیامد",
+    tnLastFail: "آخرین قطعی", tnFails: "{n} تلاش ناموفق",
     tnInbounds: "اینباندها", tnSshOpt: "Deploy با SSH (اختیاری)", tnPortHere: "پورت روی سرور میانی", tnBusy: "اشغال روی سرور میانی",
     tnRemove: "حذف relay از سرور میانی (روی همان سرور بزنید):", tnCmdTitle: "دستور نصب سرور میانی",
     tnInbounds: "اینباندها", tnDeploying: "در حال نصب روی سرور میانی… (تا چند دقیقه)", tnConfirmDel: "این سرور میانی حذف شود؟ اینباندها دیگر از آن استفاده نمی‌کنند.", tnXrayErr: "خطای relay",
@@ -81,6 +83,8 @@ const T = {
     tnOnline: "Connected", tnOffline: "Down", tnNever: "not connected yet", tnAgo: "ago", tnQuick: "Quick install without a password: run this on the middle server as root. Valid 24 h, void after it connects.",
     tnNewCmd: "New install command", tnNoSrv: "No middle server yet.", tnInfo: "WSS method: the middle server connects with WebSocket+TLS to port {port} on {domain}. User → middle server → this server → internet.",
     tnNeedSSL: "The WSS tunnel needs this server's domain and SSL: set them in the SSH menu first.", tnUse: "Tunnel", tnPick: "Which middle servers should this inbound use? Each one gets its own link.",
+    tnTest: "Test connection", tnTesting: "Testing…", tnTestOk: "Connected · {ms} ms", tnTestBad: "No answer from the middle server",
+    tnLastFail: "Last drop", tnFails: "{n} failed attempts",
     tnSshOpt: "Deploy over SSH (optional)", tnPortHere: "Port on middle server", tnBusy: "busy on middle server",
     tnRemove: "Remove the relay from the middle server (run there):", tnCmdTitle: "Middle server install command",
     tnInbounds: "Inbounds", tnDeploying: "Installing on the middle server… (a few minutes)", tnConfirmDel: "Remove this middle server? Inbounds stop using it.", tnXrayErr: "Relay error",
@@ -552,6 +556,7 @@ async function loadTunnels() {
   try { tunnelData = await api("GET", "api/tunnels"); } catch (e) { return; }
   renderTunnels();
 }
+const tnTestRes = {};
 function renderTunnels() {
   const d = tunnelData; if (!d) return;
   $("#tunnelInfo").textContent = d.ready ? t("tnInfo").replace("{port}", d.port || "—").replace("{domain}", d.domain) : t("tnNeedSSL");
@@ -569,11 +574,14 @@ function renderTunnels() {
           ${s.agentVer ? `<span class="pill gray">v${esc(s.agentVer)}</span>` : ""}</div>
         <div class="actions">
           ${s.host ? `<button class="btn small primary" data-tn="deploy" data-i="${i}">${t("tnDeploy")}</button>` : ""}
+          <button class="btn small" data-tn="test" data-i="${i}">${t("tnTest")}</button>
           <button class="btn small" data-tn="join" data-i="${i}">${t("tnNewCmd")}</button>
           <button class="btn small danger" data-tn="del" data-i="${i}">${t("del")}</button>
         </div>
       </div>
       <p class="muted">${t("tnInbounds")}: ${s.inbounds.length ? s.inbounds.map((x) => `<span class="chip">${esc(x)}</span>`).join("") : "—"}</p>
+      ${tnTestRes[s.id] ? `<p class="${tnTestRes[s.id].ok ? "okmsg" : "err"}">${esc(tnTestRes[s.id].text)}</p>` : ""}
+      ${s.lastFail ? `<p class="muted small">${t("tnLastFail")}: ${esc(s.failAt ? ago(Math.max(0, Math.round(now - s.failAt))) + " " + t("tnAgo") : "")} · ${t("tnFails").replace("{n}", s.fails || 0)} · <span class="mono">${esc(s.lastFail)}</span></p>` : ""}
       ${s.xrayErr ? `<p class="err">${t("tnXrayErr")}: ${esc(s.xrayErr)}</p>` : ""}
       ${s.command ? `<div class="clients"><p class="muted">${t("tnQuick")}</p>${copyRow(s.command)}</div>` : ""}
       <details class="muted small-details"><summary>${t("tnRemove").replace(/[:：]$/, "")}</summary>${copyRow(s.remove)}</details>
@@ -590,6 +598,15 @@ $("#tunnelList").addEventListener("click", guard(async (e) => {
   } else if (b.dataset.tn === "join") {
     await api("POST", "api/tunnels/" + s.id + "/join"); loadTunnels();
   } else if (b.dataset.tn === "deploy") openDeploy(s);
+  else if (b.dataset.tn === "test") {
+    tnTestRes[s.id] = { ok: true, text: t("tnTesting") }; renderTunnels();
+    try {
+      const r = await api("POST", "api/tunnels/" + s.id + "/test");
+      tnTestRes[s.id] = r.ok ? { ok: r.xrayOk !== false, text: t("tnTestOk").replace("{ms}", r.ms) + (r.xrayErr ? " · " + r.xrayErr : "") }
+        : { ok: false, text: t("tnTestBad") + (r.lastFail ? " · " + r.lastFail : "") };
+    } catch (err) { tnTestRes[s.id] = { ok: false, text: err.message }; }
+    loadTunnels();
+  }
 }));
 function openDeploy(s) {
   openModal(`<h3>${t("tnDeploy")} · ${esc(s.name)}</h3>

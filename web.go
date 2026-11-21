@@ -186,6 +186,7 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("DELETE /api/tunnels/{id}", a.api(a.handleDelTunnel))
 	mux.HandleFunc("POST /api/tunnels/{id}/deploy", a.api(a.handleDeployTunnel))
 	mux.HandleFunc("POST /api/tunnels/{id}/join", a.api(a.handleNewJoin))
+	mux.HandleFunc("POST /api/tunnels/{id}/test", a.api(a.handleTestTunnel))
 	mux.HandleFunc("POST /api/tunnels/assign", a.api(a.handleTunnelAssign))
 	mux.HandleFunc("POST /api/agent/beat", a.handleBeat)
 	mux.HandleFunc("GET /sub/{token}", a.handleSub)

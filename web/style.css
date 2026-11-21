@@ -125,3 +125,5 @@ textarea.ports { width: 100%; box-sizing: border-box; resize: vertical; padding:
 details summary{cursor:pointer;margin:.3rem 0}
 .small-details{font-size:12px;margin-top:.4rem}
 @media (max-width:560px){.tnrow{grid-template-columns:1fr}}
+.okmsg{color:var(--ok,#1f7a4d)}
+.small{font-size:12px}

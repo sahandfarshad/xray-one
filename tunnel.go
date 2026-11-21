@@ -24,6 +24,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -60,6 +61,62 @@ type TunnelServer struct {
 	Applied  string `json:"applied,omitempty"` // config hash the agent runs
 	CtlPort  int    `json:"ctlPort,omitempty"` // agent's local control port
 	Busy     []int  `json:"busy,omitempty"`    // ports already taken on the middle server
+	Fails    int    `json:"fails,omitempty"`   // heartbeats that failed before the last one got through
+	LastFail string `json:"lastFail,omitempty"`
+	FailAt   int64  `json:"failAt,omitempty"`
+}
+
+// agentHub wakes held heartbeats (long-poll) and lets a manual test wait for
+// the next heartbeat of a middle server.
+type agentHub struct {
+	mu      sync.Mutex
+	poke    map[string]chan struct{}
+	waiters map[string][]chan struct{}
+}
+
+var hub = &agentHub{poke: map[string]chan struct{}{}, waiters: map[string][]chan struct{}{}}
+
+func (h *agentHub) pokeChan(id string) chan struct{} {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	c := h.poke[id]
+	if c == nil {
+		c = make(chan struct{}, 1)
+		h.poke[id] = c
+	}
+	return c
+}
+
+// Poke asks the middle server to send a heartbeat right away.
+func (h *agentHub) Poke(id string) {
+	select {
+	case h.pokeChan(id) <- struct{}{}:
+	default:
+	}
+}
+
+func (h *agentHub) PokeAll(ids []string) {
+	for _, id := range ids {
+		h.Poke(id)
+	}
+}
+
+func (h *agentHub) Wait(id string) chan struct{} {
+	c := make(chan struct{}, 1)
+	h.mu.Lock()
+	h.waiters[id] = append(h.waiters[id], c)
+	h.mu.Unlock()
+	return c
+}
+
+func (h *agentHub) Beat(id string) {
+	h.mu.Lock()
+	ws := h.waiters[id]
+	delete(h.waiters, id)
+	h.mu.Unlock()
+	for _, c := range ws {
+		c <- struct{}{}
+	}
 }
 
 // TunnelUse: one inbound goes through one middle server, listening there on
@@ -431,9 +488,9 @@ func (a *App) relaysFor(id string) []Relay {
 
 type tunnelView struct {
 	TunnelServer
-	Online  bool     `json:"online"`
-	Command string   `json:"command,omitempty"`
-	Inbound []string `json:"inbounds"`
+	Online  bool           `json:"online"`
+	Command string         `json:"command,omitempty"`
+	Inbound []string       `json:"inbounds"`
 	Remove  string         `json:"remove"`
 	Ports   map[string]int `json:"ports"` // inbound id -> chosen port on the middle server (0 = same)
 }
@@ -657,6 +714,12 @@ func (a *App) handleTunnelAssign(w http.ResponseWriter, r *http.Request) {
 		fail(w, 400, err)
 		return
 	}
+	for _, u := range b.Uses {
+		hub.Poke(u.Server)
+	}
+	for _, u := range prev {
+		hub.Poke(u.Server)
+	}
 	writeJSONResp(w, 200, map[string]bool{"ok": true})
 }
 
@@ -670,6 +733,9 @@ type beatReq struct {
 	Applied  string `json:"applied"`
 	CtlPort  int    `json:"ctlPort"`
 	Busy     []int  `json:"busy"`
+	Wait     bool   `json:"wait"`     // agent accepts a held (long-poll) reply
+	Fails    int    `json:"fails"`    // failed heartbeats since the last good one
+	LastFail string `json:"lastFail"` // why the last one failed
 }
 
 type beatResp struct {
@@ -677,6 +743,8 @@ type beatResp struct {
 	Hash   string          `json:"hash"`
 	Config json.RawMessage `json:"config,omitempty"`
 	Every  int             `json:"every"`
+	Held   bool            `json:"held,omitempty"`  // reply was held; beat again at once
+	Probe  bool            `json:"probe,omitempty"` // beat again at once (test or new config)
 }
 
 func (a *App) handleBeat(w http.ResponseWriter, r *http.Request) {
@@ -715,6 +783,9 @@ func (a *App) handleBeat(w http.ResponseWriter, r *http.Request) {
 			req.Busy = req.Busy[:2000]
 		}
 		s.Busy = req.Busy
+		if req.Fails > 0 {
+			s.Fails, s.LastFail, s.FailAt = req.Fails, trimTo(req.LastFail, 300), time.Now().Unix()
+		}
 		srv = *s
 		return nil
 	})
@@ -735,6 +806,18 @@ func (a *App) handleBeat(w http.ResponseWriter, r *http.Request) {
 		resp.Config = cfg
 	}
 	resp.Every = int(beatEvery / time.Second)
+	hub.Beat(srv.ID)
+	if req.Wait && resp.Config == nil && resp.Token == "" {
+		resp.Held = true
+		pc := hub.pokeChan(srv.ID)
+		select {
+		case <-pc:
+			resp.Probe = true
+		case <-time.After(25 * time.Second):
+		case <-r.Context().Done():
+			return
+		}
+	}
 	writeJSONResp(w, 200, resp)
 }
 
@@ -795,3 +878,59 @@ func (a *App) handleDeployTunnel(w http.ResponseWriter, r *http.Request) {
 func panelSSHKeyPath(dir string) string { return filepath.Join(dir, "ssh", "id_ed25519") }
 
 func fileExists(p string) bool { _, err := os.Stat(p); return err == nil }
+
+// handleTestTunnel: manual connection test. Wakes the middle server's held
+// heartbeat and waits for a fresh one through the tunnel.
+func (a *App) handleTestTunnel(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	servers, _, _ := a.store.TunnelsCopy()
+	var srv *TunnelServer
+	for i := range servers {
+		if servers[i].ID == id {
+			srv = &servers[i]
+		}
+	}
+	if srv == nil {
+		fail(w, 404, errors.New("unknown tunnel server"))
+		return
+	}
+	limit := 15 * time.Second
+	if srv.AgentVer == "" || versionLess(srv.AgentVer, "0.4.2") {
+		limit = 40 * time.Second // old agent: no long-poll, waits for its 30 s beat
+	}
+	start := time.Now()
+	c := hub.Wait(id)
+	hub.Poke(id)
+	select {
+	case <-c:
+		servers, _, _ = a.store.TunnelsCopy()
+		for _, s := range servers {
+			if s.ID == id {
+				writeJSONResp(w, 200, map[string]any{"ok": true, "ms": time.Since(start).Milliseconds(),
+					"xrayOk": s.XrayOK, "xrayErr": s.XrayErr, "agentVer": s.AgentVer})
+				return
+			}
+		}
+	case <-time.After(limit):
+	case <-r.Context().Done():
+		return
+	}
+	writeJSONResp(w, 200, map[string]any{"ok": false, "lastSeen": srv.LastSeen, "lastFail": srv.LastFail})
+}
+
+func versionLess(a, b string) bool {
+	pa, pb := strings.Split(a, "."), strings.Split(b, ".")
+	for i := 0; i < 3; i++ {
+		var x, y int
+		if i < len(pa) {
+			fmt.Sscan(pa[i], &x)
+		}
+		if i < len(pb) {
+			fmt.Sscan(pb[i], &y)
+		}
+		if x != y {
+			return x < y
+		}
+	}
+	return false
+}

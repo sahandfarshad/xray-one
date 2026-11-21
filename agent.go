@@ -198,13 +198,14 @@ func agentRun() {
 		st.Ctl = agentCtlPort
 	}
 	proxy, _ := url.Parse(fmt.Sprintf("socks5://127.0.0.1:%d", st.Ctl))
-	cl := &http.Client{Timeout: 20 * time.Second, Transport: &http.Transport{Proxy: http.ProxyURL(proxy),
+	cl := &http.Client{Timeout: 45 * time.Second, Transport: &http.Transport{Proxy: http.ProxyURL(proxy),
 		// the hop runs inside the authenticated VLESS+TLS tunnel to 127.0.0.1
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}}
 	every := beatEvery
 	var ip string
 	var ipAt time.Time
 	lastErr := ""
+	fails, lastFail := 0, ""
 	for {
 		if time.Since(ipAt) > time.Hour || ip == "" {
 			if v := publicIP(); v != "" {
@@ -213,7 +214,8 @@ func agentRun() {
 			ipAt = time.Now()
 		}
 		active, _ := run(5*time.Second, "systemctl", "is-active", agentRelay)
-		req := beatReq{Version: version, PublicIP: ip, XrayOK: active == "active", XrayErr: lastErr, Applied: st.Hash, CtlPort: st.Ctl, Busy: busyPorts(st.Ctl)}
+		req := beatReq{Version: version, PublicIP: ip, XrayOK: active == "active", XrayErr: lastErr, Applied: st.Hash, CtlPort: st.Ctl, Busy: busyPorts(st.Ctl),
+			Wait: true, Fails: fails, LastFail: lastFail}
 		body, _ := json.Marshal(req)
 		hr, _ := http.NewRequest("POST", strings.TrimSuffix(st.Join.Panel, "/")+"/api/agent/beat", bytes.NewReader(body))
 		hr.Header.Set("Content-Type", "application/json")
@@ -224,15 +226,27 @@ func agentRun() {
 		}
 		hr.Header.Set("X-Agent-Token", tok)
 		resp, err := cl.Do(hr)
+		next := every
 		if err != nil {
 			fmt.Println("heartbeat failed:", err)
+			fails++
+			lastFail = time.Now().UTC().Format("15:04:05Z ") + err.Error()
+			next = 5 * time.Second
+			// self-heal: restart the relay after 3 failures in a row
+			if fails%3 == 0 {
+				_, _ = run(30*time.Second, "systemctl", "restart", agentRelay)
+			}
 		} else {
 			var br beatResp
 			b, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 			resp.Body.Close()
 			if resp.StatusCode != 200 || json.Unmarshal(b, &br) != nil {
 				fmt.Println("heartbeat rejected:", resp.StatusCode, strings.TrimSpace(string(b)))
+				fails++
+				lastFail = time.Now().UTC().Format("15:04:05Z ") + fmt.Sprintf("HTTP %d", resp.StatusCode)
+				next = 10 * time.Second
 			} else {
+				fails = 0
 				if br.Token != "" {
 					st.Token = br.Token
 					_ = saveAgent(st)
@@ -250,9 +264,13 @@ func agentRun() {
 				if br.Every >= 10 && br.Every <= 600 {
 					every = time.Duration(br.Every) * time.Second
 				}
+				next = every
+				if br.Held || br.Probe {
+					next = 200 * time.Millisecond
+				}
 			}
 		}
-		time.Sleep(every)
+		time.Sleep(next)
 	}
 }
 
