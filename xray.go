@@ -18,6 +18,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -188,7 +189,7 @@ func (s *ConfigStore) Mutate(fn func(root *OMap) error) error {
 		_ = writeAtomic(core.ConfigPath, orig)
 		return fmt.Errorf("xray rejected the new config, nothing changed: %v", err)
 	}
-	return restartCore(core)
+	return restartOrRollback(core, orig)
 }
 
 func (s *ConfigStore) RestoreRaw(data []byte) error {
@@ -209,7 +210,7 @@ func (s *ConfigStore) RestoreRaw(data []byte) error {
 		_ = writeAtomic(core.ConfigPath, orig)
 		return fmt.Errorf("xray rejected this backup: %v", err)
 	}
-	return restartCore(core)
+	return restartOrRollback(core, orig)
 }
 
 func (s *ConfigStore) backup(data []byte) error {
@@ -244,8 +245,12 @@ func (s *ConfigStore) Backups() []string {
 
 func writeAtomic(p string, data []byte) error {
 	mode := os.FileMode(0o644)
+	uid, gid := -1, -1
 	if st, err := os.Stat(p); err == nil {
 		mode = st.Mode().Perm()
+		if sys, ok := st.Sys().(*syscall.Stat_t); ok {
+			uid, gid = int(sys.Uid), int(sys.Gid)
+		}
 	}
 	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 		return err
@@ -253,6 +258,11 @@ func writeAtomic(p string, data []byte) error {
 	tmp := p + ".xray-one.tmp"
 	if err := os.WriteFile(tmp, data, mode); err != nil {
 		return err
+	}
+	_ = os.Chmod(tmp, mode) // umask-proof
+	if uid >= 0 {
+		// keep the original owner so a non-root xray service can still read it
+		_ = os.Chown(tmp, uid, gid)
 	}
 	return os.Rename(tmp, p)
 }
@@ -264,7 +274,14 @@ func testConfig(core Core) error {
 	} else {
 		args = append(args, "-config", core.ConfigPath)
 	}
-	out, err := run(20*time.Second, core.Bin, args...)
+	name, full := core.Bin, args
+	if u := serviceUser(core); u != "" && u != "root" {
+		// test the way the service will read it: as its own user
+		if rp, err := exec.LookPath("runuser"); err == nil {
+			name, full = rp, append([]string{"-u", u, "--", core.Bin}, args...)
+		}
+	}
+	out, err := run(20*time.Second, name, full...)
 	if err != nil {
 		lines := strings.Split(out, "\n")
 		if len(lines) > 6 {
@@ -273,6 +290,50 @@ func testConfig(core Core) error {
 		return errors.New(strings.Join(lines, " | "))
 	}
 	return nil
+}
+
+// serviceUser returns the User= of the xray unit ("" when unknown/root).
+func serviceUser(core Core) string {
+	if _, err := exec.LookPath("systemctl"); err != nil {
+		return ""
+	}
+	out, err := run(5*time.Second, "systemctl", "show", "-p", "User", "--value", core.Service)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(out)
+}
+
+func serviceActive(core Core) bool {
+	out, _ := run(5*time.Second, "systemctl", "is-active", core.Service)
+	return strings.TrimSpace(out) == "active"
+}
+
+// restartOrRollback restarts xray and makes sure it stays up. If it was up
+// before and does not come back, the previous config is restored and xray is
+// restarted again, so the panel can never leave the core dead.
+func restartOrRollback(core Core, orig []byte) error {
+	if _, err := exec.LookPath("systemctl"); err != nil {
+		return nil
+	}
+	wasActive := serviceActive(core)
+	rerr := restartCore(core)
+	if rerr == nil {
+		time.Sleep(2 * time.Second)
+		if serviceActive(core) {
+			return nil
+		}
+	}
+	if !wasActive || len(orig) == 0 {
+		if rerr != nil {
+			return rerr
+		}
+		return errors.New("config saved, but xray is not running (it was not running before either); check: journalctl -u " + core.Service)
+	}
+	logs, _ := run(5*time.Second, "journalctl", "-u", core.Service, "-n", "5", "--no-pager", "-o", "cat")
+	_ = writeAtomic(core.ConfigPath, orig)
+	_ = restartCore(core)
+	return fmt.Errorf("xray did not start with the new config, previous config restored: %s", strings.ReplaceAll(logs, "\n", " | "))
 }
 
 func restartCore(core Core) error {
