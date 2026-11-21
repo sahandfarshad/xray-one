@@ -586,8 +586,12 @@ func BuildInbound(root *OMap, n NewInbound) (*OMap, error) {
 		if n.CertFile == "" || n.KeyFile == "" {
 			return nil, errors.New("TLS needs certificate and key file paths")
 		}
+		cf, kf, err := xrayReadableCert(n.CertFile, n.KeyFile)
+		if err != nil {
+			return nil, fmt.Errorf("cannot prepare certificate for xray: %v", err)
+		}
 		stream.Set("tlsSettings", om("serverName", n.ServerName,
-			"certificates", []any{om("certificateFile", n.CertFile, "keyFile", n.KeyFile)}))
+			"certificates", []any{om("certificateFile", cf, "keyFile", kf)}))
 	case "reality":
 		if n.Protocol != "vless" && n.Protocol != "trojan" {
 			return nil, errors.New("REALITY works with VLESS or Trojan")
