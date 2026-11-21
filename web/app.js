@@ -337,7 +337,8 @@ async function openInboundForm(ed) {
   const certOpts = certs.map((c, i) => `<option value="${i}">${esc(c.domain)} · ${esc(c.source)}</option>`).join("");
   openModal(`<h3>${ed ? t("editInbound") + ` · <span class="mono">${esc(ed.id)}</span>` : t("addInbound")}</h3>
   <form id="ibForm" class="form">
-    <label>${t("protocol")}<select name="protocol"><option>vless</option><option>vmess</option><option>trojan</option><option value="shadowsocks">shadowsocks 2022</option><option value="hysteria">hysteria2</option><option>socks</option><option>http</option></select></label>
+    <label>${t("protocol")}<select name="protocol"><option>vless</option><option>vmess</option><option>trojan</option><option value="shadowsocks">shadowsocks 2022</option><option value="hysteria">hysteria2</option><option>socks</option><option>http</option><option>wireguard</option></select></label>
+    <label data-show="venc">VLESS Encryption<select name="vlessEnc"><option value="none">none</option><option value="mlkem768x25519plus">ML-KEM-768 (post-quantum)</option></select></label>
     <label>${t("port")}<input name="port" type="number" min="1" max="65535" value="${fp.port || ""}" required></label>
     <label>${t("network")}<select name="network"><option>tcp</option><option>ws</option><option>grpc</option><option>xhttp</option><option>httpupgrade</option><option>kcp</option></select></label>
     <label>${t("security")}<select name="security"><option>reality</option><option>tls</option><option>none</option></select></label>
@@ -377,7 +378,7 @@ async function openInboundForm(ed) {
     const v = ed.form, r = v.reality;
     f.protocol.value = v.protocol; f.protocol.disabled = true;
     f.tag.value = v.tag || ""; f.tag.readOnly = true;
-    f.network.value = v.network; f.security.value = v.security;
+    f.network.value = v.network; f.security.value = v.security; if (v.vlessEnc) f.vlessEnc.value = v.vlessEnc;
     f.path.value = v.path || ""; f.serviceName.value = v.serviceName || ""; f.serverName.value = v.serverName || "";
     f.certFile.value = v.certFile || ""; f.keyFile.value = v.keyFile || "";
     if (r) {
@@ -405,7 +406,9 @@ async function openInboundForm(ed) {
   };
   const sync = () => {
     const net = f.network.value, sec = f.security.value, proto = f.protocol.value;
-    const show = { path: ["ws", "xhttp", "httpupgrade"].includes(net), grpc: net === "grpc", sni: sec !== "none", reality: sec === "reality", tls: sec === "tls" };
+    const wg = proto === "wireguard", fixed = wg || proto === "socks" || proto === "http";
+    f.network.disabled = fixed; f.security.disabled = fixed;
+    const show = { path: !fixed && ["ws", "xhttp", "httpupgrade"].includes(net), grpc: !fixed && net === "grpc", sni: !fixed && sec !== "none", reality: !fixed && sec === "reality", tls: !fixed && sec === "tls", venc: proto === "vless" };
     f.querySelectorAll("[data-show]").forEach((l) => l.classList.toggle("hidden", !show[l.dataset.show]));
     [...f.security.options].forEach((o) => (o.disabled = o.value === "reality" && !["vless", "trojan"].includes(proto)));
     if (f.security.selectedOptions[0].disabled) f.security.value = "tls";

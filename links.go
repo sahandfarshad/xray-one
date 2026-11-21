@@ -242,7 +242,7 @@ func clientLinkAt(ib *OMap, c *OMap, host string, r Relay) string {
 	switch proto {
 	case "vless":
 		q := url.Values{}
-		q.Set("encryption", "none")
+		q.Set("encryption", vlessClientEncryption(pathStr(ib, "settings", "decryption")))
 		if f := asStr(c.Get("flow")); f != "" {
 			q.Set("flow", f)
 		}
@@ -275,6 +275,14 @@ func clientLinkAt(ib *OMap, c *OMap, host string, r Relay) string {
 		q.Set("alpn", "h3")
 		q.Set("insecure", "0")
 		return "hysteria2://" + url.PathEscape(asStr(c.Get("auth"))) + "@" + hp + "/?" + q.Encode() + "#" + name
+	case "wireguard":
+		q := url.Values{}
+		q.Set("publickey", wgPub(pathStr(ib, "settings", "secretKey")))
+		if a := asArr(c.Get("allowedIPs")); len(a) > 0 {
+			q.Set("address", asStr(a[0]))
+		}
+		q.Set("mtu", orDefault(pathStr(ib, "settings", "mtu"), "1420"))
+		return "wireguard://" + url.QueryEscape(asStr(c.Get("privateKey"))) + "@" + hp + "?" + q.Encode() + "#" + name
 	case "socks":
 		return "socks://" + base64.StdEncoding.EncodeToString([]byte(asStr(c.Get("user"))+":"+asStr(c.Get("pass")))) + "@" + hp + "#" + name
 	case "http":

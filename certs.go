@@ -136,6 +136,11 @@ func portFree(port int) bool {
 		return false
 	}
 	l.Close()
+	u, err := net.ListenPacket("udp", fmt.Sprintf(":%d", port))
+	if err != nil {
+		return false
+	}
+	u.Close()
 	return true
 }
 

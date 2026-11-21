@@ -7,6 +7,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -393,7 +394,7 @@ func findInbound(root *OMap, id string) (*OMap, int) {
 
 func supportsClients(ib *OMap) bool {
 	switch asStr(ib.Get("protocol")) {
-	case "vless", "vmess", "trojan", "hysteria":
+	case "vless", "vmess", "trojan", "hysteria", "wireguard":
 		return true
 	case "shadowsocks":
 		return path(ib, "settings", "clients") != nil
@@ -407,6 +408,9 @@ func clientSecret(proto string, c *OMap) string {
 	}
 	if proto == "hysteria" {
 		return asStr(c.Get("auth"))
+	}
+	if proto == "wireguard" {
+		return asStr(c.Get("privateKey"))
 	}
 	return asStr(c.Get("password"))
 }
@@ -531,6 +535,87 @@ type NewInbound struct {
 	HeaderType  string       `json:"headerType"`
 	Flow        string       `json:"-"`
 	Reality     *RealityOpts `json:"reality,omitempty"`
+	VlessEnc    string       `json:"vlessEnc,omitempty"` // "" / none / mlkem768x25519plus
+}
+
+const vlessEncName = "mlkem768x25519plus"
+
+// newVlessDecryption: VLESS Encryption (ML-KEM-768 + X25519 key exchange, X25519 auth).
+func newVlessDecryption() (string, error) {
+	priv, _, err := genX25519()
+	if err != nil {
+		return "", err
+	}
+	return vlessEncName + ".native.600s." + priv, nil
+}
+
+// vlessClientEncryption turns the server's decryption string into the client's.
+func vlessClientEncryption(dec string) string {
+	if dec == "" || dec == "none" {
+		return "none"
+	}
+	p := strings.Split(dec, ".")
+	if len(p) < 4 {
+		return "none"
+	}
+	pub := pubFromPriv(p[len(p)-1])
+	if pub == "" {
+		return "none" // ML-KEM auth key: public part can't be derived here
+	}
+	return p[0] + "." + p[1] + ".0rtt." + pub
+}
+
+// visionOK: VLESS Vision flow fits raw TCP with TLS, REALITY or VLESS Encryption.
+func visionOK(ib *OMap) bool {
+	if asStr(ib.Get("protocol")) != "vless" {
+		return false
+	}
+	network, security := streamInfo(ib)
+	if network != "tcp" && network != "raw" {
+		return false
+	}
+	dec := pathStr(ib, "settings", "decryption")
+	return security == "reality" || security == "tls" || (dec != "" && dec != "none")
+}
+
+func wgKeyPair() (priv, pub string, err error) {
+	pr, pb, err := genX25519()
+	if err != nil {
+		return
+	}
+	a, _ := base64.RawURLEncoding.DecodeString(pr)
+	b, _ := base64.RawURLEncoding.DecodeString(pb)
+	return base64.StdEncoding.EncodeToString(a), base64.StdEncoding.EncodeToString(b), nil
+}
+
+func wgPub(priv string) string {
+	k, err := base64.StdEncoding.DecodeString(priv)
+	if err != nil || len(k) != 32 {
+		return ""
+	}
+	p := pubFromPriv(base64.RawURLEncoding.EncodeToString(k))
+	b, _ := base64.RawURLEncoding.DecodeString(p)
+	if len(b) != 32 {
+		return ""
+	}
+	return base64.StdEncoding.EncodeToString(b)
+}
+
+// nextWGAddr: first free 10.66.0.x/32 among the peers.
+func nextWGAddr(ib *OMap) string {
+	used := map[string]bool{}
+	for _, v := range clientsOf(ib) {
+		for _, a := range asArr(asMap(v).Get("allowedIPs")) {
+			used[asStr(a)] = true
+		}
+	}
+	for i := 2; i < 255; i++ {
+		a := fmt.Sprintf("10.66.0.%d/32", i)
+		if !used[a] {
+			return a
+		}
+	}
+	return ""
 }
 
 // RealityOpts: the full REALITY form (like 3x-ui). Empty fields get defaults.
@@ -658,7 +743,14 @@ func BuildInbound(root *OMap, n NewInbound) (*OMap, error) {
 	var settings *OMap
 	switch n.Protocol {
 	case "vless":
-		settings = om("clients", []any{}, "decryption", "none")
+		dec := "none"
+		if n.VlessEnc == vlessEncName {
+			var err error
+			if dec, err = newVlessDecryption(); err != nil {
+				return nil, err
+			}
+		}
+		settings = om("clients", []any{}, "decryption", dec)
 	case "vmess", "trojan":
 		settings = om("clients", []any{})
 	case "shadowsocks":
@@ -684,6 +776,13 @@ func BuildInbound(root *OMap, n NewInbound) (*OMap, error) {
 		if n.Security != "tls" {
 			return nil, errors.New("Hysteria2 needs TLS (a domain certificate)")
 		}
+	case "wireguard":
+		priv, _, err := wgKeyPair()
+		if err != nil {
+			return nil, err
+		}
+		settings = om("secretKey", priv, "peers", []any{}, "mtu", 1420)
+		n.Network, n.Security = "udp", "none"
 	case "socks":
 		settings = om("auth", "password", "accounts", []any{om("user", "u"+randHex(3), "pass", randHex(8))}, "udp", true)
 		n.Network, n.Security = "tcp", "none"
@@ -692,6 +791,9 @@ func BuildInbound(root *OMap, n NewInbound) (*OMap, error) {
 		n.Network, n.Security = "tcp", "none"
 	default:
 		return nil, errors.New("unsupported protocol")
+	}
+	if n.Protocol == "wireguard" {
+		return om("tag", n.Tag, "listen", "0.0.0.0", "port", n.Port, "protocol", n.Protocol, "settings", settings), nil
 	}
 	if n.Network == "" {
 		n.Network = "tcp"
@@ -762,14 +864,24 @@ func BuildInbound(root *OMap, n NewInbound) (*OMap, error) {
 
 func NewClient(ib *OMap, email string) (*OMap, error) {
 	proto := asStr(ib.Get("protocol"))
-	network, security := streamInfo(ib)
 	switch proto {
 	case "vless":
 		c := om("id", newUUID(), "email", email, "level", 0)
-		if (network == "tcp" || network == "raw") && (security == "reality" || security == "tls") {
+		if visionOK(ib) {
 			c.Set("flow", "xtls-rprx-vision")
 		}
 		return c, nil
+	case "wireguard":
+		priv, pub, err := wgKeyPair()
+		if err != nil {
+			return nil, err
+		}
+		addr := nextWGAddr(ib)
+		if addr == "" {
+			return nil, errors.New("no free WireGuard address left")
+		}
+		// email and privateKey are kept for the panel (links, names); xray ignores them
+		return om("email", email, "publicKey", pub, "privateKey", priv, "allowedIPs", []any{addr}), nil
 	case "vmess":
 		return om("id", newUUID(), "email", email, "level", 0), nil
 	case "trojan":
@@ -791,7 +903,14 @@ func NewClient(ib *OMap, email string) (*OMap, error) {
 
 var reEmail = regexp.MustCompile(`^[A-Za-z0-9._@+-]{1,64}$`)
 
-func clientsOf(ib *OMap) []any { return asArr(path(ib, "settings", "clients")) }
+func clientsKey(ib *OMap) string {
+	if asStr(ib.Get("protocol")) == "wireguard" {
+		return "peers"
+	}
+	return "clients"
+}
+
+func clientsOf(ib *OMap) []any { return asArr(path(ib, "settings", clientsKey(ib))) }
 
 func setClients(ib *OMap, cl []any) {
 	s := asMap(ib.Get("settings"))
@@ -799,7 +918,7 @@ func setClients(ib *OMap, cl []any) {
 		s = NewOMap()
 		ib.Set("settings", s)
 	}
-	s.Set("clients", cl)
+	s.Set(clientsKey(ib), cl)
 }
 
 func removeClient(ib *OMap, email string) (*OMap, bool) {

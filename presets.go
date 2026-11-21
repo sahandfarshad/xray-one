@@ -20,6 +20,7 @@ type Preset struct {
 	Network    string `json:"network"`
 	Security   string `json:"security"`
 	Method     string `json:"method,omitempty"`
+	VlessEnc   string `json:"vlessEnc,omitempty"`
 	HeaderType string `json:"headerType,omitempty"`
 	Note       string `json:"note,omitempty"`
 }
@@ -33,6 +34,8 @@ func ssPreset(id, label, method, note string) Preset {
 }
 
 func hdr(p Preset, h string) Preset { p.HeaderType = h; return p }
+
+func enc(p Preset) Preset { p.VlessEnc = vlessEncName; return p }
 
 var presets = []Preset{
 	// REALITY: no domain or certificate needed
@@ -62,6 +65,9 @@ var presets = []Preset{
 	pr("hysteria2", "Hysteria2 (QUIC · UDP)", "tls", "hysteria", "hysteria", "tls", "UDP"),
 
 	// no TLS
+	enc(pr("vless-tcp-enc", "VLESS · TCP · Encryption (ML-KEM, Vision)", "plain", "vless", "tcp", "none", "post-quantum, no domain")),
+	enc(pr("vless-xhttp-enc", "VLESS · XHTTP · Encryption (ML-KEM)", "plain", "vless", "xhttp", "none", "post-quantum, relay / CDN")),
+	enc(pr("vless-ws-enc", "VLESS · WebSocket · Encryption (ML-KEM)", "plain", "vless", "ws", "none", "post-quantum, relay / CDN")),
 	pr("vless-tcp", "VLESS · TCP", "plain", "vless", "tcp", "none", ""),
 	hdr(pr("vless-tcp-http", "VLESS · TCP · HTTP header", "plain", "vless", "tcp", "none", "obfs"), "http"),
 	pr("vless-ws", "VLESS · WebSocket", "plain", "vless", "ws", "none", "relay / CDN over HTTP"),
@@ -89,6 +95,7 @@ var presets = []Preset{
 	// plain proxies (own random user/password, not the shared client)
 	pr("socks", "SOCKS5 (user/password)", "proxy", "socks", "tcp", "none", "TCP+UDP"),
 	pr("http", "HTTP proxy (user/password)", "proxy", "http", "tcp", "none", ""),
+	pr("wireguard", "WireGuard", "proxy", "wireguard", "udp", "none", "UDP"),
 }
 
 // presetCert picks the certificate TLS presets use: the panel's own, else
@@ -170,7 +177,7 @@ func (a *App) handleCreatePresets(w http.ResponseWriter, r *http.Request) {
 			if !ok {
 				return fmt.Errorf("unknown type %q", id)
 			}
-			n := NewInbound{Protocol: p.Protocol, Network: p.Network, Security: p.Security, Method: p.Method, HeaderType: p.HeaderType}
+			n := NewInbound{Protocol: p.Protocol, Network: p.Network, Security: p.Security, Method: p.Method, HeaderType: p.HeaderType, VlessEnc: p.VlessEnc}
 			if p.Security == "reality" {
 				n.Dest, n.ServerName = strings.TrimSpace(body.Dest), strings.TrimSpace(body.SNI)
 			}

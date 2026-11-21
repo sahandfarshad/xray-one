@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 )
 
 func strList(v any) []string {
@@ -29,6 +30,12 @@ func numOf(v any) int64 {
 // inboundForm reads an inbound back into the Add-inbound form shape.
 func inboundForm(ib *OMap) NewInbound {
 	n := NewInbound{Protocol: asStr(ib.Get("protocol")), Tag: asStr(ib.Get("tag")), HeaderType: "none"}
+	if n.Protocol == "vless" {
+		n.VlessEnc = "none"
+		if strings.HasPrefix(pathStr(ib, "settings", "decryption"), vlessEncName) {
+			n.VlessEnc = vlessEncName
+		}
+	}
 	n.Port = int(numOf(ib.Get("port")))
 	n.Network, n.Security = streamInfo(ib)
 	if n.Network == "raw" {
@@ -94,7 +101,7 @@ func editableInbound(root *OMap, ib *OMap) error {
 		return errors.New("system inbound cannot be edited")
 	}
 	switch asStr(ib.Get("protocol")) {
-	case "vless", "vmess", "trojan", "shadowsocks", "hysteria", "socks", "http":
+	case "vless", "vmess", "trojan", "shadowsocks", "hysteria", "socks", "http", "wireguard":
 	default:
 		return fmt.Errorf("protocol %q cannot be edited here", asStr(ib.Get("protocol")))
 	}
@@ -172,6 +179,11 @@ func (a *App) handleEditInbound(w http.ResponseWriter, r *http.Request) {
 			return err
 		}
 		ib.Set("port", n.Port)
+		if n.Protocol == "vless" && n.VlessEnc != "" && n.VlessEnc != old.VlessEnc {
+			if s := asMap(ib.Get("settings")); s != nil {
+				s.Set("decryption", pathStr(nb, "settings", "decryption"))
+			}
+		}
 		if ns := asMap(nb.Get("streamSettings")); ns != nil {
 			if os := asMap(ib.Get("streamSettings")); os != nil {
 				for _, k := range []string{"sockopt", "finalmask"} {
@@ -184,8 +196,7 @@ func (a *App) handleEditInbound(w http.ResponseWriter, r *http.Request) {
 		}
 		// VLESS Vision flow only fits TCP + TLS/REALITY
 		if n.Protocol == "vless" {
-			net, sec := streamInfo(ib)
-			vision := (net == "tcp" || net == "raw") && (sec == "tls" || sec == "reality")
+			vision := visionOK(ib)
 			for _, c := range asArr(asMap(ib.Get("settings")).Get("clients")) {
 				cm := asMap(c)
 				if cm == nil || isTunnelEmail(asStr(cm.Get("email"))) {
