@@ -24,6 +24,7 @@
     <nav id="tabs">
       <button data-view="overview" data-t="overview"></button>
       <button data-view="inbounds" data-t="inbounds"></button>
+      <button data-view="users" data-t="usersTab"></button>
       <button data-view="tunnels" data-t="tunnels"></button>
       <button data-view="settings" data-t="settings"></button>
     </nav>
@@ -77,11 +78,21 @@
           <label class="selall"><input type="checkbox" id="selAll"><span data-t="selectAll"></span></label>
           <button id="portsBtn" class="btn" data-t="ports"></button>
           <button id="relaySelBtn" class="btn" disabled></button>
+          <button id="delSelBtn" class="btn danger" disabled></button>
           <button id="quickBtn" class="btn" data-t="quick"></button>
           <button id="addInboundBtn" class="btn primary" data-t="addInbound"></button>
         </div>
       </div>
       <div id="inboundList" class="stack"></div>
+    </section>
+
+    <section id="view-users" class="view hidden">
+      <div class="row-between head">
+        <h2 data-t="usersTab"></h2>
+        <div class="actions"><button id="addUserBtn" class="btn primary" data-t="addUser"></button></div>
+      </div>
+      <p class="muted" data-t="usersHint"></p>
+      <div id="userList" class="stack"></div>
     </section>
 
     <section id="view-tunnels" class="view hidden">

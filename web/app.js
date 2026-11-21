@@ -31,8 +31,13 @@ const T = {
     quick: "ساخت خودکار", quickTitle: "ساخت خودکار کانفیگ‌ها", quickHint: "هر نوعی که تیک بزنی روی یک پورت آزاد ساخته می‌شود و یک کلاینت مشترک می‌گیرد، پس سابسکریپشن همان کلاینت همه را دارد.",
     gReality: "REALITY (بدون دامنه و گواهی)", gTls: "TLS (با گواهی دامنه)", gPlain: "بدون TLS (برای relay یا CDN روی HTTP)",
     needCert: "اول SSL را از منوی SSH تنظیم کن", exists: "داری", all: "همه", none: "هیچ", clientName: "نام کلاینت مشترک",
-    createN: "ساختن", relay: "Relay", addRelay: "افزودن Relay", relaySel: "Relay برای انتخاب‌شده‌ها", relayAddr: "IP یا دامنه‌ی relay",
-    relayPort: "پورت relay (خالی = همان پورت اینباند)", relayName: "اسم (اختیاری)", relayHint: "لینک‌ها یک نسخه‌ی اضافه با این آدرس می‌گیرند؛ SNI و REALITY همان سرور اصلی می‌ماند.",
+    createN: "ساختن", relay: "آدرس جایگزین", addRelay: "افزودن آدرس جایگزین", relaySel: "آدرس جایگزین برای انتخاب‌شده‌ها", relayAddr: "IP یا دامنه‌ی جایگزین",
+    relayPort: "پورت (خالی = همان پورت اینباند)", relayName: "اسم (اختیاری)", relayHint: "هر کلاینت یک لینک اضافه با این آدرس می‌گیرد (در QR و سابسکریپشن هم). SNI، کلید و بقیه‌ی تنظیمات همان می‌ماند. پنل مسیر را نمی‌سازد؛ این آدرس باید خودش به این سرور برسد.",
+    relayEx: "مثال‌ها: یک ساب‌دامنه‌ی دیگر که به همین IP اشاره می‌کند (اگر دامنه‌ی اول فیلتر شد) · ساب‌دامنه یا IP تمیز Cloudflare برای اینباندهای WS/XHTTP با TLS · IP سروری که خودت با iptables/HAProxy به اینجا فوروارد کرده‌ای.",
+    relayBefore: "لینک فعلی", relayAfter: "لینک اضافه با این آدرس", relayNoClient: "این اینباند هنوز کلاینتی ندارد که نمونه‌ی لینک نشان داده شود.",
+    delSel: "حذف", confirmDelSel: "{n} اینباند انتخاب‌شده حذف شود؟ کلاینت‌های داخلشان هم حذف می‌شوند.",
+    usersTab: "کلاینت‌ها", addUser: "کلاینت جدید", usersHint: "هر کلاینت یک اسم است که روی چند اینباند می‌نشیند، با یک محدودیت حجم و زمان و یک لینک سابسکریپشن برای همه.",
+    noUsers: "هنوز کلاینتی نیست.", pickInbounds: "اینباندهای این کلاینت", editUser: "ویرایش", noInboundsYet: "بدون اینباند", confirmDelUser: "این کلاینت از همه‌ی اینباندها حذف شود؟",
     tunnels: "تانل", addTunnel: "سرور میانی جدید", tnName: "نام", tnHost: "IP یا دامنه‌ی سرور میانی (برای SSH)", tnSshPort: "پورت SSH", tnSshUser: "کاربر SSH",
     tnMethod: "روش", tnDeploy: "Deploy با SSH", tnPass: "پسورد SSH (فقط یک بار؛ ذخیره نمی‌شود)", tnPassKey: "کلید پنل نصب شده؛ پسورد لازم نیست",
     tnOnline: "متصل", tnOffline: "قطع", tnNever: "هنوز وصل نشده", tnAgo: "پیش", tnQuick: "نصب سریع بدون پسورد: این دستور را روی سرور میانی (با root) بزنید. تا ۲۴ ساعت معتبر است و بعد از اتصال باطل می‌شود.",
@@ -76,8 +81,13 @@ const T = {
     quick: "Quick setup", quickTitle: "Create configs automatically", quickHint: "Every type you tick gets its own free port and one shared client, so that client's subscription carries them all.",
     gReality: "REALITY (no domain or certificate needed)", gTls: "TLS (uses your domain certificate)", gPlain: "No TLS (for relays or CDN over HTTP)",
     needCert: "Set SSL in the SSH menu first", exists: "have it", all: "All", none: "None", clientName: "Shared client name",
-    createN: "Create", relay: "Relay", addRelay: "Add relay", relaySel: "Relay for selected", relayAddr: "Relay IP or domain",
-    relayPort: "Relay port (empty = inbound port)", relayName: "Name (optional)", relayHint: "Links get an extra copy with this address; SNI and REALITY stay those of the real server.",
+    createN: "Create", relay: "Alt address", addRelay: "Add alt address", relaySel: "Alt address for selected", relayAddr: "Alternative IP or domain",
+    relayPort: "Port (empty = inbound port)", relayName: "Name (optional)", relayHint: "Every client gets an extra link with this address (also in QR and subscription). SNI, keys and other settings stay the same. The panel does not build the route; this address must already reach this server.",
+    relayEx: "Examples: a second subdomain pointing to this IP (if the first gets blocked) · a Cloudflare subdomain or clean IP for WS/XHTTP+TLS inbounds · the IP of a server you forward here yourself with iptables/HAProxy.",
+    relayBefore: "Current link", relayAfter: "Extra link with this address", relayNoClient: "This inbound has no client yet to preview a link.",
+    delSel: "Delete", confirmDelSel: "Delete {n} selected inbounds? Their clients go too.",
+    usersTab: "Clients", addUser: "New client", usersHint: "A client is one name that sits on several inbounds, with one traffic/time limit and one subscription link for all of them.",
+    noUsers: "No clients yet.", pickInbounds: "Inbounds of this client", editUser: "Edit", noInboundsYet: "no inbound", confirmDelUser: "Remove this client from every inbound?",
     tunnels: "Tunnel", addTunnel: "New middle server", tnName: "Name", tnHost: "Middle server IP or domain (for SSH)", tnSshPort: "SSH port", tnSshUser: "SSH user",
     tnMethod: "Method", tnDeploy: "Deploy over SSH", tnPass: "SSH password (used once, never stored)", tnPassKey: "Panel key installed; no password needed",
     tnOnline: "Connected", tnOffline: "Down", tnNever: "not connected yet", tnAgo: "ago", tnQuick: "Quick install without a password: run this on the middle server as root. Valid 24 h, void after it connects.",
@@ -144,7 +154,7 @@ $("#logoutBtn").onclick = guard(async () => { await api("POST", "api/logout"); s
 $("#langBtn").onclick = () => { lang = lang === "fa" ? "en" : "fa"; localStorage.setItem("xo_lang", lang); applyLang(); };
 
 // ---------- navigation ----------
-document.querySelectorAll("#tabs button").forEach((b) => (b.onclick = () => { state.view = b.dataset.view; render(); if (state.view === "settings") loadSettings(); if (state.view === "tunnels") loadTunnels(); }));
+document.querySelectorAll("#tabs button").forEach((b) => (b.onclick = () => { state.view = b.dataset.view; render(); if (state.view === "settings") loadSettings(); if (state.view === "tunnels") loadTunnels(); if (state.view === "users") loadUsers(); }));
 
 async function boot() {
   try {
@@ -186,6 +196,8 @@ function renderSubBar() {
   const n = state.sel.size;
   $("#relaySelBtn").textContent = t("relaySel") + (n ? " (" + n + ")" : "");
   $("#relaySelBtn").disabled = !n;
+  $("#delSelBtn").textContent = t("delSel") + (n ? " (" + n + ")" : "");
+  $("#delSelBtn").disabled = !n;
   const all = state.inbounds.filter((i) => !i.system);
   $("#selAll").checked = all.length > 0 && n === all.length;
   $("#selAll").indeterminate = n > 0 && n < all.length;
@@ -417,17 +429,39 @@ function openClient(ib, cl) {
   });
 }
 
+function swapAddr(link, addr, port) {
+  if (!link) return "";
+  if (link.startsWith("vmess://")) {
+    try {
+      const j = JSON.parse(atob(link.slice(8)));
+      if (addr) j.add = addr; if (port) j.port = String(port); j.ps = (j.ps || "") + "-alt";
+      return "vmess://" + btoa(JSON.stringify(j));
+    } catch { return link; }
+  }
+  return link.replace(/@(\[[^\]]+\]|[^:/?#@]+):(\d+)/, (m, h, p) => "@" + (addr || h) + ":" + (port || p));
+}
 function openRelay(ids) {
+  const ib = state.inbounds.find((x) => x.id === ids[0]);
+  const sample = ib && ib.clients && ib.clients[0] ? ib.clients[0].link : (ib && ib.singleLink) || "";
   openModal(`<h3>${t("addRelay")}</h3>
-  <p class="muted">${esc(ids.map((id) => id).join(" · "))}</p>
-  <form id="rlForm" class="form">
-    <label>${t("relayAddr")}<input name="address" required placeholder="1.2.3.4"></label>
-    <label>${t("relayPort")}<input name="port" type="number" min="1" max="65535"></label>
-    <label>${t("relayName")}<input name="name" placeholder="iran-relay"></label>
-  </form>
+  <p class="muted">${esc(ids.join(" · "))}</p>
   <p class="muted">${t("relayHint")}</p>
+  <p class="muted small">${t("relayEx")}</p>
+  <form id="rlForm" class="form">
+    <label>${t("relayAddr")}<input name="address" required placeholder="cdn.example.com"></label>
+    <label>${t("relayPort")}<input name="port" type="number" min="1" max="65535"></label>
+    <label>${t("relayName")}<input name="name" placeholder="cdn"></label>
+  </form>
+  ${sample ? `<label>${t("relayBefore")}</label><pre class="log mono wrap">${esc(sample)}</pre>
+  <label>${t("relayAfter")}</label><pre id="rlPrev" class="log mono wrap">${esc(sample)}</pre>` : `<p class="muted">${t("relayNoClient")}</p>`}
   <p id="rlErr" class="err"></p>
-  <div class="actions"><button class="btn primary" id="rlSave">${t("save")}</button><button class="btn" data-close>${t("cancel")}</button></div>`);
+  <div class="actions"><button class="btn primary" id="rlSave">${t("save")}</button><button class="btn" data-close>${t("cancel")}</button></div>`, true);
+  const prev = () => {
+    if (!sample) return;
+    const d = Object.fromEntries(new FormData($("#rlForm")));
+    $("#rlPrev").innerHTML = esc(swapAddr(sample, d.address.trim(), +d.port || 0)).replace(/@([^:]+):(\d+)/, '@<mark>$1</mark>:<mark>$2</mark>');
+  };
+  $("#rlForm").addEventListener("input", prev);
   $("#rlSave").onclick = async () => {
     const d = Object.fromEntries(new FormData($("#rlForm")));
     try {
@@ -435,6 +469,92 @@ function openRelay(ids) {
       closeModal(); toast(t("done")); refreshInbounds();
     } catch (e) { $("#rlErr").textContent = e.message; }
   };
+}
+$("#delSelBtn").onclick = guard(async () => {
+  const ids = [...state.sel]; if (!ids.length) return;
+  if (!confirm(t("confirmDelSel").replace("{n}", ids.length))) return;
+  await api("POST", "api/inbounds/delete", { ids }); state.sel.clear(); toast(t("done")); refreshInbounds();
+});
+
+// ---------- clients tab ----------
+let userData = null;
+async function loadUsers() {
+  try { userData = await api("GET", "api/users"); } catch (e) { $("#userList").innerHTML = `<div class="card empty">${esc(e.message)}</div>`; return; }
+  renderUsers();
+}
+function ibLabel(id) {
+  const x = userData.inbounds.find((i) => i.id === id);
+  return x ? `${x.tag || x.id} · ${x.protocol}${x.network ? "/" + x.network : ""} · :${x.port}` : id;
+}
+function renderUsers() {
+  const d = userData; if (!d) return;
+  if (!d.clients.length) { $("#userList").innerHTML = `<div class="card empty">${t("noUsers")}</div>`; return; }
+  $("#userList").innerHTML = d.clients.map((u, i) => {
+    const used = (u.up || 0) + (u.down || 0);
+    const pct = u.limitBytes ? Math.min(100, (used / u.limitBytes) * 100) : 0;
+    const cl = { meta: u, disabled: u.disabled };
+    return `<div class="card">
+      <div class="ib-head">
+        <div class="ib-title"><b class="mono">${esc(u.email)}</b>${clientStatus(cl)}
+          <span class="pill gray">${fmtBytes(used)} / ${u.limitBytes ? fmtBytes(u.limitBytes) : t("unlimited")}</span></div>
+        <div class="actions">
+          <button class="btn small primary" data-u="edit" data-i="${i}">${t("editUser")}</button>
+          <button class="btn small" data-u="qr" data-i="${i}">QR</button>
+          <button class="btn small danger" data-u="del" data-i="${i}">${t("del")}</button>
+        </div>
+      </div>
+      ${u.limitBytes ? `<div class="bar"><i style="width:${pct}%"></i></div>` : ""}
+      <p class="muted">${t("inbounds")}: ${u.inbounds.length ? u.inbounds.map((x) => `<span class="chip">${esc(ibLabel(x))}</span>`).join("") : t("noInboundsYet")}</p>
+      ${copyRow(subURL(u))}
+    </div>`;
+  }).join("");
+}
+$("#userList").addEventListener("click", guard(async (e) => {
+  const cp = e.target.closest("[data-copy]"); if (cp) { copyText(cp.dataset.copy); return; }
+  const b = e.target.closest("button[data-u]"); if (!b) return;
+  const u = userData.clients[+b.dataset.i];
+  if (b.dataset.u === "del") {
+    if (!confirm(t("confirmDelUser"))) return;
+    await api("DELETE", "api/users?email=" + encodeURIComponent(u.email)); toast(t("done")); loadUsers(); refreshInbounds();
+  } else if (b.dataset.u === "qr") {
+    openModal(`<h3 class="mono">${esc(u.email)}</h3>${copyRow(subURL(u))}<img class="qr" alt="QR" src="api/qr?text=${encodeURIComponent(subURL(u))}"><div class="actions"><button class="btn" data-close>${t("cancel")}</button></div>`);
+  } else openUser(u);
+}));
+$("#addUserBtn").onclick = guard(async () => { if (!userData) await loadUsers(); openUser(null); });
+function openUser(u) {
+  const isNew = !u;
+  const boxes = userData.inbounds.map((x) => `<label class="pitem"><input type="checkbox" value="${esc(x.id)}" ${u && u.inbounds.includes(x.id) ? "checked" : ""}><span class="mono">${esc(ibLabel(x.id))}</span></label>`).join("");
+  openModal(`<h3>${isNew ? t("addUser") : esc(u.email)}</h3>
+  <form id="usForm" class="form">
+    ${isNew ? `<label>${t("name")}<input name="email" required pattern="[A-Za-z0-9._@+\\-]{1,64}" placeholder="ali"></label>` : ""}
+    <label>${isNew ? t("expiryDays") : t("setExpiry")}<input name="expiryDays" type="number" min="0" step="1" ${isNew ? 'value="30"' : `placeholder="${t("expiryDays")}"`}></label>
+    <label>${isNew ? t("limitGB") : t("setLimit")}<input name="limitGB" type="number" min="0" step="0.5" ${isNew ? 'value="0"' : `placeholder="${t("limitGB")}"`}></label>
+  </form>
+  <label>${t("pickInbounds")}</label>
+  <div class="pgrid" id="usIbs">${boxes || `<p class="muted">${t("noInbounds")}</p>`}</div>
+  <p id="usErr" class="err"></p>
+  <div class="actions">
+    <button class="btn primary" id="usSave">${isNew ? t("create") : u.disabled ? t("save") + " + " + t("enable") : t("save")}</button>
+    ${isNew ? "" : `<button class="btn" id="usReset">${t("resetTraffic")}</button>`}
+    <button class="btn ghost" data-close>${t("cancel")}</button>
+  </div>`, true);
+  const collect = (extra) => {
+    const d = Object.fromEntries(new FormData($("#usForm")));
+    const inbounds = [...$("#usIbs").querySelectorAll("input:checked")].map((x) => x.value);
+    if (isNew) return { email: d.email.trim(), expiryDays: +d.expiryDays, limitGB: +d.limitGB, inbounds };
+    const body = { email: u.email, inbounds, setInbounds: true, enable: !!u.disabled, ...extra };
+    if (d.expiryDays !== "") { body.setExpiry = true; body.expiryDays = +d.expiryDays; }
+    if (d.limitGB !== "") { body.setLimit = true; body.limitGB = +d.limitGB; }
+    return body;
+  };
+  const go = async (extra) => {
+    try {
+      await api("POST", isNew ? "api/users" : "api/users/edit", collect(extra));
+      closeModal(); toast(t("saved")); loadUsers(); refreshInbounds();
+    } catch (e) { $("#usErr").textContent = e.message; }
+  };
+  $("#usSave").onclick = () => go({});
+  if (!isNew) $("#usReset").onclick = () => go({ resetTraffic: true });
 }
 $("#relaySelBtn").onclick = () => openRelay([...state.sel]);
 $("#portsBtn").onclick = () => {

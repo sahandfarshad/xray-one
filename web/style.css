@@ -127,3 +127,6 @@ details summary{cursor:pointer;margin:.3rem 0}
 @media (max-width:560px){.tnrow{grid-template-columns:1fr}}
 .okmsg{color:var(--ok,#1f7a4d)}
 .small{font-size:12px}
+.wrap{white-space:pre-wrap;word-break:break-all;font-size:12px;max-height:140px;overflow:auto}
+mark{background:#ffe58a;color:inherit;border-radius:3px;padding:0 2px}
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:.4rem;max-height:320px;overflow:auto}

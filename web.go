@@ -158,6 +158,11 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("GET /api/inbounds", a.api(a.handleInbounds))
 	mux.HandleFunc("POST /api/inbounds", a.api(a.handleAddInbound))
 	mux.HandleFunc("DELETE /api/inbounds", a.api(a.handleDelInbound))
+	mux.HandleFunc("POST /api/inbounds/delete", a.api(a.handleDelInbounds))
+	mux.HandleFunc("GET /api/users", a.api(a.handleUsers))
+	mux.HandleFunc("POST /api/users", a.api(a.handleAddUser))
+	mux.HandleFunc("POST /api/users/edit", a.api(a.handleEditUser))
+	mux.HandleFunc("DELETE /api/users", a.api(a.handleDelUser))
 	mux.HandleFunc("POST /api/clients", a.api(a.handleAddClient))
 	mux.HandleFunc("DELETE /api/clients", a.api(a.handleDelClient))
 	mux.HandleFunc("POST /api/clients/update", a.api(a.handleUpdateClient))
@@ -590,12 +595,12 @@ func (a *App) handleSub(w http.ResponseWriter, r *http.Request) {
 	host := a.host(r)
 	var links []string
 	if !m.Disabled {
-		for _, v := range asArr(root.Get("inbounds")) {
+		for i, v := range asArr(root.Get("inbounds")) {
 			ib := asMap(v)
 			for _, cv := range clientsOf(ib) {
 				c := asMap(cv)
 				if asStr(c.Get("email")) == m.Email {
-					l, rl := ClientLinks(ib, c, host, a.relaysFor(asStr(ib.Get("tag"))))
+					l, rl := ClientLinks(ib, c, host, a.relaysFor(inboundID(ib, i)))
 					links = append(append(links, l), rl...)
 				}
 			}
