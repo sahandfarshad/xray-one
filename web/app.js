@@ -35,7 +35,7 @@ const T = {
     relayPort: "پورت (خالی = همان پورت اینباند)", relayName: "اسم (اختیاری)", relayHint: "هر کلاینت یک لینک اضافه با این آدرس می‌گیرد (در QR و سابسکریپشن هم). SNI، کلید و بقیه‌ی تنظیمات همان می‌ماند. پنل مسیر را نمی‌سازد؛ این آدرس باید خودش به این سرور برسد.",
     relayEx: "مثال‌ها: یک ساب‌دامنه‌ی دیگر که به همین IP اشاره می‌کند (اگر دامنه‌ی اول فیلتر شد) · ساب‌دامنه یا IP تمیز Cloudflare برای اینباندهای WS/XHTTP با TLS · IP سروری که خودت با iptables/HAProxy به اینجا فوروارد کرده‌ای.",
     relayBefore: "لینک فعلی", relayAfter: "لینک اضافه با این آدرس", relayNoClient: "این اینباند هنوز کلاینتی ندارد که نمونه‌ی لینک نشان داده شود.",
-    delSel: "حذف", rsCheck: "بررسی", rCommas: "با کاما جدا کنید", rNew: "ساخت دوباره", rNewKeys: "کلید جدید", rClear: "پاک کردن", rsFind: "پیدا کردن", rsTitle: "اسکنر مقصد REALITY", rsHint: "از روی همین سرور چک می‌کند کدام سایت برای REALITY مناسب است (TLS 1.3، h2، X25519 و گواهی معتبر). خالی بگذارید تا سایت‌های معروف چک شوند، یا یک دامنه، IP یا رنج مثل 1.2.3.0/24 بدهید.",
+    delSel: "حذف", selAll: "انتخاب همه", selNone: "هیچ‌کدام", editInbound: "ویرایش اینباند", editIbNote: "پروتکل، تگ و کلاینت‌ها همین‌طور می‌مانند. با عوض کردن پورت یا تنظیمات، لینک‌ها و ساب عوض می‌شوند و کاربرها باید ساب را آپدیت کنند.", rsCheck: "بررسی", rCommas: "با کاما جدا کنید", rNew: "ساخت دوباره", rNewKeys: "کلید جدید", rClear: "پاک کردن", rsFind: "پیدا کردن", rsTitle: "اسکنر مقصد REALITY", rsHint: "از روی همین سرور چک می‌کند کدام سایت برای REALITY مناسب است (TLS 1.3، h2، X25519 و گواهی معتبر). خالی بگذارید تا سایت‌های معروف چک شوند، یا یک دامنه، IP یا رنج مثل 1.2.3.0/24 بدهید.",
     rsPh: "دامنه، IP یا رنج — خالی = سایت‌های معروف", rsScan: "اسکن", rsStatus: "وضعیت", rsCert: "گواهی", rsLatency: "تأخیر", rsOk: "مناسب", rsNo: "نامناسب", rsUse: "استفاده", rsWait: "در حال اسکن… (تا یک دقیقه)", rsCount: "{a} مناسب از {b} مورد", close: "بستن", tunSel: "⇄ تانل", tbTitle: "تانل گروهی", tbHint: "اینباندهای انتخاب‌شده با همان پورت خودشان روی سرور میانی باز می‌شوند. پورت‌هایی که آنجا اشغال باشند رد می‌شوند و اینجا نشان داده می‌شوند.",
     tbAdd: "تانل کن", tbRemove: "برداشتن از این سرور", tbSkipped: "رد شدند", tbDone: "{n} اینباند انجام شد", tbProgress: "{a} از {b} روی سرور میانی آماده شد", tbSlow: "سرور میانی جواب نداد. آنلاین بودنش را در تب تانل چک کنید.",
     stOk: "باز", stBusy: "اشغال روی سرور میانی", stDown: "باز نشد", stOffline: "سرور میانی آفلاین", stUnknown: "ایجنت قدیمی؛ دستور نصب را دوباره اجرا کنید", stPending: "در حال بررسی…", confirmDelSel: "{n} اینباند انتخاب‌شده حذف شود؟ کلاینت‌های داخلشان هم حذف می‌شوند.",
@@ -88,7 +88,7 @@ const T = {
     relayPort: "Port (empty = inbound port)", relayName: "Name (optional)", relayHint: "Every client gets an extra link with this address (also in QR and subscription). SNI, keys and other settings stay the same. The panel does not build the route; this address must already reach this server.",
     relayEx: "Examples: a second subdomain pointing to this IP (if the first gets blocked) · a Cloudflare subdomain or clean IP for WS/XHTTP+TLS inbounds · the IP of a server you forward here yourself with iptables/HAProxy.",
     relayBefore: "Current link", relayAfter: "Extra link with this address", relayNoClient: "This inbound has no client yet to preview a link.",
-    delSel: "Delete", rsCheck: "Check", rCommas: "comma separated", rNew: "Regenerate", rNewKeys: "New keys", rClear: "Clear", rsFind: "Find", rsTitle: "REALITY target scanner", rsHint: "Checks from this server which sites work as a REALITY target (TLS 1.3, h2, X25519, valid certificate). Leave empty for common sites, or enter a domain, an IP or a range like 1.2.3.0/24.",
+    delSel: "Delete", selAll: "Select all", selNone: "Select none", editInbound: "Edit inbound", editIbNote: "Protocol, tag and clients stay. Changing the port or settings changes links and the subscription; users must update their sub.", rsCheck: "Check", rCommas: "comma separated", rNew: "Regenerate", rNewKeys: "New keys", rClear: "Clear", rsFind: "Find", rsTitle: "REALITY target scanner", rsHint: "Checks from this server which sites work as a REALITY target (TLS 1.3, h2, X25519, valid certificate). Leave empty for common sites, or enter a domain, an IP or a range like 1.2.3.0/24.",
     rsPh: "domain, IP or range — empty = common sites", rsScan: "Scan", rsStatus: "Status", rsCert: "Certificate", rsLatency: "Latency", rsOk: "Feasible", rsNo: "Not usable", rsUse: "Use", rsWait: "Scanning… (up to a minute)", rsCount: "{a} usable of {b}", close: "Close", tunSel: "⇄ Tunnel", tbTitle: "Bulk tunnel", tbHint: "Selected inbounds open on the middle server on their own port. Ports busy there are skipped and shown here.",
     tbAdd: "Tunnel", tbRemove: "Remove from this server", tbSkipped: "Skipped", tbDone: "{n} inbounds done", tbProgress: "{a} of {b} ready on the middle server", tbSlow: "The middle server did not answer. Check it is online in the Tunnels tab.",
     stOk: "open", stBusy: "busy on middle server", stDown: "not listening", stOffline: "middle server offline", stUnknown: "old agent; rerun the install command", stPending: "checking…", confirmDelSel: "Delete {n} selected inbounds? Their clients go too.",
@@ -281,6 +281,7 @@ function renderInbounds() {
         <div class="actions">
           ${ib.system ? "" : `<button class="btn small" data-act="relay" data-i="${idx}">+ ${t("relay")}</button>`}
           ${ib.system ? "" : `<button class="btn small" data-act="tunnel" data-i="${idx}">⇄ ${t("tnUse")}</button>`}
+          ${ib.system ? "" : `<button class="btn small" data-act="editInbound" data-i="${idx}">✎ ${t("edit")}</button>`}
           ${ib.system ? "" : `<button class="btn small danger" data-act="delInbound" data-i="${idx}">${t("del")}</button>`}
         </div>
       </div>
@@ -307,6 +308,9 @@ $("#inboundList").addEventListener("click", guard(async (e) => {
   if (b.dataset.act === "delInbound") {
     if (!confirm(t("confirmDelInbound"))) return;
     await api("DELETE", "api/inbounds?id=" + encodeURIComponent(ib.id)); toast(t("done")); refreshInbounds();
+  } else if (b.dataset.act === "editInbound") {
+    const ed = await api("GET", "api/inbounds/detail?id=" + encodeURIComponent(ib.id));
+    await openInboundForm(ed);
   } else if (b.dataset.act === "addClient") openAddClient(ib);
   else if (b.dataset.act === "client") openClient(ib, ib.clients[+b.dataset.c]);
   else if (b.dataset.act === "relay") openRelay([ib.id]);
@@ -327,10 +331,11 @@ $("#modal").addEventListener("click", (e) => {
   if (e.target.id === "modal" || e.target.dataset.close !== undefined) closeModal();
 });
 
-$("#addInboundBtn").onclick = guard(async () => {
-  const [fp, certs] = await Promise.all([api("GET", "api/freeport"), api("GET", "api/certs")]);
+$("#addInboundBtn").onclick = guard(() => openInboundForm(null));
+async function openInboundForm(ed) {
+  const [fp, certs] = await Promise.all([ed ? { port: ed.form.port } : api("GET", "api/freeport"), api("GET", "api/certs")]);
   const certOpts = certs.map((c, i) => `<option value="${i}">${esc(c.domain)} · ${esc(c.source)}</option>`).join("");
-  openModal(`<h3>${t("addInbound")}</h3>
+  openModal(`<h3>${ed ? t("editInbound") + ` · <span class="mono">${esc(ed.id)}</span>` : t("addInbound")}</h3>
   <form id="ibForm" class="form">
     <label>${t("protocol")}<select name="protocol"><option>vless</option><option>vmess</option><option>trojan</option><option value="shadowsocks">shadowsocks 2022</option><option value="hysteria">hysteria2</option><option>socks</option><option>http</option></select></label>
     <label>${t("port")}<input name="port" type="number" min="1" max="65535" value="${fp.port || ""}" required></label>
@@ -360,14 +365,29 @@ $("#addInboundBtn").onclick = guard(async () => {
     <label data-show="tls">${t("keyFile")}<input name="keyFile" placeholder="/etc/letsencrypt/live/…/privkey.pem"></label>
   </form>
   <p id="ibErr" class="err"></p>
-  <div class="actions"><button class="btn primary" id="ibCreate">${t("create")}</button><button class="btn" data-close>${t("cancel")}</button></div>`, true);
+  ${ed ? `<p class="muted">${t("editIbNote")}</p>` : ""}
+  <div class="actions"><button class="btn primary" id="ibCreate">${ed ? t("save") : t("create")}</button><button class="btn" data-close>${t("cancel")}</button></div>`, true);
   const f = $("#ibForm");
   $("#ibScan").onclick = () => openRealityScan((r) => { f.r_target.value = r.target; f.r_sni.value = r.sni; }, true);
   const rhex = (n) => [...crypto.getRandomValues(new Uint8Array(n))].map((b) => b.toString(16).padStart(2, "0")).join("");
   const newSids = () => { f.r_sids.value = [8, 2, 1, 3, 4, 7, 5, 6].map(rhex).join(","); };
   const newSpx = () => { const a = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"; f.r_spx.value = "/" + [...crypto.getRandomValues(new Uint8Array(15))].map((b) => a[b % a.length]).join(""); };
   const newKeys = async () => { try { const k = await api("GET", "api/reality/keys"); f.r_priv.value = k.privateKey; f.r_pub.value = k.publicKey; } catch (e) { $("#ibErr").textContent = e.message; } };
-  newSids(); newSpx(); newKeys();
+  if (ed) {
+    const v = ed.form, r = v.reality;
+    f.protocol.value = v.protocol; f.protocol.disabled = true;
+    f.tag.value = v.tag || ""; f.tag.readOnly = true;
+    f.network.value = v.network; f.security.value = v.security;
+    f.path.value = v.path || ""; f.serviceName.value = v.serviceName || ""; f.serverName.value = v.serverName || "";
+    f.certFile.value = v.certFile || ""; f.keyFile.value = v.keyFile || "";
+    if (r) {
+      f.r_show.checked = !!r.show; f.r_xver.value = r.xver || 0; f.r_fp.value = r.fingerprint || "chrome";
+      f.r_target.value = r.target || ""; f.r_sni.value = (r.serverNames || []).join(",");
+      f.r_mtd.value = r.maxTimeDiff || 0; f.r_minv.value = r.minClientVer || ""; f.r_maxv.value = r.maxClientVer || "";
+      f.r_sids.value = (r.shortIds || []).join(","); f.r_spx.value = r.spiderX || "/";
+      f.r_priv.value = r.privateKey || ""; f.r_pub.value = ed.publicKey || "";
+    } else { newSids(); newSpx(); newKeys(); }
+  } else { newSids(); newSpx(); newKeys(); }
   $("#rSids").onclick = newSids; $("#rSpx").onclick = newSpx; $("#rKeys").onclick = newKeys;
   $("#rClear").onclick = () => { f.r_priv.value = ""; f.r_pub.value = ""; };
   f.r_priv.onchange = async () => {
@@ -401,14 +421,18 @@ $("#addInboundBtn").onclick = guard(async () => {
   $("#ibCreate").onclick = async () => {
     const d = Object.fromEntries(new FormData(f)); d.port = +d.port; delete d.certPick;
     const list = (v) => (v || "").split(/[,\s]+/).map((x) => x.trim()).filter(Boolean);
+    const sidList = (v) => { const a = (v || "").split(",").map((x) => x.trim()); const out = a.filter(Boolean); if (a.length > 1 && a.some((x) => !x)) out.push(""); return out; };
     if (d.security === "reality") d.reality = { show: !!f.r_show.checked, xver: +d.r_xver || 0, fingerprint: d.r_fp, target: (d.r_target || "").trim(),
       serverNames: list(d.r_sni), maxTimeDiff: +d.r_mtd || 0, minClientVer: (d.r_minv || "").trim(), maxClientVer: (d.r_maxv || "").trim(),
-      shortIds: list(d.r_sids), spiderX: (d.r_spx || "").trim(), privateKey: (d.r_priv || "").trim() };
+      shortIds: sidList(d.r_sids), spiderX: (d.r_spx || "").trim(), privateKey: (d.r_priv || "").trim() };
     Object.keys(d).filter((k) => k.startsWith("r_")).forEach((k) => delete d[k]);
-    try { await api("POST", "api/inbounds", d); closeModal(); toast(t("done")); refreshInbounds(); }
-    catch (e) { $("#ibErr").textContent = e.message; }
+    try {
+      if (ed && d.network === ed.form.network) d.headerType = ed.form.headerType;
+      if (ed) await api("POST", "api/inbounds/edit", { ...d, id: ed.id }); else await api("POST", "api/inbounds", d);
+      closeModal(); toast(ed ? t("saved") : t("done")); refreshInbounds();
+    } catch (e) { $("#ibErr").textContent = e.message; }
   };
-});
+}
 
 function openAddClient(ib) {
   openModal(`<h3>${t("addClient")} · <span class="mono">${esc(ib.tag || ib.id)}</span></h3>
@@ -616,7 +640,7 @@ function openUser(u) {
     <label>${isNew ? t("expiryDays") : t("setExpiry")}<input name="expiryDays" type="number" min="0" step="1" ${isNew ? 'value="30"' : `placeholder="${t("expiryDays")}"`}></label>
     <label>${isNew ? t("limitGB") : t("setLimit")}<input name="limitGB" type="number" min="0" step="0.5" ${isNew ? 'value="0"' : `placeholder="${t("limitGB")}"`}></label>
   </form>
-  <label>${t("pickInbounds")}</label>
+  <div class="pickhead"><label>${t("pickInbounds")}</label>${boxes ? `<span><button type="button" class="btn small" id="usAll">${t("selAll")}</button> <button type="button" class="btn small" id="usNone">${t("selNone")}</button></span>` : ""}</div>
   <div class="pgrid" id="usIbs">${boxes || `<p class="muted">${t("noInbounds")}</p>`}</div>
   <p id="usErr" class="err"></p>
   <div class="actions">
@@ -640,6 +664,10 @@ function openUser(u) {
     } catch (e) { $("#usErr").textContent = e.message; }
   };
   $("#usSave").onclick = () => go({});
+  if (boxes) {
+    const setAll = (v) => $("#usIbs").querySelectorAll("input[type=checkbox]").forEach((x) => (x.checked = v));
+    $("#usAll").onclick = () => setAll(true); $("#usNone").onclick = () => setAll(false);
+  }
   if (!isNew) $("#usReset").onclick = () => go({ resetTraffic: true });
 }
 $("#relaySelBtn").onclick = () => openRelay([...state.sel]);

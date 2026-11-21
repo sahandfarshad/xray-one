@@ -587,11 +587,20 @@ func buildReality(n NewInbound) (*OMap, error) {
 		return nil, errors.New("REALITY private key is not a valid x25519 key")
 	}
 	sids := clean(o.ShortIDs)
+	hasEmpty := false
+	for _, v := range o.ShortIDs {
+		if strings.TrimSpace(v) == "" {
+			hasEmpty = true
+		}
+	}
 	for i, v := range sids {
 		sids[i] = strings.ToLower(v)
 		if !reShortID.MatchString(sids[i]) {
 			return nil, fmt.Errorf("short ID %q: use 0-16 hex characters, even length", v)
 		}
+	}
+	if hasEmpty {
+		sids = append(sids, "")
 	}
 	if len(sids) == 0 {
 		sids = []string{randHex(4)}

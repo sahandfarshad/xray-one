@@ -159,6 +159,8 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("POST /api/inbounds", a.api(a.handleAddInbound))
 	mux.HandleFunc("DELETE /api/inbounds", a.api(a.handleDelInbound))
 	mux.HandleFunc("POST /api/inbounds/delete", a.api(a.handleDelInbounds))
+	mux.HandleFunc("GET /api/inbounds/detail", a.api(a.handleInboundDetail))
+	mux.HandleFunc("POST /api/inbounds/edit", a.api(a.handleEditInbound))
 	mux.HandleFunc("GET /api/users", a.api(a.handleUsers))
 	mux.HandleFunc("POST /api/users", a.api(a.handleAddUser))
 	mux.HandleFunc("POST /api/users/edit", a.api(a.handleEditUser))

@@ -149,3 +149,4 @@ mark{background:#ffe58a;color:inherit;border-radius:3px;padding:0 2px}
 .rgrid.hidden{display:none}
 @media (max-width:640px){.rgrid{grid-template-columns:1fr}}
 .rgrid .rck input{width:16px;height:16px;padding:0}
+.pickhead{display:flex;align-items:center;justify-content:space-between;gap:.5rem;flex-wrap:wrap}
