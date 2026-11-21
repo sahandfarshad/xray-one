@@ -8,6 +8,7 @@ import (
 	"errors"
 	"net/http"
 	"sort"
+	"strings"
 )
 
 type userView struct {
@@ -46,13 +47,13 @@ func (a *App) handleUsers(w http.ResponseWriter, r *http.Request) {
 		n, s := streamInfo(ib)
 		ibs = append(ibs, userInbound{ID: id, Tag: tag, Protocol: asStr(ib.Get("protocol")), Port: asStr(ib.Get("port")), Network: n, Security: s})
 		for _, cv := range clientsOf(ib) {
-			if e := asStr(asMap(cv).Get("email")); e != "" {
+			if e := asStr(asMap(cv).Get("email")); e != "" && !isTunnelEmail(e) {
 				on[e] = append(on[e], id)
 			}
 		}
 	}
 	for _, m := range a.store.All() {
-		if m.Disabled {
+		if m.Disabled && !isTunnelEmail(m.Email) {
 			for id := range m.Saved {
 				on[m.Email] = append(on[m.Email], id)
 			}
@@ -66,7 +67,7 @@ func (a *App) handleUsers(w http.ResponseWriter, r *http.Request) {
 		out = append(out, userView{ClientMeta: *m, Inbounds: ids})
 	}
 	for _, m := range a.store.All() { // clients with no inbound yet
-		if _, ok := on[m.Email]; !ok {
+		if _, ok := on[m.Email]; !ok && !isTunnelEmail(m.Email) {
 			m.Saved = nil
 			out = append(out, userView{ClientMeta: m, Inbounds: []string{}})
 		}
@@ -82,6 +83,9 @@ type userReq struct {
 
 // setUserInbounds puts the client on exactly the given inbounds.
 func (a *App) setUserInbounds(email string, want []string) error {
+	if isTunnelEmail(email) {
+		return errors.New("tunnel-* names belong to middle servers")
+	}
 	m := a.store.Meta(email)
 	wantSet := map[string]bool{}
 	for _, id := range want {
@@ -97,6 +101,13 @@ func (a *App) setUserInbounds(email string, want []string) error {
 				continue
 			}
 			id := inboundID(ib, i)
+			if asStr(ib.Get("tag")) == tunnelTag {
+				if wantSet[id] {
+					return errors.New("the tunnel inbound is managed by XRay One")
+				}
+				has[id] = true
+				continue
+			}
 			present := false
 			for _, cv := range clientsOf(ib) {
 				if asStr(asMap(cv).Get("email")) == email {
@@ -156,7 +167,7 @@ func (a *App) handleAddUser(w http.ResponseWriter, r *http.Request) {
 		fail(w, 400, err)
 		return
 	}
-	if !reEmail.MatchString(req.Email) {
+	if !reEmail.MatchString(req.Email) || isTunnelEmail(req.Email) {
 		fail(w, 400, errors.New("name may use letters, digits and . _ @ + - only"))
 		return
 	}
@@ -275,3 +286,6 @@ func (a *App) handleDelInbounds(w http.ResponseWriter, r *http.Request) {
 	})
 	writeJSONResp(w, 200, map[string]any{"ok": true, "removed": len(removed)})
 }
+
+// isTunnelEmail: names XRay One gives middle servers on the tunnel inbound.
+func isTunnelEmail(e string) bool { return strings.HasPrefix(e, "tunnel-") }

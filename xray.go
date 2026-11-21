@@ -371,6 +371,7 @@ type InboundView struct {
 	Clients  []ClientView `json:"clients"`
 	Relays   []Relay      `json:"relays"`
 	Single   string       `json:"singleLink,omitempty"` // single-user shadowsocks
+	Tunnels  []TunnelLink `json:"tunnels"`
 }
 
 func inboundID(ib *OMap, i int) string {

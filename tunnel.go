@@ -41,29 +41,30 @@ const (
 )
 
 type TunnelServer struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	Method   string `json:"method"`
-	Host     string `json:"host,omitempty"` // SSH address / public address
-	SSHPort  int    `json:"sshPort,omitempty"`
-	SSHUser  string `json:"sshUser,omitempty"`
-	HostKey  string `json:"hostKey,omitempty"` // TOFU, "ssh-ed25519 AAAA..."
-	KeyOK    bool   `json:"keyInstalled,omitempty"`
-	UUID     string `json:"uuid"`
-	Token    string `json:"token,omitempty"`
-	Join     string `json:"join,omitempty"`
-	JoinExp  int64  `json:"joinExp,omitempty"`
-	LastSeen int64  `json:"lastSeen,omitempty"`
-	PublicIP string `json:"publicIP,omitempty"`
-	AgentVer string `json:"agentVer,omitempty"`
-	XrayOK   bool   `json:"xrayOk,omitempty"`
-	XrayErr  string `json:"xrayErr,omitempty"`
-	Applied  string `json:"applied,omitempty"` // config hash the agent runs
-	CtlPort  int    `json:"ctlPort,omitempty"` // agent's local control port
-	Busy     []int  `json:"busy,omitempty"`    // ports already taken on the middle server
-	Fails    int    `json:"fails,omitempty"`   // heartbeats that failed before the last one got through
-	LastFail string `json:"lastFail,omitempty"`
-	FailAt   int64  `json:"failAt,omitempty"`
+	ID        string            `json:"id"`
+	Name      string            `json:"name"`
+	Method    string            `json:"method"`
+	Host      string            `json:"host,omitempty"` // SSH address / public address
+	SSHPort   int               `json:"sshPort,omitempty"`
+	SSHUser   string            `json:"sshUser,omitempty"`
+	HostKey   string            `json:"hostKey,omitempty"` // TOFU, "ssh-ed25519 AAAA..."
+	KeyOK     bool              `json:"keyInstalled,omitempty"`
+	UUID      string            `json:"uuid"`
+	Token     string            `json:"token,omitempty"`
+	Join      string            `json:"join,omitempty"`
+	JoinExp   int64             `json:"joinExp,omitempty"`
+	LastSeen  int64             `json:"lastSeen,omitempty"`
+	PublicIP  string            `json:"publicIP,omitempty"`
+	AgentVer  string            `json:"agentVer,omitempty"`
+	XrayOK    bool              `json:"xrayOk,omitempty"`
+	XrayErr   string            `json:"xrayErr,omitempty"`
+	Applied   string            `json:"applied,omitempty"` // config hash the agent runs
+	CtlPort   int               `json:"ctlPort,omitempty"` // agent's local control port
+	Busy      []int             `json:"busy,omitempty"`    // ports already taken on the middle server
+	Fails     int               `json:"fails,omitempty"`   // heartbeats that failed before the last one got through
+	LastFail  string            `json:"lastFail,omitempty"`
+	FailAt    int64             `json:"failAt,omitempty"`
+	PortState map[string]string `json:"portState,omitempty"`
 }
 
 // agentHub wakes held heartbeats (long-poll) and lets a manual test wait for
@@ -653,43 +654,9 @@ func (a *App) handleTunnelAssign(w http.ResponseWriter, r *http.Request) {
 		}
 		if err := a.store.EditTunnels(func() error {
 			prev = a.store.TunnelUse[b.ID]
-			var ok []TunnelUse
-			seen := map[string]bool{}
-			for _, u := range b.Uses {
-				srv := a.store.tunnelByID(u.Server)
-				if srv == nil || seen[u.Server] {
-					continue
-				}
-				seen[u.Server] = true
-				if u.Port < 0 || u.Port > 65535 {
-					return errors.New("invalid port")
-				}
-				if u.Port == ibPort {
-					u.Port = 0
-				}
-				lp := u.ListenPort(ibPort)
-				if lp == srv.CtlPort || (srv.CtlPort == 0 && lp == agentCtlPort) {
-					return fmt.Errorf("port %d is the agent's own port on %s", lp, srv.Name)
-				}
-				mine := false
-				for k, us := range a.store.TunnelUse {
-					for _, x := range us {
-						if k != b.ID && x.Server == srv.ID && x.ListenPort(ibPorts[k]) == lp {
-							return fmt.Errorf("port %d on %s is already used by another tunneled inbound", lp, srv.Name)
-						}
-						if k == b.ID && x.Server == srv.ID && x.ListenPort(ibPort) == lp {
-							mine = true
-						}
-					}
-				}
-				if !mine {
-					for _, bp := range srv.Busy {
-						if bp == lp {
-							return fmt.Errorf("port %d is busy on %s; pick another port", lp, srv.Name)
-						}
-					}
-				}
-				ok = append(ok, u)
+			ok, err := a.store.checkUsesLocked(b.ID, b.Uses, ibPort, ibPorts)
+			if err != nil {
+				return err
 			}
 			if len(ok) == 0 {
 				delete(a.store.TunnelUse, b.ID)
@@ -723,19 +690,173 @@ func (a *App) handleTunnelAssign(w http.ResponseWriter, r *http.Request) {
 	writeJSONResp(w, 200, map[string]bool{"ok": true})
 }
 
+// checkUsesLocked validates an inbound's middle servers and ports
+// (store lock held).
+func (s *Store) checkUsesLocked(id string, uses []TunnelUse, ibPort int, ibPorts map[string]int) ([]TunnelUse, error) {
+	var ok []TunnelUse
+	seen := map[string]bool{}
+	for _, u := range uses {
+		srv := s.tunnelByID(u.Server)
+		if srv == nil || seen[u.Server] {
+			continue
+		}
+		seen[u.Server] = true
+		if u.Port < 0 || u.Port > 65535 {
+			return nil, errors.New("invalid port")
+		}
+		if u.Port == ibPort {
+			u.Port = 0
+		}
+		lp := u.ListenPort(ibPort)
+		if lp == srv.CtlPort || (srv.CtlPort == 0 && lp == agentCtlPort) {
+			return nil, fmt.Errorf("port %d is the agent's own port on %s", lp, srv.Name)
+		}
+		mine := false
+		for k, us := range s.TunnelUse {
+			for _, x := range us {
+				if k != id && x.Server == srv.ID && x.ListenPort(ibPorts[k]) == lp {
+					return nil, fmt.Errorf("port %d on %s is already used by another tunneled inbound", lp, srv.Name)
+				}
+				if k == id && x.Server == srv.ID && x.ListenPort(ibPort) == lp {
+					mine = true
+				}
+			}
+		}
+		if !mine {
+			for _, bp := range srv.Busy {
+				if bp == lp {
+					return nil, fmt.Errorf("port %d is busy on %s; pick another port", lp, srv.Name)
+				}
+			}
+		}
+		ok = append(ok, u)
+	}
+	return ok, nil
+}
+
+// handleTunnelBulk adds (or removes) one middle server on many inbounds at
+// once, each on its own port. Inbounds that cannot be tunneled are skipped
+// and reported.
+func (a *App) handleTunnelBulk(w http.ResponseWriter, r *http.Request) {
+	var b struct {
+		IDs    []string `json:"ids"`
+		Server string   `json:"server"`
+		Remove bool     `json:"remove"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&b); err != nil || len(b.IDs) == 0 || b.Server == "" {
+		fail(w, 400, errors.New("pick inbounds and a middle server"))
+		return
+	}
+	type skip struct {
+		ID     string `json:"id"`
+		Reason string `json:"reason"`
+	}
+	var skipped []skip
+	done := 0
+	var backup map[string][]TunnelUse
+	err := a.cfg.Mutate(func(root *OMap) error {
+		ibPorts := map[string]int{}
+		ibs := map[string]*OMap{}
+		for i, v := range asArr(root.Get("inbounds")) {
+			if x := asMap(v); x != nil {
+				id := inboundID(x, i)
+				_, ibPorts[id] = targetOf(x)
+				ibs[id] = x
+			}
+		}
+		if err := a.store.EditTunnels(func() error {
+			if a.store.tunnelByID(b.Server) == nil {
+				return errors.New("middle server not found")
+			}
+			backup = map[string][]TunnelUse{}
+			for k, v := range a.store.TunnelUse {
+				backup[k] = append([]TunnelUse{}, v...)
+			}
+			if a.store.TunnelUse == nil {
+				a.store.TunnelUse = map[string][]TunnelUse{}
+			}
+			for _, id := range b.IDs {
+				ib := ibs[id]
+				if ib == nil {
+					skipped = append(skipped, skip{id, "inbound not found"})
+					continue
+				}
+				if t := asStr(ib.Get("tag")); t == tunnelTag || (apiTag(root) != "" && t == apiTag(root)) {
+					skipped = append(skipped, skip{id, "system inbound"})
+					continue
+				}
+				cur := a.store.TunnelUse[id]
+				var next []TunnelUse
+				has := false
+				for _, u := range cur {
+					if u.Server == b.Server {
+						has = true
+						if b.Remove {
+							continue
+						}
+					}
+					next = append(next, u)
+				}
+				if b.Remove {
+					if !has {
+						continue
+					}
+				} else {
+					if has {
+						continue
+					}
+					if ibPorts[id] == 0 {
+						skipped = append(skipped, skip{id, "port range cannot be tunneled"})
+						continue
+					}
+					next = append(next, TunnelUse{Server: b.Server})
+				}
+				ok, err := a.store.checkUsesLocked(id, next, ibPorts[id], ibPorts)
+				if err != nil {
+					skipped = append(skipped, skip{id, err.Error()})
+					continue
+				}
+				if len(ok) == 0 {
+					delete(a.store.TunnelUse, id)
+				} else {
+					a.store.TunnelUse[id] = ok
+				}
+				done++
+			}
+			return nil
+		}); err != nil {
+			return err
+		}
+		return a.applyTunnelConfig(root)
+	})
+	if err != nil {
+		if backup != nil {
+			_ = a.store.EditTunnels(func() error { a.store.TunnelUse = backup; return nil })
+		}
+		fail(w, 400, err)
+		return
+	}
+	hub.Poke(b.Server)
+	if skipped == nil {
+		skipped = []skip{}
+	}
+	writeJSONResp(w, 200, map[string]any{"ok": true, "done": done, "skipped": skipped})
+}
+
 // ---------- agent heartbeat (no login; agent token) ----------
 
 type beatReq struct {
-	Version  string `json:"version"`
-	PublicIP string `json:"publicIP"`
-	XrayOK   bool   `json:"xrayOk"`
-	XrayErr  string `json:"xrayErr"`
-	Applied  string `json:"applied"`
-	CtlPort  int    `json:"ctlPort"`
-	Busy     []int  `json:"busy"`
-	Wait     bool   `json:"wait"`     // agent accepts a held (long-poll) reply
-	Fails    int    `json:"fails"`    // failed heartbeats since the last good one
-	LastFail string `json:"lastFail"` // why the last one failed
+	Version   string            `json:"version"`
+	PublicIP  string            `json:"publicIP"`
+	XrayOK    bool              `json:"xrayOk"`
+	XrayErr   string            `json:"xrayErr"`
+	Applied   string            `json:"applied"`
+	CtlPort   int               `json:"ctlPort"`
+	Busy      []int             `json:"busy"`
+	Wait      bool              `json:"wait"`                // agent accepts a held (long-poll) reply
+	Fails     int               `json:"fails"`               // failed heartbeats since the last good one
+	LastFail  string            `json:"lastFail"`            // why the last one failed
+	PortState map[string]string `json:"portState,omitempty"` // forwarded port -> ok / busy / down (0.5.1+)
 }
 
 type beatResp struct {
@@ -783,6 +904,7 @@ func (a *App) handleBeat(w http.ResponseWriter, r *http.Request) {
 			req.Busy = req.Busy[:2000]
 		}
 		s.Busy = req.Busy
+		s.PortState = req.PortState
 		if req.Fails > 0 {
 			s.Fails, s.LastFail, s.FailAt = req.Fails, trimTo(req.LastFail, 300), time.Now().Unix()
 		}
@@ -933,4 +1055,46 @@ func versionLess(a, b string) bool {
 		}
 	}
 	return false
+}
+
+// TunnelLink: one middle server an inbound goes through, with the state the
+// agent reported for that port.
+type TunnelLink struct {
+	Server  string `json:"server"`
+	Name    string `json:"name"`
+	Address string `json:"address"`
+	Port    int    `json:"port"`
+	State   string `json:"state"` // ok, busy, down, offline, unknown (old agent), pending
+	Online  bool   `json:"online"`
+}
+
+func (a *App) tunnelStatus(id string, ib *OMap) []TunnelLink {
+	servers, _, tmap := a.store.TunnelsCopy()
+	_, ibPort := targetOf(ib)
+	out := []TunnelLink{}
+	now := time.Now()
+	for _, u := range tmap[id] {
+		for _, s := range servers {
+			if s.ID != u.Server {
+				continue
+			}
+			lp := u.ListenPort(ibPort)
+			l := TunnelLink{Server: s.ID, Name: orDefault(s.Name, "tunnel"), Address: orDefault(s.PublicIP, s.Host), Port: lp,
+				Online: s.LastSeen > 0 && now.Sub(time.Unix(s.LastSeen, 0)) < onlineWindow}
+			switch {
+			case !l.Online:
+				l.State = "offline"
+			case s.PortState == nil:
+				l.State = "unknown"
+			default:
+				if st, ok := s.PortState[strconv.Itoa(lp)]; ok {
+					l.State = st
+				} else {
+					l.State = "pending"
+				}
+			}
+			out = append(out, l)
+		}
+	}
+	return out
 }

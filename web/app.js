@@ -35,7 +35,9 @@ const T = {
     relayPort: "پورت (خالی = همان پورت اینباند)", relayName: "اسم (اختیاری)", relayHint: "هر کلاینت یک لینک اضافه با این آدرس می‌گیرد (در QR و سابسکریپشن هم). SNI، کلید و بقیه‌ی تنظیمات همان می‌ماند. پنل مسیر را نمی‌سازد؛ این آدرس باید خودش به این سرور برسد.",
     relayEx: "مثال‌ها: یک ساب‌دامنه‌ی دیگر که به همین IP اشاره می‌کند (اگر دامنه‌ی اول فیلتر شد) · ساب‌دامنه یا IP تمیز Cloudflare برای اینباندهای WS/XHTTP با TLS · IP سروری که خودت با iptables/HAProxy به اینجا فوروارد کرده‌ای.",
     relayBefore: "لینک فعلی", relayAfter: "لینک اضافه با این آدرس", relayNoClient: "این اینباند هنوز کلاینتی ندارد که نمونه‌ی لینک نشان داده شود.",
-    delSel: "حذف", confirmDelSel: "{n} اینباند انتخاب‌شده حذف شود؟ کلاینت‌های داخلشان هم حذف می‌شوند.",
+    delSel: "حذف", tunSel: "⇄ تانل", tbTitle: "تانل گروهی", tbHint: "اینباندهای انتخاب‌شده با همان پورت خودشان روی سرور میانی باز می‌شوند. پورت‌هایی که آنجا اشغال باشند رد می‌شوند و اینجا نشان داده می‌شوند.",
+    tbAdd: "تانل کن", tbRemove: "برداشتن از این سرور", tbSkipped: "رد شدند", tbDone: "{n} اینباند انجام شد",
+    stOk: "باز", stBusy: "اشغال روی سرور میانی", stDown: "باز نشد", stOffline: "سرور میانی آفلاین", stUnknown: "ایجنت قدیمی؛ دستور نصب را دوباره اجرا کنید", stPending: "در حال بررسی…", confirmDelSel: "{n} اینباند انتخاب‌شده حذف شود؟ کلاینت‌های داخلشان هم حذف می‌شوند.",
     usersTab: "کلاینت‌ها", addUser: "کلاینت جدید", usersHint: "هر کلاینت یک اسم است که روی چند اینباند می‌نشیند، با یک محدودیت حجم و زمان و یک لینک سابسکریپشن برای همه.",
     noUsers: "هنوز کلاینتی نیست.", pickInbounds: "اینباندهای این کلاینت", editUser: "ویرایش", noInboundsYet: "بدون اینباند", confirmDelUser: "این کلاینت از همه‌ی اینباندها حذف شود؟",
     tunnels: "تانل", addTunnel: "سرور میانی جدید", tnName: "نام", tnHost: "IP یا دامنه‌ی سرور میانی (برای SSH)", tnSshPort: "پورت SSH", tnSshUser: "کاربر SSH",
@@ -85,7 +87,9 @@ const T = {
     relayPort: "Port (empty = inbound port)", relayName: "Name (optional)", relayHint: "Every client gets an extra link with this address (also in QR and subscription). SNI, keys and other settings stay the same. The panel does not build the route; this address must already reach this server.",
     relayEx: "Examples: a second subdomain pointing to this IP (if the first gets blocked) · a Cloudflare subdomain or clean IP for WS/XHTTP+TLS inbounds · the IP of a server you forward here yourself with iptables/HAProxy.",
     relayBefore: "Current link", relayAfter: "Extra link with this address", relayNoClient: "This inbound has no client yet to preview a link.",
-    delSel: "Delete", confirmDelSel: "Delete {n} selected inbounds? Their clients go too.",
+    delSel: "Delete", tunSel: "⇄ Tunnel", tbTitle: "Bulk tunnel", tbHint: "Selected inbounds open on the middle server on their own port. Ports busy there are skipped and shown here.",
+    tbAdd: "Tunnel", tbRemove: "Remove from this server", tbSkipped: "Skipped", tbDone: "{n} inbounds done",
+    stOk: "open", stBusy: "busy on middle server", stDown: "not listening", stOffline: "middle server offline", stUnknown: "old agent; rerun the install command", stPending: "checking…", confirmDelSel: "Delete {n} selected inbounds? Their clients go too.",
     usersTab: "Clients", addUser: "New client", usersHint: "A client is one name that sits on several inbounds, with one traffic/time limit and one subscription link for all of them.",
     noUsers: "No clients yet.", pickInbounds: "Inbounds of this client", editUser: "Edit", noInboundsYet: "no inbound", confirmDelUser: "Remove this client from every inbound?",
     tunnels: "Tunnel", addTunnel: "New middle server", tnName: "Name", tnHost: "Middle server IP or domain (for SSH)", tnSshPort: "SSH port", tnSshUser: "SSH user",
@@ -196,6 +200,8 @@ function renderSubBar() {
   const n = state.sel.size;
   $("#relaySelBtn").textContent = t("relaySel") + (n ? " (" + n + ")" : "");
   $("#relaySelBtn").disabled = !n;
+  $("#tunSelBtn").textContent = t("tunSel") + (n ? " (" + n + ")" : "");
+  $("#tunSelBtn").disabled = !n;
   $("#delSelBtn").textContent = t("delSel") + (n ? " (" + n + ")" : "");
   $("#delSelBtn").disabled = !n;
   const all = state.inbounds.filter((i) => !i.system);
@@ -261,32 +267,24 @@ function renderInbounds() {
   if (!ibs.length) { list.innerHTML = `<div class="card empty">${t("noInbounds")}</div>`; return; }
   list.innerHTML = ibs.map((ib, idx) => {
     const pills = [ib.protocol, ib.network, ib.security].filter(Boolean).map((p) => `<span class="pill gray">${esc(p)}</span>`).join("");
-    const clients = !ib.managed ? "" : ib.clients.length === 0
-      ? `<div class="clients"><p class="muted">${t("noClients")}</p></div>`
-      : `<div class="clients">${ib.clients.map((cl, ci) => {
-          const m = cl.meta || {}; const used = (m.up || 0) + (m.down || 0);
-          const pct = m.limitBytes ? Math.min(100, (used / m.limitBytes) * 100) : 0;
-          return `<div class="client">
-            <div class="name">${esc(cl.email || "—")}</div>
-            <div>${clientStatus(cl)}</div>
-            <div class="muted">${fmtBytes(used)} / ${m.limitBytes ? fmtBytes(m.limitBytes) : t("unlimited")}
-              ${m.limitBytes ? `<div class="bar"><i style="width:${pct}%"></i></div>` : ""}</div>
-            <div class="actions"><button class="btn small" data-act="client" data-i="${idx}" data-c="${ci}">${t("details")}</button></div>
-          </div>`;
-        }).join("")}</div>`;
+    const clients = "";
     return `<div class="card">
       <div class="ib-head">
         <div class="ib-title">${ib.system ? "" : `<input type="checkbox" data-sel="${esc(ib.id)}" ${state.sel.has(ib.id) ? "checked" : ""}>`}<b>${esc(ib.tag || ib.id)}</b>${pills}<span class="pill">:${esc(ib.port)}</span>
           ${ib.system ? `<span class="pill gray">${t("system")}</span>` : !ib.managed ? `<span class="pill gray">${t("unmanaged")}</span>` : ""}</div>
         <div class="actions">
-          ${ib.managed ? `<button class="btn small primary" data-act="addClient" data-i="${idx}">${t("addClient")}</button>` : ""}
           ${ib.system ? "" : `<button class="btn small" data-act="relay" data-i="${idx}">+ ${t("relay")}</button>`}
           ${ib.system ? "" : `<button class="btn small" data-act="tunnel" data-i="${idx}">⇄ ${t("tnUse")}</button>`}
           ${ib.system ? "" : `<button class="btn small danger" data-act="delInbound" data-i="${idx}">${t("del")}</button>`}
         </div>
       </div>
-      ${ib.relays && ib.relays.length ? `<div class="relays"><span class="muted">${t("relay")}:</span>${ib.relays.map((r, ri) =>
-        `<span class="chip${r.tunnel ? " tun" : ""}">${r.tunnel ? "⇄ " : ""}${esc((r.name ? r.name + " · " : "") + r.address + (r.port ? ":" + r.port : ""))}${r.tunnel ? "" : `<button title="${t("del")}" data-act="delRelay" data-i="${idx}" data-r="${ri}">×</button>`}</span>`).join("")}</div>` : ""}
+      ${(ib.relays || []).some((r) => !r.tunnel) ? `<div class="relays"><span class="muted">${t("relay")}:</span>${ib.relays.map((r, ri) => r.tunnel ? "" :
+        `<span class="chip">${esc((r.name ? r.name + " · " : "") + r.address + (r.port ? ":" + r.port : ""))}<button title="${t("del")}" data-act="delRelay" data-i="${idx}" data-r="${ri}">×</button></span>`).join("")}</div>` : ""}
+      ${ib.tunnels && ib.tunnels.length ? `<div class="relays"><span class="muted">${t("tunnels")}:</span>${ib.tunnels.map((x) => {
+        const cls = x.state === "ok" ? "ok" : ["busy", "down", "offline"].includes(x.state) ? "bad" : "tun";
+        const label = { ok: t("stOk"), busy: t("stBusy"), down: t("stDown"), offline: t("stOffline"), unknown: t("stUnknown"), pending: t("stPending") }[x.state] || x.state;
+        return `<span class="chip ${cls}" title="${esc(label)}">⇄ ${esc(x.name + " · " + (x.address || "?") + ":" + x.port)} <small>${esc(label)}</small></span>`;
+      }).join("")}</div>` : ""}
       ${ib.singleLink ? `<div class="clients"><p class="muted">${t("singleUser")}</p>${copyRow(ib.singleLink)}</div>` : ""}
       ${clients}</div>`;
   }).join("");
@@ -470,6 +468,32 @@ function openRelay(ids) {
     } catch (e) { $("#rlErr").textContent = e.message; }
   };
 }
+$("#tunSelBtn").onclick = guard(async () => {
+  const ids = [...state.sel]; if (!ids.length) return;
+  const d = await api("GET", "api/tunnels");
+  if (!d.servers.length) { toast(d.ready ? t("tnNoSrv") : t("tnNeedSSL")); return; }
+  openModal(`<h3>${t("tbTitle")} (${ids.length})</h3>
+  <p class="muted">${t("tbHint")}</p>
+  <div class="stack" id="tbList">${d.servers.map((s, i) => {
+    const busy = ids.filter((id) => { const ib = state.inbounds.find((x) => x.id === id); return ib && (s.busy || []).includes(+ib.port) && !s.inbounds.includes(id); });
+    return `<label class="pitem"><input type="radio" name="tbsrv" value="${esc(s.id)}" ${i === 0 ? "checked" : ""}><span class="dot${s.online ? "" : " bad"}"></span><b>${esc(s.name)}</b><small class="mono">${esc(s.publicIP || s.host || "")}</small>${busy.length ? `<small class="err">${esc(busy.join(", "))}: ${t("stBusy")}</small>` : ""}</label>`;
+  }).join("")}</div>
+  <div id="tbOut"></div>
+  <p id="tbErr" class="err"></p>
+  <div class="actions"><button class="btn primary" id="tbAdd">${t("tbAdd")}</button><button class="btn" id="tbRm">${t("tbRemove")}</button><button class="btn ghost" data-close>${t("cancel")}</button></div>`, true);
+  const go = async (remove) => {
+    const server = ($("#tbList").querySelector("input:checked") || {}).value;
+    try {
+      const r = await api("POST", "api/tunnels/bulk", { ids, server, remove });
+      toast(t("tbDone").replace("{n}", r.done)); refreshInbounds();
+      if (r.skipped.length) {
+        $("#tbOut").innerHTML = `<label>${t("tbSkipped")}</label>` + r.skipped.map((x) => `<p class="err mono">${esc(x.id)}: ${esc(x.reason)}</p>`).join("");
+      } else closeModal();
+    } catch (e) { $("#tbErr").textContent = e.message; }
+  };
+  $("#tbAdd").onclick = () => go(false);
+  $("#tbRm").onclick = () => go(true);
+});
 $("#delSelBtn").onclick = guard(async () => {
   const ids = [...state.sel]; if (!ids.length) return;
   if (!confirm(t("confirmDelSel").replace("{n}", ids.length))) return;

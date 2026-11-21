@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -120,6 +121,7 @@ func agentInstall(code string) error {
 	if err := os.WriteFile(filepath.Join(agentDir, "xray.json"), cfg, 0o600); err != nil {
 		return err
 	}
+	_ = os.WriteFile(filepath.Join(agentDir, "xray.want.json"), cfg, 0o600)
 	if err := saveAgent(st); err != nil {
 		return err
 	}
@@ -206,6 +208,7 @@ func agentRun() {
 	var ipAt time.Time
 	lastErr := ""
 	fails, lastFail := 0, ""
+	var rc reconciler
 	for {
 		if time.Since(ipAt) > time.Hour || ip == "" {
 			if v := publicIP(); v != "" {
@@ -213,9 +216,15 @@ func agentRun() {
 			}
 			ipAt = time.Now()
 		}
+		pstate, busy, rerr := rc.run()
+		if rerr != "" {
+			lastErr = rerr
+		} else if fails == 0 {
+			lastErr = ""
+		}
 		active, _ := run(5*time.Second, "systemctl", "is-active", agentRelay)
-		req := beatReq{Version: version, PublicIP: ip, XrayOK: active == "active", XrayErr: lastErr, Applied: st.Hash, CtlPort: st.Ctl, Busy: busyPorts(st.Ctl),
-			Wait: true, Fails: fails, LastFail: lastFail}
+		req := beatReq{Version: version, PublicIP: ip, XrayOK: active == "active", XrayErr: lastErr, Applied: st.Hash, CtlPort: st.Ctl, Busy: busy,
+			Wait: true, Fails: fails, LastFail: lastFail, PortState: pstate}
 		body, _ := json.Marshal(req)
 		hr, _ := http.NewRequest("POST", strings.TrimSuffix(st.Join.Panel, "/")+"/api/agent/beat", bytes.NewReader(body))
 		hr.Header.Set("Content-Type", "application/json")
@@ -251,21 +260,21 @@ func agentRun() {
 					st.Token = br.Token
 					_ = saveAgent(st)
 				}
+				newCfg := false
 				if len(br.Config) > 0 && br.Hash != st.Hash {
-					if e := applyRelayConfig(br.Config); e != nil {
-						lastErr = e.Error()
-						fmt.Println(lastErr)
-					} else {
-						lastErr = ""
+					// keep what the panel wants; rc.run() applies it minus busy ports
+					if e := os.WriteFile(filepath.Join(agentDir, "xray.want.json"), br.Config, 0o600); e == nil {
 						st.Hash = br.Hash
 						_ = saveAgent(st)
+						rc.failed = ""
+						newCfg = true
 					}
 				}
 				if br.Every >= 10 && br.Every <= 600 {
 					every = time.Duration(br.Every) * time.Second
 				}
 				next = every
-				if br.Held || br.Probe {
+				if br.Held || br.Probe || newCfg {
 					next = 200 * time.Millisecond
 				}
 			}
@@ -349,37 +358,28 @@ func downloadXray(dir string) error {
 	return errors.New("xray binary not found in archive")
 }
 
-// busyPorts lists ports listening on this server that are not our relay's
-// own, so the panel never asks the relay to take a busy port.
-func busyPorts(ctl int) []int {
-	own := map[int]bool{ctl: true}
-	if b, err := os.ReadFile(filepath.Join(agentDir, "xray.json")); err == nil {
-		var c struct {
-			Inbounds []struct {
-				Port any `json:"port"`
-			} `json:"inbounds"`
-		}
-		if json.Unmarshal(b, &c) == nil {
-			for _, ib := range c.Inbounds {
-				if f, ok := ib.Port.(float64); ok {
-					own[int(f)] = true
-				}
-			}
-		}
-	}
-	seen := map[int]bool{}
-	var out []int
+// ---------- ports on the middle server ----------
+
+type listener struct {
+	inode string
+	tcp   bool
+}
+
+// scanListeners maps each listening TCP port / bound UDP port to its sockets.
+func scanListeners() map[int][]listener {
+	out := map[int][]listener{}
 	for _, f := range []string{"tcp", "tcp6", "udp", "udp6"} {
 		b, err := os.ReadFile("/proc/net/" + f)
 		if err != nil {
 			continue
 		}
+		tcp := strings.HasPrefix(f, "tcp")
 		for i, line := range strings.Split(string(b), "\n") {
 			fs := strings.Fields(line)
-			if i == 0 || len(fs) < 4 {
+			if i == 0 || len(fs) < 10 {
 				continue
 			}
-			if strings.HasPrefix(f, "tcp") && fs[3] != "0A" { // LISTEN
+			if tcp && fs[3] != "0A" { // LISTEN
 				continue
 			}
 			k := strings.LastIndex(fs[1], ":")
@@ -387,13 +387,162 @@ func busyPorts(ctl int) []int {
 				continue
 			}
 			var port int
-			if _, err := fmt.Sscanf(fs[1][k+1:], "%X", &port); err != nil || port == 0 || own[port] || seen[port] {
+			if _, err := fmt.Sscanf(fs[1][k+1:], "%X", &port); err != nil || port == 0 {
 				continue
 			}
-			seen[port] = true
-			out = append(out, port)
+			out[port] = append(out[port], listener{inode: fs[9], tcp: tcp})
+		}
+	}
+	return out
+}
+
+// relayInodes: sockets held by the running relay xray.
+func relayInodes() map[string]bool {
+	own := map[string]bool{}
+	pid, _ := run(5*time.Second, "systemctl", "show", "-p", "MainPID", "--value", agentRelay)
+	pid = strings.TrimSpace(pid)
+	if pid == "" || pid == "0" {
+		return own
+	}
+	ents, err := os.ReadDir("/proc/" + pid + "/fd")
+	if err != nil {
+		return own
+	}
+	for _, e := range ents {
+		l, err := os.Readlink("/proc/" + pid + "/fd/" + e.Name())
+		if err == nil && strings.HasPrefix(l, "socket:[") {
+			own[strings.TrimSuffix(strings.TrimPrefix(l, "socket:["), "]")] = true
+		}
+	}
+	return own
+}
+
+// portView answers, per port, whether another program holds it and whether
+// our relay listens on it.
+type portView struct {
+	ls  map[int][]listener
+	own map[string]bool
+}
+
+func newPortView() portView { return portView{ls: scanListeners(), own: relayInodes()} }
+
+func (v portView) foreign(p int) bool {
+	for _, l := range v.ls[p] {
+		if !v.own[l.inode] && l.inode != "0" {
+			return true
+		}
+	}
+	return false
+}
+
+func (v portView) ours(p int) bool {
+	for _, l := range v.ls[p] {
+		if l.tcp && v.own[l.inode] {
+			return true
+		}
+	}
+	return false
+}
+
+// busy: every port another program uses (the panel avoids them).
+func (v portView) busy() []int {
+	var out []int
+	for p := range v.ls {
+		if v.foreign(p) {
+			out = append(out, p)
 		}
 	}
 	sort.Ints(out)
 	return out
+}
+
+// fwdPorts lists the forwarded ports of a relay config.
+func fwdPorts(cfg []byte) []int {
+	var c struct {
+		Inbounds []struct {
+			Protocol string `json:"protocol"`
+			Port     any    `json:"port"`
+		} `json:"inbounds"`
+	}
+	var out []int
+	if json.Unmarshal(cfg, &c) == nil {
+		for _, ib := range c.Inbounds {
+			if f, ok := ib.Port.(float64); ok && ib.Protocol == "dokodemo-door" {
+				out = append(out, int(f))
+			}
+		}
+	}
+	return out
+}
+
+// dropPorts removes forwarded inbounds on the given ports from a relay config.
+func dropPorts(cfg []byte, drop map[int]bool) []byte {
+	if len(drop) == 0 {
+		return cfg
+	}
+	v, err := ParseOrdered(cfg)
+	if err != nil {
+		return cfg
+	}
+	root := asMap(v)
+	var keep []any
+	for _, x := range asArr(root.Get("inbounds")) {
+		ib := asMap(x)
+		if ib != nil && asStr(ib.Get("protocol")) == "dokodemo-door" {
+			if n, err := strconv.Atoi(fmt.Sprint(ib.Get("port"))); err == nil && drop[n] {
+				continue
+			}
+		}
+		keep = append(keep, x)
+	}
+	root.Set("inbounds", keep)
+	return EncodeIndent(root)
+}
+
+// reconciler keeps the relay running the wanted config minus ports another
+// program holds, and reports every wanted port as ok / busy / down.
+type reconciler struct {
+	failed   string // config that failed to start
+	failedAt time.Time
+}
+
+func (r *reconciler) run() (state map[string]string, busy []int, errMsg string) {
+	want, err := os.ReadFile(filepath.Join(agentDir, "xray.want.json"))
+	if err != nil { // agents older than 0.5.1 kept only xray.json
+		want, _ = os.ReadFile(filepath.Join(agentDir, "xray.json"))
+	}
+	pv := newPortView()
+	drop := map[int]bool{}
+	for _, p := range fwdPorts(want) {
+		if pv.foreign(p) {
+			drop[p] = true
+		}
+	}
+	if len(want) > 0 {
+		next := dropPorts(want, drop)
+		cur, _ := os.ReadFile(filepath.Join(agentDir, "xray.json"))
+		if !bytes.Equal(next, cur) && !(string(next) == r.failed && time.Since(r.failedAt) < 10*time.Minute) {
+			if e := applyRelayConfig(next); e != nil {
+				r.failed, r.failedAt = string(next), time.Now()
+				errMsg = e.Error()
+			} else {
+				r.failed = ""
+			}
+			pv = newPortView()
+		} else if string(next) == r.failed {
+			errMsg = "relay config failed to start; retrying in a few minutes"
+		}
+	}
+	state = map[string]string{}
+	for _, p := range fwdPorts(want) {
+		switch {
+		case drop[p] || pv.foreign(p):
+			state[strconv.Itoa(p)] = "busy"
+		case pv.ours(p):
+			state[strconv.Itoa(p)] = "ok"
+		default:
+			state[strconv.Itoa(p)] = "down"
+		}
+	}
+	return state, pv.busy(), errMsg
 }
