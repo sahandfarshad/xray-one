@@ -12,19 +12,12 @@ import (
 	"time"
 )
 
-// xray.service usually runs as a non-root user (nobody), which cannot read
-// /etc/xray-one/certs or /etc/letsencrypt/live. For TLS inbounds we therefore
-// give xray its own copy of the certificate, owned by the service user, next
-// to its config, and keep that copy in sync when the source is renewed.
-
-type certSource struct {
-	Cert string `json:"cert"`
-	Key  string `json:"key"`
-}
-
-func xrayCertRoot(core Core) string {
-	return filepath.Join(filepath.Dir(core.ConfigPath), "xray-one-certs")
-}
+// xray.service usually runs as a non-root user (nobody). For TLS inbounds we
+// let that user read the ORIGINAL certificate files in place (one fixed path
+// shared by the panel, xray and Muse99): parent folders get traverse-only
+// permission, the certificate folder and key get the service group. Renewal
+// rewrites the same files, so the path never changes; xray is restarted when
+// the certificate content changes.
 
 func serviceIDs(core Core) (int, int, bool) {
 	u := serviceUser(core)
@@ -37,108 +30,160 @@ func serviceIDs(core Core) (int, int, bool) {
 	}
 	uid, _ := strconv.Atoi(pu.Uid)
 	gid, _ := strconv.Atoi(pu.Gid)
-	if g := strings.TrimSpace(func() string {
-		o, _ := run(5*time.Second, "systemctl", "show", "-p", "Group", "--value", core.Service)
-		return o
-	}()); g != "" {
-		if pg, err := user.LookupGroup(g); err == nil {
+	if g, _ := run(5*time.Second, "systemctl", "show", "-p", "Group", "--value", core.Service); strings.TrimSpace(g) != "" {
+		if pg, err := user.LookupGroup(strings.TrimSpace(g)); err == nil {
 			gid, _ = strconv.Atoi(pg.Gid)
 		}
 	}
 	return uid, gid, true
 }
 
-// xrayReadableCert returns certificate paths xray's service user can read.
-// When xray runs as root the original paths are returned unchanged.
+// grantRead makes certFile/keyFile readable by the xray service user without
+// moving them. Symlinks (certbot live/ → archive/) are followed.
+func grantRead(certFile, keyFile string, gid int) {
+	for _, f := range []string{certFile, keyFile} {
+		real, err := filepath.EvalSymlinks(f)
+		if err != nil {
+			continue
+		}
+		for _, p := range []string{f, real} {
+			dir := filepath.Dir(p)
+			// the folder holding the files: group read+traverse
+			_ = os.Chown(dir, 0, gid)
+			_ = os.Chmod(dir, 0o750)
+			// parents up to /etc: traverse only (no listing)
+			for d := filepath.Dir(dir); d != "/" && d != "/etc" && d != "."; d = filepath.Dir(d) {
+				if st, err := os.Stat(d); err == nil && st.Mode().Perm()&0o001 == 0 {
+					_ = os.Chmod(d, st.Mode().Perm()|0o011)
+				}
+			}
+		}
+		_ = os.Chown(real, 0, gid)
+		if f == keyFile {
+			_ = os.Chmod(real, 0o640)
+		} else {
+			_ = os.Chmod(real, 0o644)
+		}
+	}
+}
+
+// xrayReadableCert returns the same paths, after giving xray read access.
 func xrayReadableCert(certFile, keyFile string) (string, string, error) {
 	core := DetectCore()
-	uid, gid, ok := serviceIDs(core)
-	if !ok {
-		return certFile, keyFile, nil
+	if _, gid, ok := serviceIDs(core); ok {
+		grantRead(certFile, keyFile, gid)
 	}
-	name := filepath.Base(filepath.Dir(certFile))
-	if name == "" || name == "." || name == "/" {
-		name = "default"
-	}
-	dir := filepath.Join(xrayCertRoot(core), name)
-	if err := copyCert(dir, certSource{certFile, keyFile}, uid, gid); err != nil {
-		return "", "", err
-	}
-	return filepath.Join(dir, "fullchain.pem"), filepath.Join(dir, "privkey.pem"), nil
+	return certFile, keyFile, nil
 }
 
-func copyCert(dir string, src certSource, uid, gid int) error {
-	c, err := os.ReadFile(src.Cert)
-	if err != nil {
-		return err
-	}
-	k, err := os.ReadFile(src.Key)
-	if err != nil {
-		return err
-	}
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return err
-	}
-	_ = os.Chmod(filepath.Dir(dir), 0o755)
-	_ = os.Chmod(dir, 0o750)
-	_ = os.Chown(dir, 0, gid)
-	for _, f := range []struct {
-		name string
-		data []byte
-		mode os.FileMode
-	}{{"fullchain.pem", c, 0o644}, {"privkey.pem", k, 0o600}} {
-		p := filepath.Join(dir, f.name)
-		tmp := p + ".tmp"
-		if err := os.WriteFile(tmp, f.data, f.mode); err != nil {
-			return err
-		}
-		_ = os.Chmod(tmp, f.mode)
-		_ = os.Chown(tmp, uid, gid)
-		if err := os.Rename(tmp, p); err != nil {
-			return err
+type certPair struct{ cert, key string }
+
+// tlsCertsInConfig lists every certificate pair referenced by an inbound.
+func tlsCertsInConfig(root *OMap) []certPair {
+	var out []certPair
+	for _, v := range asArr(root.Get("inbounds")) {
+		ib := asMap(v)
+		for _, c := range asArr(path(ib, "streamSettings", "tlsSettings", "certificates")) {
+			cm := asMap(c)
+			if cm == nil {
+				continue
+			}
+			cf, kf := asStr(cm.Get("certificateFile")), asStr(cm.Get("keyFile"))
+			if cf != "" && kf != "" {
+				out = append(out, certPair{cf, kf})
+			}
 		}
 	}
-	b, _ := json.Marshal(src)
-	return os.WriteFile(filepath.Join(dir, "source.json"), b, 0o600)
+	return out
 }
 
-// syncXrayCerts refreshes every copy whose source changed (renewal) and
-// restarts xray once if anything was updated.
-func syncXrayCerts() {
+// migrateCertCopies undoes v0.3.3's private copies: inbounds pointing at
+// <configdir>/xray-one-certs/* go back to the original files.
+func (a *App) migrateCertCopies() {
 	core := DetectCore()
-	uid, gid, ok := serviceIDs(core)
-	if !ok {
+	root := filepath.Join(filepath.Dir(core.ConfigPath), "xray-one-certs")
+	if _, err := os.Stat(root); err != nil {
 		return
 	}
-	dirs, _ := filepath.Glob(filepath.Join(xrayCertRoot(core), "*", "source.json"))
-	changed := false
-	for _, sj := range dirs {
-		var src certSource
-		b, err := os.ReadFile(sj)
-		if err != nil || json.Unmarshal(b, &src) != nil {
-			continue
-		}
-		dir := filepath.Dir(sj)
-		newC, err1 := os.ReadFile(src.Cert)
-		oldC, _ := os.ReadFile(filepath.Join(dir, "fullchain.pem"))
-		if err1 != nil || bytes.Equal(newC, oldC) {
-			continue
-		}
-		if err := copyCert(dir, src, uid, gid); err != nil {
-			log.Printf("cert sync %s: %v", dir, err)
-			continue
-		}
-		changed = true
+	type src struct {
+		Cert string `json:"cert"`
+		Key  string `json:"key"`
 	}
-	if changed && serviceActive(core) {
-		log.Printf("certificate renewed, restarting %s", core.Service)
-		_ = restartCore(core)
+	m := map[string]string{}
+	sjs, _ := filepath.Glob(filepath.Join(root, "*", "source.json"))
+	for _, sj := range sjs {
+		var s src
+		b, _ := os.ReadFile(sj)
+		if json.Unmarshal(b, &s) == nil && s.Cert != "" {
+			d := filepath.Dir(sj)
+			m[filepath.Join(d, "fullchain.pem")] = s.Cert
+			m[filepath.Join(d, "privkey.pem")] = s.Key
+		}
 	}
+	_, gid, ok := serviceIDs(core)
+	err := a.cfg.Mutate(func(r *OMap) error {
+		for _, v := range asArr(r.Get("inbounds")) {
+			for _, c := range asArr(path(asMap(v), "streamSettings", "tlsSettings", "certificates")) {
+				cm := asMap(c)
+				if cm == nil {
+					continue
+				}
+				cf, kf := m[asStr(cm.Get("certificateFile"))], m[asStr(cm.Get("keyFile"))]
+				if cf != "" && kf != "" {
+					if ok {
+						grantRead(cf, kf, gid)
+					}
+					cm.Set("certificateFile", cf)
+					cm.Set("keyFile", kf)
+				}
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		log.Printf("cert migration: %v", err)
+		return
+	}
+	if root2, _, err := a.cfg.Load(); err == nil {
+		for _, p := range tlsCertsInConfig(root2) {
+			if strings.HasPrefix(p.cert, root) {
+				return // still in use, keep it
+			}
+		}
+	}
+	_ = os.RemoveAll(root)
 }
 
-func certSyncLoop() {
+// certSyncLoop keeps permissions right after every renewal and restarts xray
+// once when a certificate it uses has changed.
+func (a *App) certSyncLoop() {
+	a.migrateCertCopies()
+	seen := map[string][]byte{}
+	first := true
 	for {
-		syncXrayCerts()
+		core := DetectCore()
+		if root, _, err := a.cfg.Load(); err == nil {
+			_, gid, ok := serviceIDs(core)
+			changed := false
+			for _, p := range tlsCertsInConfig(root) {
+				data, err := os.ReadFile(p.cert)
+				if err != nil {
+					continue
+				}
+				if ok {
+					grantRead(p.cert, p.key, gid)
+				}
+				if old, had := seen[p.cert]; had && !bytes.Equal(old, data) {
+					changed = true
+				}
+				seen[p.cert] = data
+			}
+			if changed && !first && serviceActive(core) {
+				log.Printf("certificate renewed, restarting %s", core.Service)
+				_ = restartCore(core)
+			}
+		}
+		first = false
 		time.Sleep(time.Hour)
 	}
 }

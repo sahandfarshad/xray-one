@@ -12,7 +12,7 @@ import (
 	"golang.org/x/term"
 )
 
-var version = "0.3.3"
+var version = "0.3.4"
 
 func main() {
 	dir := os.Getenv("XRAY_ONE_DIR")
@@ -60,7 +60,7 @@ func serve(dir string) {
 		log.Fatal("no login configured yet: run `xray-one` first")
 	}
 	go app.Enforce()
-	go certSyncLoop()
+	go app.certSyncLoop()
 	cfg := app.store.Cfg
 	srv := &http.Server{Addr: cfg.Listen, ReadHeaderTimeout: 10 * time.Second}
 	if cfg.CertFile != "" && cfg.KeyFile != "" {
