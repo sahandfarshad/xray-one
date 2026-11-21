@@ -58,6 +58,22 @@ type TunnelServer struct {
 	XrayOK   bool   `json:"xrayOk,omitempty"`
 	XrayErr  string `json:"xrayErr,omitempty"`
 	Applied  string `json:"applied,omitempty"` // config hash the agent runs
+	CtlPort  int    `json:"ctlPort,omitempty"` // agent's local control port
+	Busy     []int  `json:"busy,omitempty"`    // ports already taken on the middle server
+}
+
+// TunnelUse: one inbound goes through one middle server, listening there on
+// Port (0 = same port as the inbound).
+type TunnelUse struct {
+	Server string `json:"server"`
+	Port   int    `json:"port,omitempty"`
+}
+
+func (u TunnelUse) ListenPort(inboundPort int) int {
+	if u.Port > 0 {
+		return u.Port
+	}
+	return inboundPort
 }
 
 type TunnelSettings struct {
@@ -67,16 +83,16 @@ type TunnelSettings struct {
 
 // ---------- store ----------
 
-func (s *Store) TunnelsCopy() ([]TunnelServer, TunnelSettings, map[string][]string) {
+func (s *Store) TunnelsCopy() ([]TunnelServer, TunnelSettings, map[string][]TunnelUse) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	out := []TunnelServer{}
 	for _, t := range s.Tunnels {
 		out = append(out, *t)
 	}
-	m := map[string][]string{}
-	for k, v := range s.TunnelMap {
-		m[k] = append([]string{}, v...)
+	m := map[string][]TunnelUse{}
+	for k, v := range s.TunnelUse {
+		m[k] = append([]TunnelUse{}, v...)
 	}
 	return out, s.TunnelCfg, m
 }
@@ -84,8 +100,8 @@ func (s *Store) TunnelsCopy() ([]TunnelServer, TunnelSettings, map[string][]stri
 func (s *Store) EditTunnels(fn func() error) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.TunnelMap == nil {
-		s.TunnelMap = map[string][]string{}
+	if s.TunnelUse == nil {
+		s.TunnelUse = map[string][]TunnelUse{}
 	}
 	if err := fn(); err != nil {
 		return err
@@ -331,8 +347,11 @@ func (a *App) panelLocalURL() string {
 	return scheme + "://127.0.0.1" + portOf(c.Listen) + c.BasePath
 }
 
-func relayXrayConfig(j joinInfo, fwd []fwdPort) []byte {
-	inbounds := []any{om("tag", "ctl", "listen", "127.0.0.1", "port", agentCtlPort, "protocol", "socks",
+func relayXrayConfig(j joinInfo, fwd []fwdPort, ctl int) []byte {
+	if ctl == 0 {
+		ctl = agentCtlPort
+	}
+	inbounds := []any{om("tag", "ctl", "listen", "127.0.0.1", "port", ctl, "protocol", "socks",
 		"settings", om("auth", "noauth", "udp", false))}
 	for _, f := range fwd {
 		inbounds = append(inbounds, om("tag", fmt.Sprintf("fwd-%d", f.Listen), "listen", "0.0.0.0", "port", f.Listen,
@@ -374,29 +393,26 @@ func (a *App) fwdFor(root *OMap, id string) []fwdPort {
 		if ib == nil {
 			continue
 		}
-		on := false
-		for _, x := range tmap[inboundID(ib, i)] {
-			if x == id {
-				on = true
+		for _, u := range tmap[inboundID(ib, i)] {
+			if u.Server != id {
+				continue
 			}
-		}
-		if !on {
-			continue
-		}
-		if h, p := targetOf(ib); p > 0 {
-			out = append(out, fwdPort{Listen: p, Host: h, Port: p})
+			if h, p := targetOf(ib); p > 0 {
+				out = append(out, fwdPort{Listen: u.ListenPort(p), Host: h, Port: p})
+			}
 		}
 	}
 	return out
 }
 
-// tunnelRelays gives the extra link addresses an inbound gets from tunnels.
+// relaysFor gives an inbound's link addresses: manual relays plus one per
+// middle server it is tunneled through.
 func (a *App) relaysFor(id string) []Relay {
 	rl := a.store.RelaysOf(id)
 	servers, _, tmap := a.store.TunnelsCopy()
-	for _, sid := range tmap[id] {
+	for _, u := range tmap[id] {
 		for _, s := range servers {
-			if s.ID != sid {
+			if s.ID != u.Server {
 				continue
 			}
 			addr := s.PublicIP
@@ -404,7 +420,7 @@ func (a *App) relaysFor(id string) []Relay {
 				addr = s.Host
 			}
 			if addr != "" {
-				rl = append(rl, Relay{Address: addr, Name: orDefault(s.Name, "tunnel"), Tunnel: s.ID})
+				rl = append(rl, Relay{Address: addr, Port: u.Port, Name: orDefault(s.Name, "tunnel"), Tunnel: s.ID})
 			}
 		}
 	}
@@ -418,6 +434,8 @@ type tunnelView struct {
 	Online  bool     `json:"online"`
 	Command string   `json:"command,omitempty"`
 	Inbound []string `json:"inbounds"`
+	Remove  string         `json:"remove"`
+	Ports   map[string]int `json:"ports"` // inbound id -> chosen port on the middle server (0 = same)
 }
 
 func (a *App) handleTunnels(w http.ResponseWriter, r *http.Request) {
@@ -425,17 +443,19 @@ func (a *App) handleTunnels(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
 	out := []tunnelView{}
 	for _, s := range servers {
-		v := tunnelView{TunnelServer: s, Online: s.LastSeen > 0 && now.Sub(time.Unix(s.LastSeen, 0)) < onlineWindow, Inbound: []string{}}
+		v := tunnelView{TunnelServer: s, Online: s.LastSeen > 0 && now.Sub(time.Unix(s.LastSeen, 0)) < onlineWindow, Inbound: []string{}, Ports: map[string]int{}}
 		if s.Join != "" && s.JoinExp > now.Unix() {
 			v.Command = "bash <(curl -fsSL " + tunnelInstall + ") " + encodeJoin(a.joinFor(s))
 		}
-		for ibid, ids := range tmap {
-			for _, x := range ids {
-				if x == s.ID {
+		for ibid, us := range tmap {
+			for _, u := range us {
+				if u.Server == s.ID {
 					v.Inbound = append(v.Inbound, ibid)
+					v.Ports[ibid] = u.Port
 				}
 			}
 		}
+		v.Remove = "xray-one agent remove"
 		sort.Strings(v.Inbound)
 		v.Token, v.Join, v.UUID = "", "", ""
 		out = append(out, v)
@@ -504,17 +524,17 @@ func (s *Store) removeTunnel(id string) {
 		}
 	}
 	s.Tunnels = keep
-	for k, v := range s.TunnelMap {
-		var nv []string
+	for k, v := range s.TunnelUse {
+		var nv []TunnelUse
 		for _, x := range v {
-			if x != id {
+			if x.Server != id {
 				nv = append(nv, x)
 			}
 		}
 		if len(nv) == 0 {
-			delete(s.TunnelMap, k)
+			delete(s.TunnelUse, k)
 		} else {
-			s.TunnelMap[k] = nv
+			s.TunnelUse[k] = nv
 		}
 	}
 }
@@ -547,37 +567,77 @@ func (a *App) handleNewJoin(w http.ResponseWriter, r *http.Request) {
 	writeJSONResp(w, 200, map[string]bool{"ok": true})
 }
 
-// handleTunnelAssign sets which tunnel servers an inbound uses.
+// handleTunnelAssign sets which middle servers an inbound uses and the port
+// it listens on there.
 func (a *App) handleTunnelAssign(w http.ResponseWriter, r *http.Request) {
 	var b struct {
-		ID      string   `json:"id"`
-		Servers []string `json:"servers"`
+		ID   string      `json:"id"`
+		Uses []TunnelUse `json:"uses"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&b); err != nil {
 		fail(w, 400, err)
 		return
 	}
-	var prev []string
+	var prev []TunnelUse
 	err := a.cfg.Mutate(func(root *OMap) error {
 		ib, _ := findInbound(root, b.ID)
 		if ib == nil {
 			return errors.New("inbound not found")
 		}
-		if _, p := targetOf(ib); p == 0 && len(b.Servers) > 0 {
+		_, ibPort := targetOf(ib)
+		if ibPort == 0 && len(b.Uses) > 0 {
 			return errors.New("inbounds with a port range cannot be tunneled")
 		}
+		ibPorts := map[string]int{}
+		for i, v := range asArr(root.Get("inbounds")) {
+			if x := asMap(v); x != nil {
+				_, ibPorts[inboundID(x, i)] = targetOf(x)
+			}
+		}
 		if err := a.store.EditTunnels(func() error {
-			prev = a.store.TunnelMap[b.ID]
-			var ok []string
-			for _, s := range b.Servers {
-				if a.store.tunnelByID(s) != nil {
-					ok = append(ok, s)
+			prev = a.store.TunnelUse[b.ID]
+			var ok []TunnelUse
+			seen := map[string]bool{}
+			for _, u := range b.Uses {
+				srv := a.store.tunnelByID(u.Server)
+				if srv == nil || seen[u.Server] {
+					continue
 				}
+				seen[u.Server] = true
+				if u.Port < 0 || u.Port > 65535 {
+					return errors.New("invalid port")
+				}
+				if u.Port == ibPort {
+					u.Port = 0
+				}
+				lp := u.ListenPort(ibPort)
+				if lp == srv.CtlPort || (srv.CtlPort == 0 && lp == agentCtlPort) {
+					return fmt.Errorf("port %d is the agent's own port on %s", lp, srv.Name)
+				}
+				mine := false
+				for k, us := range a.store.TunnelUse {
+					for _, x := range us {
+						if k != b.ID && x.Server == srv.ID && x.ListenPort(ibPorts[k]) == lp {
+							return fmt.Errorf("port %d on %s is already used by another tunneled inbound", lp, srv.Name)
+						}
+						if k == b.ID && x.Server == srv.ID && x.ListenPort(ibPort) == lp {
+							mine = true
+						}
+					}
+				}
+				if !mine {
+					for _, bp := range srv.Busy {
+						if bp == lp {
+							return fmt.Errorf("port %d is busy on %s; pick another port", lp, srv.Name)
+						}
+					}
+				}
+				ok = append(ok, u)
 			}
 			if len(ok) == 0 {
-				delete(a.store.TunnelMap, b.ID)
+				delete(a.store.TunnelUse, b.ID)
 			} else {
-				a.store.TunnelMap[b.ID] = ok
+				a.store.TunnelUse[b.ID] = ok
 			}
 			return nil
 		}); err != nil {
@@ -588,9 +648,9 @@ func (a *App) handleTunnelAssign(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		_ = a.store.EditTunnels(func() error {
 			if prev == nil {
-				delete(a.store.TunnelMap, b.ID)
+				delete(a.store.TunnelUse, b.ID)
 			} else {
-				a.store.TunnelMap[b.ID] = prev
+				a.store.TunnelUse[b.ID] = prev
 			}
 			return nil
 		})
@@ -608,6 +668,8 @@ type beatReq struct {
 	XrayOK   bool   `json:"xrayOk"`
 	XrayErr  string `json:"xrayErr"`
 	Applied  string `json:"applied"`
+	CtlPort  int    `json:"ctlPort"`
+	Busy     []int  `json:"busy"`
 }
 
 type beatResp struct {
@@ -646,6 +708,13 @@ func (a *App) handleBeat(w http.ResponseWriter, r *http.Request) {
 			s.PublicIP = ip.String()
 		}
 		s.AgentVer, s.XrayOK, s.XrayErr, s.Applied = req.Version, req.XrayOK, trimTo(req.XrayErr, 400), req.Applied
+		if req.CtlPort > 0 {
+			s.CtlPort = req.CtlPort
+		}
+		if len(req.Busy) > 2000 {
+			req.Busy = req.Busy[:2000]
+		}
+		s.Busy = req.Busy
 		srv = *s
 		return nil
 	})
@@ -659,7 +728,7 @@ func (a *App) handleBeat(w http.ResponseWriter, r *http.Request) {
 	if lerr == nil {
 		fwd = a.fwdFor(root, srv.ID)
 	}
-	cfg := relayXrayConfig(a.joinFor(srv), fwd)
+	cfg := relayXrayConfig(a.joinFor(srv), fwd, srv.CtlPort)
 	sum := sha256.Sum256(cfg)
 	resp.Hash = fmt.Sprintf("%x", sum[:8])
 	if req.Applied != resp.Hash {

@@ -118,3 +118,10 @@ textarea.ports { width: 100%; box-sizing: border-box; resize: vertical; padding:
 .chip.tun{background:var(--soft);color:var(--accent)}
 .ib-title .dot{width:9px;height:9px;flex:none}
 .pitem .dot{display:inline-block;width:8px;height:8px;flex:none;box-shadow:none}
+.tnrow{display:grid;grid-template-columns:1fr 190px;gap:.5rem;align-items:end}
+.tnrow .tnbusy{grid-column:1/-1;min-height:0}
+.tnport{font-size:12px}
+.tnport input{direction:ltr}
+details summary{cursor:pointer;margin:.3rem 0}
+.small-details{font-size:12px;margin-top:.4rem}
+@media (max-width:560px){.tnrow{grid-template-columns:1fr}}

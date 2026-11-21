@@ -19,6 +19,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"time"
 )
@@ -34,6 +35,7 @@ type agentState struct {
 	Join  joinInfo `json:"join"`
 	Token string   `json:"token,omitempty"`
 	Hash  string   `json:"hash,omitempty"`
+	Ctl   int      `json:"ctl,omitempty"`
 }
 
 func agentMain(args []string) {
@@ -104,7 +106,17 @@ func agentInstall(code string) error {
 		return err
 	}
 	st := agentState{Join: j}
-	cfg := relayXrayConfig(j, nil)
+	if old, err := loadAgent(); err == nil && old.Ctl > 0 {
+		st.Ctl = old.Ctl
+		_, _ = run(20*time.Second, "systemctl", "stop", agentRelay)
+	}
+	if st.Ctl == 0 || !portFree(st.Ctl) {
+		st.Ctl = agentCtlPort
+		for i := 0; i < 50 && !portFree(st.Ctl); i++ {
+			st.Ctl = suggestPort()
+		}
+	}
+	cfg := relayXrayConfig(j, nil, st.Ctl)
 	if err := os.WriteFile(filepath.Join(agentDir, "xray.json"), cfg, 0o600); err != nil {
 		return err
 	}
@@ -182,7 +194,10 @@ func agentRun() {
 		fmt.Println("agent not installed:", err)
 		os.Exit(1)
 	}
-	proxy, _ := url.Parse(fmt.Sprintf("socks5://127.0.0.1:%d", agentCtlPort))
+	if st.Ctl == 0 {
+		st.Ctl = agentCtlPort
+	}
+	proxy, _ := url.Parse(fmt.Sprintf("socks5://127.0.0.1:%d", st.Ctl))
 	cl := &http.Client{Timeout: 20 * time.Second, Transport: &http.Transport{Proxy: http.ProxyURL(proxy),
 		// the hop runs inside the authenticated VLESS+TLS tunnel to 127.0.0.1
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}}
@@ -198,7 +213,7 @@ func agentRun() {
 			ipAt = time.Now()
 		}
 		active, _ := run(5*time.Second, "systemctl", "is-active", agentRelay)
-		req := beatReq{Version: version, PublicIP: ip, XrayOK: active == "active", XrayErr: lastErr, Applied: st.Hash}
+		req := beatReq{Version: version, PublicIP: ip, XrayOK: active == "active", XrayErr: lastErr, Applied: st.Hash, CtlPort: st.Ctl, Busy: busyPorts(st.Ctl)}
 		body, _ := json.Marshal(req)
 		hr, _ := http.NewRequest("POST", strings.TrimSuffix(st.Join.Panel, "/")+"/api/agent/beat", bytes.NewReader(body))
 		hr.Header.Set("Content-Type", "application/json")
@@ -246,7 +261,7 @@ func agentRun() {
 func applyRelayConfig(cfg []byte) error {
 	p := filepath.Join(agentDir, "xray.json")
 	old, _ := os.ReadFile(p)
-	tmp := p + ".new"
+	tmp := filepath.Join(agentDir, "xray.next.json") // xray needs a .json name
 	if err := os.WriteFile(tmp, cfg, 0o600); err != nil {
 		return err
 	}
@@ -314,4 +329,53 @@ func downloadXray(dir string) error {
 		return nil
 	}
 	return errors.New("xray binary not found in archive")
+}
+
+// busyPorts lists ports listening on this server that are not our relay's
+// own, so the panel never asks the relay to take a busy port.
+func busyPorts(ctl int) []int {
+	own := map[int]bool{ctl: true}
+	if b, err := os.ReadFile(filepath.Join(agentDir, "xray.json")); err == nil {
+		var c struct {
+			Inbounds []struct {
+				Port any `json:"port"`
+			} `json:"inbounds"`
+		}
+		if json.Unmarshal(b, &c) == nil {
+			for _, ib := range c.Inbounds {
+				if f, ok := ib.Port.(float64); ok {
+					own[int(f)] = true
+				}
+			}
+		}
+	}
+	seen := map[int]bool{}
+	var out []int
+	for _, f := range []string{"tcp", "tcp6", "udp", "udp6"} {
+		b, err := os.ReadFile("/proc/net/" + f)
+		if err != nil {
+			continue
+		}
+		for i, line := range strings.Split(string(b), "\n") {
+			fs := strings.Fields(line)
+			if i == 0 || len(fs) < 4 {
+				continue
+			}
+			if strings.HasPrefix(f, "tcp") && fs[3] != "0A" { // LISTEN
+				continue
+			}
+			k := strings.LastIndex(fs[1], ":")
+			if k < 0 {
+				continue
+			}
+			var port int
+			if _, err := fmt.Sscanf(fs[1][k+1:], "%X", &port); err != nil || port == 0 || own[port] || seen[port] {
+				continue
+			}
+			seen[port] = true
+			out = append(out, port)
+		}
+	}
+	sort.Ints(out)
+	return out
 }

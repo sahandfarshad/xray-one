@@ -50,10 +50,11 @@ type Store struct {
 	AllToken string `json:"allToken"`
 	// Relays: extra addresses (relay / CDN IPs) per inbound tag.
 	Relays map[string][]Relay `json:"relays"`
-	// Tunnels: middle servers; TunnelMap: inbound id -> tunnel server ids.
-	Tunnels   []*TunnelServer     `json:"tunnels,omitempty"`
-	TunnelCfg TunnelSettings      `json:"tunnelCfg"`
-	TunnelMap map[string][]string `json:"tunnelMap,omitempty"`
+	// Tunnels: middle servers; TunnelUse: inbound id -> servers (+ port there).
+	Tunnels   []*TunnelServer        `json:"tunnels,omitempty"`
+	TunnelCfg TunnelSettings         `json:"tunnelCfg"`
+	TunnelUse map[string][]TunnelUse `json:"tunnelUse,omitempty"`
+	TunnelMap map[string][]string    `json:"tunnelMap,omitempty"` // v0.4.0, migrated
 }
 
 type Relay struct {
@@ -110,6 +111,18 @@ func OpenStore(dir string) (*Store, error) {
 	}
 	if s.Relays == nil {
 		s.Relays = map[string][]Relay{}
+	}
+	if s.TunnelUse == nil {
+		s.TunnelUse = map[string][]TunnelUse{}
+	}
+	if len(s.TunnelMap) > 0 {
+		for ib, ids := range s.TunnelMap {
+			for _, id := range ids {
+				s.TunnelUse[ib] = append(s.TunnelUse[ib], TunnelUse{Server: id})
+			}
+		}
+		s.TunnelMap = nil
+		_ = s.saveLocked()
 	}
 	if s.AllToken == "" {
 		s.AllToken = randHex(16)

@@ -38,6 +38,8 @@ const T = {
     tnOnline: "متصل", tnOffline: "قطع", tnNever: "هنوز وصل نشده", tnAgo: "پیش", tnQuick: "نصب سریع بدون پسورد: این دستور را روی سرور میانی (با root) بزنید. تا ۲۴ ساعت معتبر است و بعد از اتصال باطل می‌شود.",
     tnNewCmd: "دستور نصب جدید", tnNoSrv: "هنوز سرور میانی اضافه نشده.", tnInfo: "روش WSS: سرور میانی با WebSocket+TLS به پورت {port} روی {domain} وصل می‌شود. کاربر ← سرور میانی ← این سرور ← اینترنت.",
     tnNeedSSL: "برای تانل WSS اول باید دامنه و SSL را از منوی SSH تنظیم کنید.", tnUse: "تانل", tnPick: "این اینباند از کدام سرورهای میانی استفاده کند؟ برای هر کدام یک لینک جدا ساخته می‌شود.",
+    tnInbounds: "اینباندها", tnSshOpt: "Deploy با SSH (اختیاری)", tnPortHere: "پورت روی سرور میانی", tnBusy: "اشغال روی سرور میانی",
+    tnRemove: "حذف relay از سرور میانی (روی همان سرور بزنید):", tnCmdTitle: "دستور نصب سرور میانی",
     tnInbounds: "اینباندها", tnDeploying: "در حال نصب روی سرور میانی… (تا چند دقیقه)", tnConfirmDel: "این سرور میانی حذف شود؟ اینباندها دیگر از آن استفاده نمی‌کنند.", tnXrayErr: "خطای relay",
     selectAll: "انتخاب همه", ports: "پورت‌ها", portsTitle: "پورت‌های استفاده‌شده", portsHint: "همه‌ی پورت‌های این‌باندها، جدا با کاما؛ برای ساخت relay و تانل.", gSS: "Shadowsocks", gProxy: "پراکسی ساده (SOCKS / HTTP، با یوزر و پسورد جدا)", relayLinks: "لینک‌های relay", singleUser: "تک‌کاربره", confirmDelRelay: "این relay حذف شود؟",
   },
@@ -79,6 +81,8 @@ const T = {
     tnOnline: "Connected", tnOffline: "Down", tnNever: "not connected yet", tnAgo: "ago", tnQuick: "Quick install without a password: run this on the middle server as root. Valid 24 h, void after it connects.",
     tnNewCmd: "New install command", tnNoSrv: "No middle server yet.", tnInfo: "WSS method: the middle server connects with WebSocket+TLS to port {port} on {domain}. User → middle server → this server → internet.",
     tnNeedSSL: "The WSS tunnel needs this server's domain and SSL: set them in the SSH menu first.", tnUse: "Tunnel", tnPick: "Which middle servers should this inbound use? Each one gets its own link.",
+    tnSshOpt: "Deploy over SSH (optional)", tnPortHere: "Port on middle server", tnBusy: "busy on middle server",
+    tnRemove: "Remove the relay from the middle server (run there):", tnCmdTitle: "Middle server install command",
     tnInbounds: "Inbounds", tnDeploying: "Installing on the middle server… (a few minutes)", tnConfirmDel: "Remove this middle server? Inbounds stop using it.", tnXrayErr: "Relay error",
     selectAll: "Select all", ports: "Ports", portsTitle: "Used ports", portsHint: "Every inbound port, comma separated, for building relays and tunnels.", gSS: "Shadowsocks", gProxy: "Plain proxies (SOCKS / HTTP, own user and password)", relayLinks: "Relay links", singleUser: "single user", confirmDelRelay: "Remove this relay?",
   },
@@ -572,6 +576,7 @@ function renderTunnels() {
       <p class="muted">${t("tnInbounds")}: ${s.inbounds.length ? s.inbounds.map((x) => `<span class="chip">${esc(x)}</span>`).join("") : "—"}</p>
       ${s.xrayErr ? `<p class="err">${t("tnXrayErr")}: ${esc(s.xrayErr)}</p>` : ""}
       ${s.command ? `<div class="clients"><p class="muted">${t("tnQuick")}</p>${copyRow(s.command)}</div>` : ""}
+      <details class="muted small-details"><summary>${t("tnRemove").replace(/[:：]$/, "")}</summary>${copyRow(s.remove)}</details>
     </div>`;
   }).join("");
 }
@@ -610,10 +615,12 @@ $("#addTunnelBtn").onclick = () => {
   openModal(`<h3>${t("addTunnel")}</h3>
   <form id="tnForm" class="form">
     <label>${t("tnName")}<input name="name" placeholder="iran-1"></label>
+    <label>${t("tnMethod")}<select name="method"><option value="wss">WSS (WebSocket + TLS)</option></select></label>
+    <details><summary>${t("tnSshOpt")}</summary>
     <label>${t("tnHost")}<input name="host" placeholder="1.2.3.4"></label>
     <label>${t("tnSshPort")}<input name="sshPort" type="number" min="1" max="65535" value="22"></label>
     <label>${t("tnSshUser")}<input name="sshUser" value="root"></label>
-    <label>${t("tnMethod")}<select name="method"><option value="wss">WSS (WebSocket + TLS)</option></select></label>
+    </details>
   </form>
   <p id="tnErr" class="err"></p>
   <div class="actions"><button class="btn primary" id="tnSave">${t("create")}</button><button class="btn" data-close>${t("cancel")}</button></div>`);
@@ -625,22 +632,38 @@ $("#addTunnelBtn").onclick = () => {
       closeModal(); await loadTunnels(); refreshInbounds();
       const s = tunnelData.servers.find((x) => x.id === r.id);
       if (s && s.host) openDeploy(s);
+      else if (s && s.command) openModal(`<h3>${t("tnCmdTitle")} · ${esc(s.name)}</h3><p class="muted">${t("tnQuick")}</p>${copyRow(s.command)}<div class="actions"><button class="btn" data-close>${t("cancel")}</button></div>`, true);
     } catch (e) { $("#tnErr").textContent = e.message; }
   };
 };
 async function openTunnelPick(ib) {
   const d = await api("GET", "api/tunnels"); tunnelData = d;
   if (!d.servers.length) { toast(d.ready ? t("tnNoSrv") : t("tnNeedSSL")); return; }
-  const cur = new Set(d.servers.filter((s) => s.inbounds.includes(ib.id)).map((s) => s.id));
+  const row = (s) => {
+    const on = s.inbounds.includes(ib.id);
+    const port = on && s.ports[ib.id] ? s.ports[ib.id] : "";
+    return `<div class="tnrow" data-id="${esc(s.id)}">
+      <label class="pitem"><input type="checkbox" ${on ? "checked" : ""}><span class="dot${s.online ? "" : " bad"}"></span><b>${esc(s.name)}</b><small class="mono">${esc(s.publicIP || s.host || "")}</small></label>
+      <label class="tnport">${t("tnPortHere")}<input type="number" min="1" max="65535" placeholder="${esc(ib.port)}" value="${port}"></label>
+      <small class="err tnbusy"></small></div>`;
+  };
   openModal(`<h3>${t("tnUse")} · <span class="mono">${esc(ib.tag || ib.id)}</span></h3>
   <p class="muted">${t("tnPick")}</p>
-  <div class="pgrid">${d.servers.map((s) => `<label class="pitem"><input type="checkbox" value="${esc(s.id)}" ${cur.has(s.id) ? "checked" : ""}>
-    <span class="dot${s.online ? "" : " bad"}"></span><b>${esc(s.name)}</b><small class="mono">${esc(s.publicIP || s.host || "")}</small></label>`).join("")}</div>
+  <div class="stack">${d.servers.map(row).join("")}</div>
   <p id="tpErr" class="err"></p>
-  <div class="actions"><button class="btn primary" id="tpSave">${t("save")}</button><button class="btn" data-close>${t("cancel")}</button></div>`);
+  <div class="actions"><button class="btn primary" id="tpSave">${t("save")}</button><button class="btn" data-close>${t("cancel")}</button></div>`, true);
+  const check = (el) => {
+    const s = d.servers.find((x) => x.id === el.dataset.id);
+    const inp = el.querySelector(".tnport input");
+    const p = +(inp.value || ib.port);
+    const mine = s.inbounds.includes(ib.id) && (s.ports[ib.id] || +ib.port) === p;
+    el.querySelector(".tnbusy").textContent = !mine && (s.busy || []).includes(p) ? `${p}: ${t("tnBusy")}` : "";
+  };
+  $("#modalBody").querySelectorAll(".tnrow").forEach((el) => { check(el); el.querySelector(".tnport input").oninput = () => check(el); });
   $("#tpSave").onclick = async () => {
-    const ids = [...$("#modalBody").querySelectorAll("input[type=checkbox]:checked")].map((x) => x.value);
-    try { await api("POST", "api/tunnels/assign", { id: ib.id, servers: ids }); closeModal(); toast(t("done")); refreshInbounds(); }
+    const uses = [...$("#modalBody").querySelectorAll(".tnrow")].filter((el) => el.querySelector("input[type=checkbox]").checked)
+      .map((el) => ({ server: el.dataset.id, port: +el.querySelector(".tnport input").value || 0 }));
+    try { await api("POST", "api/tunnels/assign", { id: ib.id, uses }); closeModal(); toast(t("done")); refreshInbounds(); }
     catch (e) { $("#tpErr").textContent = e.message; }
   };
 }
