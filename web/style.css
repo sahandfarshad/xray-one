@@ -133,3 +133,13 @@ mark{background:#ffe58a;color:inherit;border-radius:3px;padding:0 2px}
 .chip.ok{background:#e3f6ea;color:#17803d}
 .chip.bad{background:#fde6e6;color:#c22}
 .chip small{opacity:.8;margin-inline-end:.35rem}
+.inrow{display:flex;gap:.4rem;align-items:center}
+.inrow input{flex:1;min-width:0}
+.rsOverlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:200;padding:1rem}
+.rsCard{width:min(980px,100%);max-height:90vh;display:flex;flex-direction:column;gap:.5rem}
+.rsWrap{overflow:auto;flex:1;border:1px solid var(--line);border-radius:10px}
+.rsTable{width:100%;border-collapse:collapse;font-size:13px;direction:ltr}
+.rsTable th,.rsTable td{padding:.45rem .6rem;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+.rsTable th{position:sticky;top:0;background:var(--card,var(--bg))}
+.pill.ok{background:#e3f6ea;color:#17803d}
+.pill.bad{background:#fde6e6;color:#c22}

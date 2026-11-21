@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 )
 
 type Preset struct {
@@ -140,6 +141,8 @@ func (a *App) handleCreatePresets(w http.ResponseWriter, r *http.Request) {
 		IDs        []string `json:"ids"`
 		Client     string   `json:"client"`
 		ExpiryDays float64  `json:"expiryDays"`
+		Dest       string   `json:"dest"`
+		SNI        string   `json:"sni"`
 		LimitGB    float64  `json:"limitGB"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -168,6 +171,9 @@ func (a *App) handleCreatePresets(w http.ResponseWriter, r *http.Request) {
 				return fmt.Errorf("unknown type %q", id)
 			}
 			n := NewInbound{Protocol: p.Protocol, Network: p.Network, Security: p.Security, Method: p.Method, HeaderType: p.HeaderType}
+			if p.Security == "reality" {
+				n.Dest, n.ServerName = strings.TrimSpace(body.Dest), strings.TrimSpace(body.SNI)
+			}
 			if p.Security == "tls" {
 				if cert == nil {
 					return errors.New("TLS types need a certificate: set SSL in the SSH menu first")
