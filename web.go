@@ -195,6 +195,7 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("POST /api/tunnels/assign", a.api(a.handleTunnelAssign))
 	mux.HandleFunc("POST /api/tunnels/bulk", a.api(a.handleTunnelBulk))
 	mux.HandleFunc("POST /api/reality/scan", a.api(a.handleRealityScan))
+	mux.HandleFunc("GET /api/reality/keys", a.api(a.handleRealityKeys))
 	mux.HandleFunc("POST /api/agent/beat", a.handleBeat)
 	mux.HandleFunc("GET /sub/{token}", a.handleSub)
 

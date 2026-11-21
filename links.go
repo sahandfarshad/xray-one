@@ -66,7 +66,7 @@ func pubFromPriv(priv string) string {
 type streamParams struct {
 	network, security       string
 	sni, fp, alpn           string
-	pbk, sid                string
+	pbk, sid, spx           string
 	path, host, serviceName string
 	headerType, mode        string
 	seed                    string
@@ -96,6 +96,12 @@ func readStream(ib *OMap, host string) streamParams {
 		}
 		p.pbk = pubFromPriv(asStr(r.Get("privateKey")))
 		p.fp = "chrome"
+		if st := asMap(r.Get("settings")); st != nil {
+			p.fp = orDefault(asStr(st.Get("fingerprint")), "chrome")
+			if v := asStr(st.Get("spiderX")); v != "" && v != "/" {
+				p.spx = v
+			}
+		}
 	}
 	switch p.network {
 	case "ws":
@@ -151,6 +157,7 @@ func (p streamParams) query(q url.Values) {
 	set("alpn", p.alpn)
 	set("pbk", p.pbk)
 	set("sid", p.sid)
+	set("spx", p.spx)
 	set("path", p.path)
 	set("host", p.host)
 	set("serviceName", p.serviceName)

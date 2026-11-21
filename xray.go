@@ -516,20 +516,121 @@ func ensureOutbounds(root *OMap) {
 }
 
 type NewInbound struct {
-	Protocol    string `json:"protocol"`
-	Port        int    `json:"port"`
-	Tag         string `json:"tag"`
-	Network     string `json:"network"`
-	Security    string `json:"security"`
-	Path        string `json:"path"`
-	ServiceName string `json:"serviceName"`
-	ServerName  string `json:"serverName"`
-	CertFile    string `json:"certFile"`
-	KeyFile     string `json:"keyFile"`
-	Dest        string `json:"dest"`
-	Method      string `json:"method"` // shadowsocks
-	HeaderType  string `json:"headerType"`
-	Flow        string `json:"-"`
+	Protocol    string       `json:"protocol"`
+	Port        int          `json:"port"`
+	Tag         string       `json:"tag"`
+	Network     string       `json:"network"`
+	Security    string       `json:"security"`
+	Path        string       `json:"path"`
+	ServiceName string       `json:"serviceName"`
+	ServerName  string       `json:"serverName"`
+	CertFile    string       `json:"certFile"`
+	KeyFile     string       `json:"keyFile"`
+	Dest        string       `json:"dest"`
+	Method      string       `json:"method"` // shadowsocks
+	HeaderType  string       `json:"headerType"`
+	Flow        string       `json:"-"`
+	Reality     *RealityOpts `json:"reality,omitempty"`
+}
+
+// RealityOpts: the full REALITY form (like 3x-ui). Empty fields get defaults.
+type RealityOpts struct {
+	Show         bool     `json:"show"`
+	Xver         int      `json:"xver"`
+	Fingerprint  string   `json:"fingerprint"`
+	Target       string   `json:"target"`
+	ServerNames  []string `json:"serverNames"`
+	MaxTimeDiff  int64    `json:"maxTimeDiff"`
+	MinClientVer string   `json:"minClientVer"`
+	MaxClientVer string   `json:"maxClientVer"`
+	ShortIDs     []string `json:"shortIds"`
+	SpiderX      string   `json:"spiderX"`
+	PrivateKey   string   `json:"privateKey"`
+}
+
+var reShortID = regexp.MustCompile(`^([0-9a-f]{2}){0,8}$`)
+var reClientVer = regexp.MustCompile(`^\d+\.\d+\.\d+$`)
+
+func buildReality(n NewInbound) (*OMap, error) {
+	o := RealityOpts{}
+	if n.Reality != nil {
+		o = *n.Reality
+	}
+	clean := func(in []string) []string {
+		var out []string
+		for _, v := range in {
+			if v = strings.TrimSpace(v); v != "" {
+				out = append(out, v)
+			}
+		}
+		return out
+	}
+	target := strings.TrimSpace(orDefault(o.Target, orDefault(n.Dest, "www.microsoft.com:443")))
+	if !strings.Contains(target, ":") {
+		target += ":443"
+	}
+	names := clean(o.ServerNames)
+	if len(names) == 0 && n.ServerName != "" {
+		names = []string{n.ServerName}
+	}
+	if len(names) == 0 {
+		names = []string{strings.Split(target, ":")[0]}
+	}
+	priv := strings.TrimSpace(o.PrivateKey)
+	pub := ""
+	if priv == "" {
+		var err error
+		if priv, pub, err = genX25519(); err != nil {
+			return nil, err
+		}
+	} else if pub = pubFromPriv(priv); pub == "" {
+		return nil, errors.New("REALITY private key is not a valid x25519 key")
+	}
+	sids := clean(o.ShortIDs)
+	for i, v := range sids {
+		sids[i] = strings.ToLower(v)
+		if !reShortID.MatchString(sids[i]) {
+			return nil, fmt.Errorf("short ID %q: use 0-16 hex characters, even length", v)
+		}
+	}
+	if len(sids) == 0 {
+		sids = []string{randHex(4)}
+	}
+	for _, v := range []string{o.MinClientVer, o.MaxClientVer} {
+		if v != "" && !reClientVer.MatchString(v) {
+			return nil, fmt.Errorf("client version %q: use x.y.z", v)
+		}
+	}
+	if o.Xver < 0 || o.Xver > 2 {
+		return nil, errors.New("xver must be 0, 1 or 2")
+	}
+	fp := orDefault(strings.TrimSpace(o.Fingerprint), "chrome")
+	spx := strings.TrimSpace(o.SpiderX)
+	if spx == "" {
+		spx = "/"
+	}
+	sidAny := make([]any, len(sids))
+	for i, v := range sids {
+		sidAny[i] = v
+	}
+	nameAny := make([]any, len(names))
+	for i, v := range names {
+		nameAny[i] = v
+	}
+	rs := om("show", o.Show, "dest", target, "xver", o.Xver, "serverNames", nameAny, "privateKey", priv)
+	if o.MinClientVer != "" {
+		rs.Set("minClientVer", o.MinClientVer)
+	}
+	if o.MaxClientVer != "" {
+		rs.Set("maxClientVer", o.MaxClientVer)
+	}
+	if o.MaxTimeDiff > 0 {
+		rs.Set("maxTimeDiff", o.MaxTimeDiff)
+	}
+	rs.Set("shortIds", sidAny)
+	// client-side values for links (xray ignores this block; 3x-ui uses the same one)
+	rs.Set("settings", om("publicKey", pub, "fingerprint", fp, "serverName", "", "spiderX", spx))
+	return rs, nil
 }
 
 func BuildInbound(root *OMap, n NewInbound) (*OMap, error) {
@@ -631,17 +732,11 @@ func BuildInbound(root *OMap, n NewInbound) (*OMap, error) {
 		if n.Protocol != "vless" && n.Protocol != "trojan" {
 			return nil, errors.New("REALITY works with VLESS or Trojan")
 		}
-		priv, _, err := genX25519()
+		rs, err := buildReality(n)
 		if err != nil {
 			return nil, err
 		}
-		dest := orDefault(n.Dest, "www.microsoft.com:443")
-		sn := n.ServerName
-		if sn == "" {
-			sn = strings.Split(dest, ":")[0]
-		}
-		stream.Set("realitySettings", om("show", false, "dest", dest, "xver", 0,
-			"serverNames", []any{sn}, "privateKey", priv, "shortIds", []any{randHex(4)}))
+		stream.Set("realitySettings", rs)
 	default:
 		return nil, errors.New("unsupported security")
 	}

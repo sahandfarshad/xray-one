@@ -35,7 +35,7 @@ const T = {
     relayPort: "پورت (خالی = همان پورت اینباند)", relayName: "اسم (اختیاری)", relayHint: "هر کلاینت یک لینک اضافه با این آدرس می‌گیرد (در QR و سابسکریپشن هم). SNI، کلید و بقیه‌ی تنظیمات همان می‌ماند. پنل مسیر را نمی‌سازد؛ این آدرس باید خودش به این سرور برسد.",
     relayEx: "مثال‌ها: یک ساب‌دامنه‌ی دیگر که به همین IP اشاره می‌کند (اگر دامنه‌ی اول فیلتر شد) · ساب‌دامنه یا IP تمیز Cloudflare برای اینباندهای WS/XHTTP با TLS · IP سروری که خودت با iptables/HAProxy به اینجا فوروارد کرده‌ای.",
     relayBefore: "لینک فعلی", relayAfter: "لینک اضافه با این آدرس", relayNoClient: "این اینباند هنوز کلاینتی ندارد که نمونه‌ی لینک نشان داده شود.",
-    delSel: "حذف", rsFind: "پیدا کردن", rsTitle: "اسکنر مقصد REALITY", rsHint: "از روی همین سرور چک می‌کند کدام سایت برای REALITY مناسب است (TLS 1.3، h2، X25519 و گواهی معتبر). خالی بگذارید تا سایت‌های معروف چک شوند، یا یک دامنه، IP یا رنج مثل 1.2.3.0/24 بدهید.",
+    delSel: "حذف", rsCheck: "بررسی", rCommas: "با کاما جدا کنید", rNew: "ساخت دوباره", rNewKeys: "کلید جدید", rClear: "پاک کردن", rsFind: "پیدا کردن", rsTitle: "اسکنر مقصد REALITY", rsHint: "از روی همین سرور چک می‌کند کدام سایت برای REALITY مناسب است (TLS 1.3، h2، X25519 و گواهی معتبر). خالی بگذارید تا سایت‌های معروف چک شوند، یا یک دامنه، IP یا رنج مثل 1.2.3.0/24 بدهید.",
     rsPh: "دامنه، IP یا رنج — خالی = سایت‌های معروف", rsScan: "اسکن", rsStatus: "وضعیت", rsCert: "گواهی", rsLatency: "تأخیر", rsOk: "مناسب", rsNo: "نامناسب", rsUse: "استفاده", rsWait: "در حال اسکن… (تا یک دقیقه)", rsCount: "{a} مناسب از {b} مورد", close: "بستن", tunSel: "⇄ تانل", tbTitle: "تانل گروهی", tbHint: "اینباندهای انتخاب‌شده با همان پورت خودشان روی سرور میانی باز می‌شوند. پورت‌هایی که آنجا اشغال باشند رد می‌شوند و اینجا نشان داده می‌شوند.",
     tbAdd: "تانل کن", tbRemove: "برداشتن از این سرور", tbSkipped: "رد شدند", tbDone: "{n} اینباند انجام شد", tbProgress: "{a} از {b} روی سرور میانی آماده شد", tbSlow: "سرور میانی جواب نداد. آنلاین بودنش را در تب تانل چک کنید.",
     stOk: "باز", stBusy: "اشغال روی سرور میانی", stDown: "باز نشد", stOffline: "سرور میانی آفلاین", stUnknown: "ایجنت قدیمی؛ دستور نصب را دوباره اجرا کنید", stPending: "در حال بررسی…", confirmDelSel: "{n} اینباند انتخاب‌شده حذف شود؟ کلاینت‌های داخلشان هم حذف می‌شوند.",
@@ -88,7 +88,7 @@ const T = {
     relayPort: "Port (empty = inbound port)", relayName: "Name (optional)", relayHint: "Every client gets an extra link with this address (also in QR and subscription). SNI, keys and other settings stay the same. The panel does not build the route; this address must already reach this server.",
     relayEx: "Examples: a second subdomain pointing to this IP (if the first gets blocked) · a Cloudflare subdomain or clean IP for WS/XHTTP+TLS inbounds · the IP of a server you forward here yourself with iptables/HAProxy.",
     relayBefore: "Current link", relayAfter: "Extra link with this address", relayNoClient: "This inbound has no client yet to preview a link.",
-    delSel: "Delete", rsFind: "Find", rsTitle: "REALITY target scanner", rsHint: "Checks from this server which sites work as a REALITY target (TLS 1.3, h2, X25519, valid certificate). Leave empty for common sites, or enter a domain, an IP or a range like 1.2.3.0/24.",
+    delSel: "Delete", rsCheck: "Check", rCommas: "comma separated", rNew: "Regenerate", rNewKeys: "New keys", rClear: "Clear", rsFind: "Find", rsTitle: "REALITY target scanner", rsHint: "Checks from this server which sites work as a REALITY target (TLS 1.3, h2, X25519, valid certificate). Leave empty for common sites, or enter a domain, an IP or a range like 1.2.3.0/24.",
     rsPh: "domain, IP or range — empty = common sites", rsScan: "Scan", rsStatus: "Status", rsCert: "Certificate", rsLatency: "Latency", rsOk: "Feasible", rsNo: "Not usable", rsUse: "Use", rsWait: "Scanning… (up to a minute)", rsCount: "{a} usable of {b}", close: "Close", tunSel: "⇄ Tunnel", tbTitle: "Bulk tunnel", tbHint: "Selected inbounds open on the middle server on their own port. Ports busy there are skipped and shown here.",
     tbAdd: "Tunnel", tbRemove: "Remove from this server", tbSkipped: "Skipped", tbDone: "{n} inbounds done", tbProgress: "{a} of {b} ready on the middle server", tbSlow: "The middle server did not answer. Check it is online in the Tunnels tab.",
     stOk: "open", stBusy: "busy on middle server", stDown: "not listening", stOffline: "middle server offline", stUnknown: "old agent; rerun the install command", stPending: "checking…", confirmDelSel: "Delete {n} selected inbounds? Their clients go too.",
@@ -339,16 +339,50 @@ $("#addInboundBtn").onclick = guard(async () => {
     <label>${t("tag")}<input name="tag"></label>
     <label data-show="path">${t("path")}<input name="path" placeholder="/"></label>
     <label data-show="grpc">${t("serviceName")}<input name="serviceName"></label>
-    <label data-show="sni">${t("serverName")}<input name="serverName" placeholder="www.microsoft.com"></label>
-    <label data-show="reality">${t("dest")}<span class="inrow"><input name="dest" placeholder="www.microsoft.com:443"><button type="button" class="btn small" id="ibScan">🔍 ${t("rsFind")}</button></span></label>
+    <label data-show="tls">${t("serverName")}<input name="serverName" placeholder="www.microsoft.com"></label>
+    <div data-show="reality" class="rgrid">
+      <label class="rck"><input type="checkbox" name="r_show"> Show</label>
+      <label>Xver<input name="r_xver" type="number" min="0" max="2" value="0"></label>
+      <label>uTLS<select name="r_fp">${["chrome", "firefox", "safari", "ios", "android", "edge", "360", "qq", "random", "randomized"].map((x) => `<option>${x}</option>`).join("")}</select></label>
+      <label class="wide">Target<span class="inrow"><input name="r_target" value="www.microsoft.com:443" dir="ltr"><button type="button" class="btn small" id="rCheck">${t("rsCheck")}</button><button type="button" class="btn small" id="ibScan">🔍 ${t("rsFind")}</button></span><small id="rCheckOut" class="muted"></small></label>
+      <label class="wide">SNI <small class="muted">(${t("rCommas")})</small><input name="r_sni" value="www.microsoft.com" dir="ltr"></label>
+      <label>Max Time Diff (ms)<input name="r_mtd" type="number" min="0" value="0"></label>
+      <label>Min Client Ver<input name="r_minv" placeholder="26.3.27" dir="ltr"></label>
+      <label>Max Client Ver<input name="r_maxv" placeholder="x.y.z" dir="ltr"></label>
+      <label class="wide">Short IDs <small class="muted">(${t("rCommas")})</small><span class="inrow"><input name="r_sids" dir="ltr"><button type="button" class="btn small" id="rSids" title="${t("rNew")}">↻</button></span></label>
+      <label class="wide">SpiderX<span class="inrow"><input name="r_spx" dir="ltr"><button type="button" class="btn small" id="rSpx" title="${t("rNew")}">↻</button></span></label>
+      <label class="wide">Public Key<input name="r_pub" readonly dir="ltr" class="mono"></label>
+      <label class="wide">Private Key<input name="r_priv" dir="ltr" class="mono"></label>
+      <div class="actions wide"><button type="button" class="btn small primary" id="rKeys">${t("rNewKeys")}</button><button type="button" class="btn small danger" id="rClear">${t("rClear")}</button></div>
+    </div>
     ${certs.length ? `<label data-show="tls">${t("pickCert")}<select name="certPick"><option value="">—</option>${certOpts}</select></label>` : ""}
     <label data-show="tls">${t("certFile")}<input name="certFile" placeholder="/etc/letsencrypt/live/…/fullchain.pem"></label>
     <label data-show="tls">${t("keyFile")}<input name="keyFile" placeholder="/etc/letsencrypt/live/…/privkey.pem"></label>
   </form>
   <p id="ibErr" class="err"></p>
-  <div class="actions"><button class="btn primary" id="ibCreate">${t("create")}</button><button class="btn" data-close>${t("cancel")}</button></div>`);
+  <div class="actions"><button class="btn primary" id="ibCreate">${t("create")}</button><button class="btn" data-close>${t("cancel")}</button></div>`, true);
   const f = $("#ibForm");
-  $("#ibScan").onclick = () => openRealityScan((r) => { f.dest.value = r.target; f.serverName.value = r.sni; }, true);
+  $("#ibScan").onclick = () => openRealityScan((r) => { f.r_target.value = r.target; f.r_sni.value = r.sni; }, true);
+  const rhex = (n) => [...crypto.getRandomValues(new Uint8Array(n))].map((b) => b.toString(16).padStart(2, "0")).join("");
+  const newSids = () => { f.r_sids.value = [8, 2, 1, 3, 4, 7, 5, 6].map(rhex).join(","); };
+  const newSpx = () => { const a = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"; f.r_spx.value = "/" + [...crypto.getRandomValues(new Uint8Array(15))].map((b) => a[b % a.length]).join(""); };
+  const newKeys = async () => { try { const k = await api("GET", "api/reality/keys"); f.r_priv.value = k.privateKey; f.r_pub.value = k.publicKey; } catch (e) { $("#ibErr").textContent = e.message; } };
+  newSids(); newSpx(); newKeys();
+  $("#rSids").onclick = newSids; $("#rSpx").onclick = newSpx; $("#rKeys").onclick = newKeys;
+  $("#rClear").onclick = () => { f.r_priv.value = ""; f.r_pub.value = ""; };
+  f.r_priv.onchange = async () => {
+    const v = f.r_priv.value.trim(); f.r_pub.value = "";
+    if (v) try { f.r_pub.value = (await api("GET", "api/reality/keys?priv=" + encodeURIComponent(v))).publicKey; } catch (e) { $("#ibErr").textContent = e.message; }
+  };
+  $("#rCheck").onclick = async () => {
+    const out = $("#rCheckOut"); out.textContent = t("rsWait");
+    try {
+      const r = (await api("POST", "api/reality/scan", { q: f.r_target.value.trim() })).results[0];
+      out.innerHTML = !r ? "—" : r.feasible ? `<span class="pill ok">${t("rsOk")}</span> TLS ${esc(r.tls)} · ${esc(r.alpn)} · ${esc(r.keyEx)} · ${esc(r.cert)} · ${r.latency} ms`
+        : `<span class="pill bad">${esc(r.reason || t("rsNo"))}</span>`;
+      if (r && r.feasible && !f.r_sni.value.trim()) f.r_sni.value = r.sni;
+    } catch (e) { out.textContent = e.message; }
+  };
   const sync = () => {
     const net = f.network.value, sec = f.security.value, proto = f.protocol.value;
     const show = { path: ["ws", "xhttp", "httpupgrade"].includes(net), grpc: net === "grpc", sni: sec !== "none", reality: sec === "reality", tls: sec === "tls" };
@@ -366,6 +400,11 @@ $("#addInboundBtn").onclick = guard(async () => {
   sync();
   $("#ibCreate").onclick = async () => {
     const d = Object.fromEntries(new FormData(f)); d.port = +d.port; delete d.certPick;
+    const list = (v) => (v || "").split(/[,\s]+/).map((x) => x.trim()).filter(Boolean);
+    if (d.security === "reality") d.reality = { show: !!f.r_show.checked, xver: +d.r_xver || 0, fingerprint: d.r_fp, target: (d.r_target || "").trim(),
+      serverNames: list(d.r_sni), maxTimeDiff: +d.r_mtd || 0, minClientVer: (d.r_minv || "").trim(), maxClientVer: (d.r_maxv || "").trim(),
+      shortIds: list(d.r_sids), spiderX: (d.r_spx || "").trim(), privateKey: (d.r_priv || "").trim() };
+    Object.keys(d).filter((k) => k.startsWith("r_")).forEach((k) => delete d[k]);
     try { await api("POST", "api/inbounds", d); closeModal(); toast(t("done")); refreshInbounds(); }
     catch (e) { $("#ibErr").textContent = e.message; }
   };

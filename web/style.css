@@ -143,3 +143,9 @@ mark{background:#ffe58a;color:inherit;border-radius:3px;padding:0 2px}
 .rsTable th{position:sticky;top:0;background:var(--card,var(--bg))}
 .pill.ok{background:#e3f6ea;color:#17803d}
 .pill.bad{background:#fde6e6;color:#c22}
+.rgrid{grid-column:1/-1;display:grid;grid-template-columns:repeat(3,1fr);gap:.6rem;border:1px solid var(--line);border-radius:12px;padding:.75rem}
+.rgrid .wide{grid-column:1/-1}
+.rgrid .rck{flex-direction:row;align-items:center;gap:.4rem}
+.rgrid.hidden{display:none}
+@media (max-width:640px){.rgrid{grid-template-columns:1fr}}
+.rgrid .rck input{width:16px;height:16px;padding:0}

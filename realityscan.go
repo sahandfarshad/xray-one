@@ -237,3 +237,22 @@ func nextIP(ip net.IP) net.IP {
 	}
 	return n
 }
+
+// handleRealityKeys makes a new x25519 pair, or gives the public key of ?priv=.
+func (a *App) handleRealityKeys(w http.ResponseWriter, r *http.Request) {
+	if p := strings.TrimSpace(r.URL.Query().Get("priv")); p != "" {
+		pub := pubFromPriv(p)
+		if pub == "" {
+			fail(w, 400, errors.New("not a valid x25519 private key"))
+			return
+		}
+		writeJSONResp(w, 200, map[string]string{"privateKey": p, "publicKey": pub})
+		return
+	}
+	priv, pub, err := genX25519()
+	if err != nil {
+		fail(w, 500, err)
+		return
+	}
+	writeJSONResp(w, 200, map[string]string{"privateKey": priv, "publicKey": pub})
+}
