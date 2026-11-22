@@ -539,7 +539,6 @@ type NewInbound struct {
 	Proto       *ProtoOpts   `json:"proto,omitempty"`    // VLESS decryption, Vision testseed, fallbacks
 }
 
-
 // visionOK: VLESS Vision flow fits raw TCP with TLS, REALITY or VLESS Encryption.
 func visionOK(ib *OMap) bool {
 	if asStr(ib.Get("protocol")) != "vless" {

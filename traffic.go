@@ -1,0 +1,231 @@
+package main
+
+// Server traffic: a live speed stream (only while the dashboard is open) and a
+// cheap per-day total from the main network card's counters.
+
+import (
+	"bufio"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"os"
+	"path/filepath"
+	"sort"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+)
+
+// mainIface: the interface of the default route, else every non-loopback one.
+func mainIface() string {
+	f, err := os.Open("/proc/net/route")
+	if err != nil {
+		return ""
+	}
+	defer f.Close()
+	sc := bufio.NewScanner(f)
+	for sc.Scan() {
+		p := strings.Fields(sc.Text())
+		if len(p) > 2 && p[1] == "00000000" {
+			return p[0]
+		}
+	}
+	return ""
+}
+
+// netCounters returns received / sent bytes of iface ("" = all but lo).
+func netCounters(iface string) (rx, tx uint64, ok bool) {
+	b, err := os.ReadFile("/proc/net/dev")
+	if err != nil {
+		return
+	}
+	for _, line := range strings.Split(string(b), "\n") {
+		i := strings.Index(line, ":")
+		if i < 0 {
+			continue
+		}
+		name := strings.TrimSpace(line[:i])
+		if (iface != "" && name != iface) || (iface == "" && name == "lo") {
+			continue
+		}
+		p := strings.Fields(line[i+1:])
+		if len(p) < 9 {
+			continue
+		}
+		r, _ := strconv.ParseUint(p[0], 10, 64)
+		t, _ := strconv.ParseUint(p[8], 10, 64)
+		rx += r
+		tx += t
+		ok = true
+	}
+	return
+}
+
+type DayTraffic struct {
+	Rx uint64 `json:"rx"` // received by the server (download)
+	Tx uint64 `json:"tx"` // sent by the server (upload)
+}
+
+type trafficLog struct {
+	mu     sync.Mutex
+	path   string
+	Iface  string                 `json:"iface"`
+	LastRx uint64                 `json:"lastRx"`
+	LastTx uint64                 `json:"lastTx"`
+	Days   map[string]*DayTraffic `json:"days"`
+	dirty  bool
+}
+
+func openTrafficLog(dir string) *trafficLog {
+	t := &trafficLog{path: filepath.Join(dir, "traffic.json"), Days: map[string]*DayTraffic{}}
+	if b, err := os.ReadFile(t.path); err == nil {
+		_ = json.Unmarshal(b, t)
+		if t.Days == nil {
+			t.Days = map[string]*DayTraffic{}
+		}
+	}
+	return t
+}
+
+func (t *trafficLog) sample() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	iface := mainIface()
+	rx, tx, ok := netCounters(iface)
+	if !ok {
+		return
+	}
+	if iface != t.Iface || (t.LastRx == 0 && t.LastTx == 0) {
+		t.Iface, t.LastRx, t.LastTx, t.dirty = iface, rx, tx, true
+		return
+	}
+	dr, dt := rx-t.LastRx, tx-t.LastTx
+	if rx < t.LastRx { // reboot / counter reset
+		dr = rx
+	}
+	if tx < t.LastTx {
+		dt = tx
+	}
+	t.LastRx, t.LastTx = rx, tx
+	day := time.Now().Format("2006-01-02")
+	d := t.Days[day]
+	if d == nil {
+		d = &DayTraffic{}
+		t.Days[day] = d
+		// keep about 13 months
+		if len(t.Days) > 400 {
+			keys := make([]string, 0, len(t.Days))
+			for k := range t.Days {
+				keys = append(keys, k)
+			}
+			sort.Strings(keys)
+			for _, k := range keys[:len(keys)-400] {
+				delete(t.Days, k)
+			}
+		}
+	}
+	d.Rx += dr
+	d.Tx += dt
+	t.dirty = true
+}
+
+func (t *trafficLog) save() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if !t.dirty {
+		return
+	}
+	b, _ := json.Marshal(t)
+	tmp := t.path + ".tmp"
+	if os.WriteFile(tmp, b, 0600) == nil && os.Rename(tmp, t.path) == nil {
+		t.dirty = false
+	}
+}
+
+// loop: count every minute, write the file every 5 minutes.
+func (t *trafficLog) loop() {
+	t.sample()
+	n := 0
+	for range time.Tick(time.Minute) {
+		t.sample()
+		if n++; n%5 == 0 {
+			t.save()
+		}
+	}
+}
+
+// GET /api/traffic/daily?month=YYYY-MM
+func (a *App) handleTrafficDaily(w http.ResponseWriter, r *http.Request) {
+	month := r.URL.Query().Get("month")
+	m, err := time.ParseInLocation("2006-01", month, time.Local)
+	if err != nil {
+		m = time.Now()
+		m = time.Date(m.Year(), m.Month(), 1, 0, 0, 0, 0, time.Local)
+	}
+	t := a.traffic
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	var days []map[string]any
+	var sumRx, sumTx uint64
+	for d := m; d.Month() == m.Month(); d = d.AddDate(0, 0, 1) {
+		k := d.Format("2006-01-02")
+		v := t.Days[k]
+		if v == nil {
+			v = &DayTraffic{}
+		}
+		sumRx += v.Rx
+		sumTx += v.Tx
+		days = append(days, map[string]any{"day": d.Day(), "rx": v.Rx, "tx": v.Tx})
+	}
+	first := ""
+	for k := range t.Days {
+		if first == "" || k < first {
+			first = k
+		}
+	}
+	writeJSONResp(w, 200, map[string]any{"month": m.Format("2006-01"), "days": days, "rx": sumRx, "tx": sumTx,
+		"since": first, "iface": t.Iface, "today": time.Now().Format("2006-01-02")})
+}
+
+// GET /api/live: server-sent events, one small line every 2 s, only while
+// the dashboard has it open (the browser closes it when you leave the page).
+func (a *App) handleLive(w http.ResponseWriter, r *http.Request) {
+	fl, ok := w.(http.Flusher)
+	if !ok {
+		fail(w, 500, fmt.Errorf("streaming not supported"))
+		return
+	}
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("X-Accel-Buffering", "no")
+	iface := mainIface()
+	prx, ptx, _ := netCounters(iface)
+	pt := time.Now()
+	tick := time.NewTicker(2 * time.Second)
+	defer tick.Stop()
+	stop := time.After(30 * time.Minute) // the page reconnects by itself
+	for {
+		select {
+		case <-r.Context().Done():
+			return
+		case <-stop:
+			return
+		case now := <-tick.C:
+			rx, tx, _ := netCounters(iface)
+			sec := now.Sub(pt).Seconds()
+			var drx, dtx uint64
+			if rx >= prx {
+				drx = rx - prx
+			}
+			if tx >= ptx {
+				dtx = tx - ptx
+			}
+			prx, ptx, pt = rx, tx, now
+			if _, err := fmt.Fprintf(w, "data: {\"rx\":%d,\"tx\":%d}\n\n", uint64(float64(drx)/sec), uint64(float64(dtx)/sec)); err != nil {
+				return
+			}
+			fl.Flush()
+		}
+	}
+}

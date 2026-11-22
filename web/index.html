@@ -55,6 +55,20 @@
       </div>
 
       <div class="card">
+        <div class="row-between"><h3 data-t="liveTitle"></h3><span class="live-nums"><span>↓ <b id="liveRx">—</b></span><span>↑ <b id="liveTx">—</b></span></span></div>
+        <canvas id="liveChart" class="livechart" height="80"></canvas>
+      </div>
+
+      <div class="card">
+        <div class="row-between">
+          <h3 data-t="dailyTitle"></h3>
+          <span class="inrow"><button class="btn small" id="dPrev">‹</button><b id="dMonth" class="mono"></b><button class="btn small" id="dNext">›</button></span>
+        </div>
+        <p class="muted" id="dSum"></p>
+        <div id="dailyChart" class="dchart"></div>
+      </div>
+
+      <div class="card">
         <div class="row-between">
           <div>
             <h3 data-t="coreTitle"></h3>

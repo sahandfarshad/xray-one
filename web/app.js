@@ -3,6 +3,7 @@ const T = {
   fa: {
     loginHint: "برای مدیریت هسته‌ی XRay وارد شوید.", user: "نام کاربری", pass: "رمز عبور", signIn: "ورود",
     overview: "نمای کلی", inbounds: "اینباندها", settings: "تنظیمات", logout: "خروج",
+    liveTitle: "مصرف لحظه‌ای سرور", dailyTitle: "مصرف روزانه", dlLbl: "دانلود", ulLbl: "آپلود", dSince: "شمارش از", ibCount: "اینباند",
     coreStatus: "وضعیت هسته", coreVersion: "نسخه‌ی هسته", clients: "کلاینت‌ها", traffic: "ترافیک کل",
     coreTitle: "هسته‌ی XRay", restart: "ری‌استارت", enableApi: "فعال‌سازی آمار ترافیک",
     install: "نصب XRay", update: "آپدیت به آخرین نسخه", updateTo: "نصب این نسخه",
@@ -56,6 +57,7 @@ const T = {
   en: {
     loginHint: "Sign in to manage the Xray core.", user: "Username", pass: "Password", signIn: "Sign in",
     overview: "Overview", inbounds: "Inbounds", settings: "Settings", logout: "Log out",
+    liveTitle: "Live server traffic", dailyTitle: "Daily traffic", dlLbl: "Download", ulLbl: "Upload", dSince: "Counting since", ibCount: "inbounds",
     coreStatus: "Core status", coreVersion: "Core version", clients: "Clients", traffic: "Total traffic",
     coreTitle: "Xray core", restart: "Restart", enableApi: "Enable traffic stats",
     install: "Install Xray", update: "Update to latest", updateTo: "Install this version",
@@ -160,7 +162,7 @@ $("#logoutBtn").onclick = guard(async () => { await api("POST", "api/logout"); s
 $("#langBtn").onclick = () => { lang = lang === "fa" ? "en" : "fa"; localStorage.setItem("xo_lang", lang); applyLang(); };
 
 // ---------- navigation ----------
-document.querySelectorAll("#tabs button").forEach((b) => (b.onclick = () => { state.view = b.dataset.view; render(); if (state.view === "settings") loadSettings(); if (state.view === "tunnels") loadTunnels(); if (state.view === "users") loadUsers(); }));
+document.querySelectorAll("#tabs button").forEach((b) => (b.onclick = () => { state.view = b.dataset.view; render(); if (state.view === "settings") loadSettings(); if (state.view === "tunnels") loadTunnels(); if (state.view === "users") loadUsers(); if (state.view === "overview" && daily.loaded) loadDaily().catch(() => {}); }));
 
 async function boot() {
   try {
@@ -187,7 +189,46 @@ async function refreshInbounds() {
 }
 
 // ---------- render ----------
+// ---------- live + daily traffic (live stream only while Overview is on screen) ----------
+const live = { es: null, pts: [] };
+const fmtRate = (n) => fmtBytes(n) + "/s";
+function liveWanted() { return state.view === "overview" && document.visibilityState === "visible" && !$("#app").classList.contains("hidden"); }
+function liveSync() {
+  if (liveWanted() && !live.es) {
+    live.es = new EventSource("api/live");
+    live.es.onmessage = (e) => {
+      const d = JSON.parse(e.data); live.pts.push(d); if (live.pts.length > 90) live.pts.shift();
+      $("#liveRx").textContent = fmtRate(d.rx); $("#liveTx").textContent = fmtRate(d.tx); drawLive();
+    };
+  } else if (!liveWanted() && live.es) { live.es.close(); live.es = null; }
+}
+document.addEventListener("visibilitychange", liveSync);
+function drawLive() {
+  const c = $("#liveChart"), w = (c.width = c.clientWidth * devicePixelRatio), h = (c.height = 80 * devicePixelRatio), x = c.getContext("2d");
+  const max = Math.max(1024, ...live.pts.map((p) => Math.max(p.rx, p.tx))), step = w / 89;
+  const line = (k, col) => {
+    x.beginPath(); live.pts.forEach((p, i) => { const X = w - (live.pts.length - 1 - i) * step, Y = h - (p[k] / max) * (h - 6) - 3; i ? x.lineTo(X, Y) : x.moveTo(X, Y); });
+    x.strokeStyle = col; x.lineWidth = 2 * devicePixelRatio; x.stroke();
+  };
+  x.clearRect(0, 0, w, h); line("rx", "#2f80ed"); line("tx", "#27ae60");
+  x.fillStyle = "#999"; x.font = `${11 * devicePixelRatio}px sans-serif`; x.fillText(fmtRate(max), 4, 13 * devicePixelRatio);
+}
+const daily = { month: "" };
+async function loadDaily(shift) {
+  if (shift) { const [y, m] = daily.month.split("-").map(Number); const d = new Date(y, m - 1 + shift, 1); daily.month = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0"); }
+  const r = await api("GET", "api/traffic/daily" + (daily.month ? "?month=" + daily.month : ""));
+  daily.month = r.month; $("#dMonth").textContent = r.month;
+  $("#dSum").textContent = `↓ ${t("dlLbl")} ${fmtBytes(r.rx)} · ↑ ${t("ulLbl")} ${fmtBytes(r.tx)} · ${t("traffic")} ${fmtBytes(r.rx + r.tx)}` + (r.since ? ` · ${t("dSince")} ${r.since}` : "");
+  const max = Math.max(1, ...r.days.map((d) => d.rx + d.tx)), n = r.days.length, W = 100 / n, today = +r.today.slice(8), cur = r.today.startsWith(r.month);
+  $("#dailyChart").innerHTML = `<svg viewBox="0 0 100 50" preserveAspectRatio="none">${r.days.map((d, i) => {
+    const hr = (d.rx / max) * 46, ht = (d.tx / max) * 46, x = i * W + W * 0.15, bw = W * 0.7;
+    return `<g><title>${d.day}: ↓ ${fmtBytes(d.rx)} · ↑ ${fmtBytes(d.tx)}</title><rect x="${x}" y="${50 - hr}" width="${bw}" height="${hr}" fill="#2f80ed"${cur && d.day === today ? ' opacity=".6"' : ""}/><rect x="${x}" y="${50 - hr - ht}" width="${bw}" height="${ht}" fill="#27ae60"/></g>`;
+  }).join("")}</svg><div class="dlabels">${r.days.map((d) => `<span>${d.day % 5 === 0 || d.day === 1 ? d.day : ""}</span>`).join("")}</div>`;
+}
+$("#dPrev").onclick = guard(() => loadDaily(-1)); $("#dNext").onclick = guard(() => loadDaily(1));
+
 function render() {
+  liveSync(); if (state.view === "overview" && !daily.loaded && !$("#app").classList.contains("hidden")) { daily.loaded = true; loadDaily().catch(() => (daily.loaded = false)); }
   document.querySelectorAll("#tabs button").forEach((b) => b.classList.toggle("active", b.dataset.view === state.view));
   document.querySelectorAll(".view").forEach((v) => v.classList.toggle("hidden", v.id !== "view-" + state.view));
   if (!state.status) return;
@@ -643,7 +684,8 @@ function renderUsers() {
     return `<div class="card">
       <div class="ib-head">
         <div class="ib-title"><b class="mono">${esc(u.email)}</b>${clientStatus(cl)}
-          <span class="pill gray">${fmtBytes(used)} / ${u.limitBytes ? fmtBytes(u.limitBytes) : t("unlimited")}</span></div>
+          <span class="pill gray">${fmtBytes(used)} / ${u.limitBytes ? fmtBytes(u.limitBytes) : t("unlimited")}</span>
+          <span class="pill gray">${u.inbounds.length ? u.inbounds.length + " " + t("ibCount") : t("noInboundsYet")}</span></div>
         <div class="actions">
           <button class="btn small primary" data-u="edit" data-i="${i}">${t("editUser")}</button>
           <button class="btn small" data-u="qr" data-i="${i}">QR</button>
@@ -651,7 +693,6 @@ function renderUsers() {
         </div>
       </div>
       ${u.limitBytes ? `<div class="bar"><i style="width:${pct}%"></i></div>` : ""}
-      <p class="muted">${t("inbounds")}: ${u.inbounds.length ? u.inbounds.map((x) => `<span class="chip">${esc(ibLabel(x))}</span>`).join("") : t("noInboundsYet")}</p>
       ${copyRow(subURL(u))}
     </div>`;
   }).join("");

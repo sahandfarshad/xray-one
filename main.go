@@ -12,7 +12,7 @@ import (
 	"golang.org/x/term"
 )
 
-var version = "0.5.8"
+var version = "0.5.9"
 
 func main() {
 	dir := os.Getenv("XRAY_ONE_DIR")
@@ -63,6 +63,7 @@ func serve(dir string) {
 	}
 	go app.Enforce()
 	go app.certSyncLoop()
+	go app.traffic.loop()
 	cfg := app.store.Cfg
 	srv := &http.Server{Addr: cfg.Listen, ReadHeaderTimeout: 10 * time.Second}
 	if cfg.CertFile != "" && cfg.KeyFile != "" {

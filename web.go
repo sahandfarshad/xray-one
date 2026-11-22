@@ -26,13 +26,14 @@ import (
 var webFS embed.FS
 
 type App struct {
-	store  *Store
-	cfg    *ConfigStore
-	job    *Job
-	sessMu sync.Mutex
-	sess   map[string]time.Time
-	fails  map[string][]time.Time
-	tls    bool
+	store   *Store
+	cfg     *ConfigStore
+	job     *Job
+	sessMu  sync.Mutex
+	sess    map[string]time.Time
+	fails   map[string][]time.Time
+	tls     bool
+	traffic *trafficLog
 }
 
 func NewApp(dir string) (*App, error) {
@@ -40,7 +41,7 @@ func NewApp(dir string) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &App{store: st, cfg: &ConfigStore{backupDir: filepath.Join(dir, "backups")}, job: &Job{},
+	return &App{store: st, traffic: openTrafficLog(dir), cfg: &ConfigStore{backupDir: filepath.Join(dir, "backups")}, job: &Job{},
 		sess: map[string]time.Time{}, fails: map[string][]time.Time{}}, nil
 }
 
@@ -199,6 +200,8 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("POST /api/reality/scan", a.api(a.handleRealityScan))
 	mux.HandleFunc("GET /api/reality/keys", a.api(a.handleRealityKeys))
 	mux.HandleFunc("GET /api/vless/enc", a.api(a.handleVlessEnc))
+	mux.HandleFunc("GET /api/live", a.api(a.handleLive))
+	mux.HandleFunc("GET /api/traffic/daily", a.api(a.handleTrafficDaily))
 	mux.HandleFunc("POST /api/agent/beat", a.handleBeat)
 	mux.HandleFunc("GET /sub/{token}", a.handleSub)
 
