@@ -228,3 +228,6 @@ img,canvas,svg,input,select,textarea,pre{max-width:100%}
   .livechart{height:110px}
   input,select,textarea{font-size:16px}
 }
+.wgrow{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.4rem;padding:.4rem 0;border-bottom:1px solid var(--line)}
+.wgrow .qr{flex-basis:100%}
+.wgrow .btn{white-space:nowrap}

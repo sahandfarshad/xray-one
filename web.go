@@ -170,6 +170,7 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("DELETE /api/clients", a.api(a.handleDelClient))
 	mux.HandleFunc("POST /api/clients/update", a.api(a.handleUpdateClient))
 	mux.HandleFunc("GET /api/qr", a.api(a.handleQR))
+	mux.HandleFunc("GET /api/wg", a.api(a.handleWG))
 	mux.HandleFunc("POST /api/core/install", a.api(a.handleInstall))
 	mux.HandleFunc("GET /api/core/job", a.api(func(w http.ResponseWriter, r *http.Request) { writeJSONResp(w, 200, a.job.Snapshot()) }))
 	mux.HandleFunc("POST /api/core/restart", a.api(a.handleRestart))
@@ -605,20 +606,9 @@ func (a *App) handleSub(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "unavailable", 503)
 		return
 	}
-	host := a.host(r)
 	var links []string
 	if !m.Disabled {
-		for i, v := range asArr(root.Get("inbounds")) {
-			ib := asMap(v)
-			for _, cv := range clientsOf(ib) {
-				c := asMap(cv)
-				if asStr(c.Get("email")) == m.Email {
-					relays := a.relaysFor(inboundID(ib, i))
-					l, rl := ClientLinks(ib, c, host, relays)
-					links = append(links, subLinks(l, rl, relays)...)
-				}
-			}
-		}
+		links = a.userLinks(root, m.Email, a.host(r))
 	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("Profile-Title", "base64:"+base64.StdEncoding.EncodeToString([]byte("XRay One · "+m.Email)))
@@ -770,4 +760,44 @@ func subLinks(direct string, relayLinks []string, relays []Relay) []string {
 		}
 	}
 	return append([]string{direct}, relayLinks...)
+}
+
+// userLinks is what a client's subscription holds (tunneled inbounds give
+// only their tunnel links).
+func (a *App) userLinks(root *OMap, email, host string) []string {
+	var links []string
+	for i, v := range asArr(root.Get("inbounds")) {
+		ib := asMap(v)
+		for _, cv := range clientsOf(ib) {
+			c := asMap(cv)
+			if asStr(c.Get("email")) == email {
+				relays := a.relaysFor(inboundID(ib, i))
+				l, rl := ClientLinks(ib, c, host, relays)
+				links = append(links, subLinks(l, rl, relays)...)
+			}
+		}
+	}
+	return links
+}
+
+// handleWG lists a client's WireGuard links; the page turns each into a
+// .conf file and QR for the official WireGuard app.
+func (a *App) handleWG(w http.ResponseWriter, r *http.Request) {
+	m := a.store.ByToken(r.URL.Query().Get("token"))
+	if m == nil {
+		writeJSONResp(w, 404, map[string]string{"error": "not found"})
+		return
+	}
+	root, _, err := a.cfg.Load()
+	if err != nil {
+		writeJSONResp(w, 503, map[string]string{"error": err.Error()})
+		return
+	}
+	out := []string{}
+	for _, l := range a.userLinks(root, m.Email, a.host(r)) {
+		if strings.HasPrefix(l, "wireguard://") {
+			out = append(out, l)
+		}
+	}
+	writeJSONResp(w, 200, out)
 }

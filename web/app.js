@@ -55,7 +55,7 @@ const T = {
     tnInbounds: "اینباندها", tnSshOpt: "Deploy با SSH (اختیاری)", tnPortHere: "پورت روی سرور میانی", tnBusy: "اشغال روی سرور میانی",
     tnRemove: "حذف relay از سرور میانی (روی همان سرور بزنید):", tnCmdTitle: "دستور نصب سرور میانی",
     tnInbounds: "اینباندها", tnDeploying: "در حال نصب روی سرور میانی… (تا چند دقیقه)", tnConfirmDel: "این سرور میانی حذف شود؟ اینباندها دیگر از آن استفاده نمی‌کنند.", tnXrayErr: "خطای relay",
-    selectAll: "انتخاب همه", ports: "پورت‌ها", portsTitle: "پورت‌های استفاده‌شده", portsHint: "همه‌ی پورت‌های این‌باندها، جدا با کاما؛ برای ساخت relay و تانل.", gSS: "Shadowsocks", gProxy: "پراکسی ساده (SOCKS / HTTP، با یوزر و پسورد جدا)", relayLinks: "لینک‌های relay", singleUser: "تک‌کاربره", confirmDelRelay: "این relay حذف شود؟",
+    selectAll: "انتخاب همه", wgTitle: "فایل WireGuard", wgHint: "در اپ WireGuard دکمه‌ی + را بزنید، بعد فایل را وارد کنید یا QR را اسکن کنید.", wgFile: "دانلود فایل", ports: "پورت‌ها", portsTitle: "پورت‌های استفاده‌شده", portsHint: "همه‌ی پورت‌های این‌باندها، جدا با کاما؛ برای ساخت relay و تانل.", gSS: "Shadowsocks", gProxy: "پراکسی ساده (SOCKS / HTTP، با یوزر و پسورد جدا)", relayLinks: "لینک‌های relay", singleUser: "تک‌کاربره", confirmDelRelay: "این relay حذف شود؟",
   },
   en: {
     loginHint: "Sign in to manage the Xray core.", user: "Username", pass: "Password", signIn: "Sign in",
@@ -112,7 +112,7 @@ const T = {
     tnSshOpt: "Deploy over SSH (optional)", tnPortHere: "Port on middle server", tnBusy: "busy on middle server",
     tnRemove: "Remove the relay from the middle server (run there):", tnCmdTitle: "Middle server install command",
     tnInbounds: "Inbounds", tnDeploying: "Installing on the middle server… (a few minutes)", tnConfirmDel: "Remove this middle server? Inbounds stop using it.", tnXrayErr: "Relay error",
-    selectAll: "Select all", ports: "Ports", portsTitle: "Used ports", portsHint: "Every inbound port, comma separated, for building relays and tunnels.", gSS: "Shadowsocks", gProxy: "Plain proxies (SOCKS / HTTP, own user and password)", relayLinks: "Relay links", singleUser: "single user", confirmDelRelay: "Remove this relay?",
+    selectAll: "Select all", wgTitle: "WireGuard file", wgHint: "For the official WireGuard app: download the file and tap + then Import from file, or scan the QR with Create from QR code.", wgFile: "Download .conf", ports: "Ports", portsTitle: "Used ports", portsHint: "Every inbound port, comma separated, for building relays and tunnels.", gSS: "Shadowsocks", gProxy: "Plain proxies (SOCKS / HTTP, own user and password)", relayLinks: "Relay links", singleUser: "single user", confirmDelRelay: "Remove this relay?",
   },
 };
 let lang = localStorage.getItem("xo_lang") || "fa";
@@ -577,6 +577,43 @@ function copyRow(val) {
   return `<div class="copy"><input readonly value="${esc(val)}"><button class="btn small" data-copy="${esc(val)}">${t("copy")}</button></div>`;
 }
 
+// WireGuard: turn a wireguard:// link into a .conf for the official app
+function wgConf(link) {
+  const u = new URL(link.replace(/^wireguard:/, "http:"));
+  const q = u.searchParams, name = decodeURIComponent(u.hash.slice(1)) || "wg";
+  const host = u.hostname, ep = (host.includes(":") ? "[" + host + "]" : host) + ":" + (u.port || "51820");
+  const conf = ["[Interface]", "PrivateKey = " + decodeURIComponent(u.username), "Address = " + (q.get("address") || "10.0.0.2/32"),
+    "DNS = 1.1.1.1, 8.8.8.8", "MTU = " + (q.get("mtu") || "1420"), "", "[Peer]", "PublicKey = " + q.get("publickey"),
+    "AllowedIPs = 0.0.0.0/0, ::/0", "Endpoint = " + ep, "PersistentKeepalive = 25", ""].join("\n");
+  const file = (name.replace(/[^A-Za-z0-9_=+.-]/g, "").slice(0, 15) || "wg") + ".conf";
+  return { name, conf, file };
+}
+async function wgFill(box, token) {
+  if (!box || !token) return;
+  const links = await api("GET", "api/wg?token=" + encodeURIComponent(token)).catch(() => []);
+  if (!links || !links.length) return;
+  box.innerHTML = `<label>${t("wgTitle")}</label><p class="muted small">${t("wgHint")}</p>` + links.map((l) => {
+    const w = wgConf(l);
+    return `<div class="wgrow"><span class="mono">${esc(w.name)}</span><span class="actions"><button type="button" class="btn small primary" data-wgdl="${esc(l)}">${t("wgFile")}</button><button type="button" class="btn small" data-wgqr="${esc(l)}">QR</button></span><img class="qr hidden" alt="QR"></div>`;
+  }).join("");
+}
+document.addEventListener("click", (e) => {
+  const d = e.target.closest("[data-wgdl]");
+  if (d) {
+    const w = wgConf(d.dataset.wgdl);
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([w.conf], { type: "text/plain" })); a.download = w.file;
+    document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+    return;
+  }
+  const qb = e.target.closest("[data-wgqr]");
+  if (qb) {
+    const img = qb.closest(".wgrow").querySelector("img");
+    if (!img.getAttribute("src")) img.src = "api/qr?text=" + encodeURIComponent(wgConf(qb.dataset.wgqr).conf);
+    img.classList.toggle("hidden");
+  }
+});
+
 function openClient(ib, cl) {
   const m = cl.meta || {};
   const sub = m.subToken ? subURL(m) : "";
@@ -586,6 +623,7 @@ function openClient(ib, cl) {
     ${sub ? `<label>${t("sub")}</label>${copyRow(sub)}` : ""}
     ${cl.relayLinks && cl.relayLinks.length ? `<label>${t("relayLinks")}</label><div class="links-list">${cl.relayLinks.map(copyRow).join("")}</div>` : ""}
     <img class="qr" alt="QR" src="api/qr?text=${encodeURIComponent(sub || cl.link)}">
+    <div id="wgBox"></div>
     <form id="edForm" class="form">
       <label>${t("setExpiry")}<input name="expiryDays" type="number" min="0" step="1" placeholder="${t("expiryDays")}"></label>
       <label>${t("setLimit")}<input name="limitGB" type="number" min="0" step="0.5" placeholder="${t("limitGB")}"></label>
@@ -597,6 +635,7 @@ function openClient(ib, cl) {
       <button class="btn danger" id="edDel">${t("del")}</button>
       <button class="btn ghost" data-close>${t("cancel")}</button>
     </div>`);
+  wgFill($("#wgBox"), m.subToken);
   const upd = async (extra) => {
     const d = Object.fromEntries(new FormData($("#edForm")));
     const body = { email: cl.email, ...extra };
@@ -744,7 +783,8 @@ $("#userList").addEventListener("click", guard(async (e) => {
     if (!confirm(t("confirmDelUser"))) return;
     await api("DELETE", "api/users?email=" + encodeURIComponent(u.email)); toast(t("done")); loadUsers(); refreshInbounds();
   } else if (b.dataset.u === "qr") {
-    openModal(`<h3 class="mono">${esc(u.email)}</h3>${copyRow(subURL(u))}<img class="qr" alt="QR" src="api/qr?text=${encodeURIComponent(subURL(u))}"><div class="actions"><button class="btn" data-close>${t("cancel")}</button></div>`);
+    openModal(`<h3 class="mono">${esc(u.email)}</h3>${copyRow(subURL(u))}<img class="qr" alt="QR" src="api/qr?text=${encodeURIComponent(subURL(u))}"><div id="wgBox"></div><div class="actions"><button class="btn" data-close>${t("cancel")}</button></div>`);
+    wgFill($("#wgBox"), u.subToken);
   } else openUser(u);
 }));
 $("#addUserBtn").onclick = guard(async () => { if (!userData) await loadUsers(); openUser(null); });
