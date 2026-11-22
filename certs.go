@@ -54,7 +54,7 @@ func certExpiry(certFile string) (time.Time, []string, error) {
 
 // FindCerts lists certificates already on this server.
 func FindCerts(dataDir string) []FoundCert {
-	var out []FoundCert
+	out := []FoundCert{}
 	add := func(domain, cf, kf, src string) {
 		if _, err := os.Stat(kf); err != nil {
 			return

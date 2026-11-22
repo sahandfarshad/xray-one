@@ -289,6 +289,7 @@ function renderSubBar() {
   $("#tunSelBtn").disabled = !n;
   $("#delSelBtn").textContent = t("delSel") + (n ? " (" + n + ")" : "");
   $("#delSelBtn").disabled = !n;
+  $("#selActs").classList.toggle("hidden", !n);
   const all = state.inbounds.filter((i) => !i.system);
   $("#selAll").checked = all.length > 0 && n === all.length;
   $("#selAll").indeterminate = n > 0 && n < all.length;
@@ -339,10 +340,10 @@ $("#verInput").oninput = renderOverview;
 
 function clientStatus(cl) {
   const m = cl.meta || {};
-  if (cl.disabled) return `<span class="pill warn">${esc(m.reason === "traffic" ? t("overLimit") : m.reason === "expired" ? t("expired") : t("paused"))}</span>`;
-  if (!m.expiry) return `<span class="pill gray">${t("never")}</span>`;
+  if (cl.disabled) return `<span dir="auto" class="pill warn">${esc(m.reason === "traffic" ? t("overLimit") : m.reason === "expired" ? t("expired") : t("paused"))}</span>`;
+  if (!m.expiry) return `<span dir="auto" class="pill gray">${t("never")}</span>`;
   const d = Math.ceil((m.expiry * 1000 - Date.now()) / 86400000);
-  return d <= 0 ? `<span class="pill warn">${t("expired")}</span>` : `<span class="pill ${d <= 3 ? "warn" : ""}">${d} ${t("daysLeft")}</span>`;
+  return d <= 0 ? `<span dir="auto" class="pill warn">${t("expired")}</span>` : `<span dir="auto" class="pill ${d <= 3 ? "warn" : ""}">${d} ${t("daysLeft")}</span>`;
 }
 
 function renderInbounds() {
@@ -351,12 +352,12 @@ function renderInbounds() {
   const ibs = state.inbounds;
   if (!ibs.length) { list.innerHTML = `<div class="card empty">${t("noInbounds")}</div>`; return; }
   list.innerHTML = ibs.map((ib, idx) => {
-    const pills = [ib.protocol, ib.network, ib.security].filter(Boolean).map((p) => `<span class="pill gray">${esc(p)}</span>`).join("");
+    const pills = [ib.protocol, ib.network, ib.security].filter(Boolean).map((p) => `<span dir="auto" class="pill gray">${esc(p)}</span>`).join("");
     const clients = "";
     return `<div class="card">
       <div class="ib-head">
-        <div class="ib-title">${ib.system ? "" : `<input type="checkbox" data-sel="${esc(ib.id)}" ${state.sel.has(ib.id) ? "checked" : ""}>`}<b>${esc(ib.tag || ib.id)}</b>${pills}<span class="pill">:${esc(ib.port)}</span>
-          ${ib.system ? `<span class="pill gray">${t("system")}</span>` : !ib.managed ? `<span class="pill gray">${t("unmanaged")}</span>` : ""}</div>
+        <div class="ib-title">${ib.system ? "" : `<input type="checkbox" data-sel="${esc(ib.id)}" ${state.sel.has(ib.id) ? "checked" : ""}>`}<b>${esc(ib.tag || ib.id)}</b>${pills}<span dir="auto" class="pill">:${esc(ib.port)}</span>
+          ${ib.system ? `<span dir="auto" class="pill gray">${t("system")}</span>` : !ib.managed ? `<span dir="auto" class="pill gray">${t("unmanaged")}</span>` : ""}</div>
         <div class="actions">
           ${ib.system ? "" : `<button class="btn small" data-act="relay" data-i="${idx}">+ ${t("relay")}</button>`}
           ${ib.system ? "" : `<button class="btn small" data-act="tunnel" data-i="${idx}">⇄ ${t("tnUse")}</button>`}
@@ -413,7 +414,7 @@ $("#modal").addEventListener("click", (e) => {
 $("#addInboundBtn").onclick = guard(() => openInboundForm(null));
 async function openInboundForm(ed) {
   const [fp, certs] = await Promise.all([ed ? { port: ed.form.port } : api("GET", "api/freeport"), api("GET", "api/certs")]);
-  const certOpts = certs.map((c, i) => `<option value="${i}">${esc(c.domain)} · ${esc(c.source)}</option>`).join("");
+  const certOpts = (certs || []).map((c, i) => `<option value="${i}">${esc(c.domain)} · ${esc(c.source)}</option>`).join("");
   openModal(`<h3>${ed ? t("editInbound") + ` · <span class="mono">${esc(ed.id)}</span>` : t("addInbound")}</h3>
   <form id="ibForm" class="form">
     <label>${t("protocol")}<select name="protocol"><option>vless</option><option>vmess</option><option>trojan</option><option value="shadowsocks">shadowsocks 2022</option><option value="hysteria">hysteria2</option><option>socks</option><option>http</option><option>wireguard</option></select></label>
@@ -505,8 +506,8 @@ async function openInboundForm(ed) {
     const out = $("#rCheckOut"); out.textContent = t("rsWait");
     try {
       const r = (await api("POST", "api/reality/scan", { q: f.r_target.value.trim() })).results[0];
-      out.innerHTML = !r ? "—" : r.feasible ? `<span class="pill ok">${t("rsOk")}</span> TLS ${esc(r.tls)} · ${esc(r.alpn)} · ${esc(r.keyEx)} · ${esc(r.cert)} · ${r.latency} ms`
-        : `<span class="pill bad">${esc(r.reason || t("rsNo"))}</span>`;
+      out.innerHTML = !r ? "—" : r.feasible ? `<span dir="auto" class="pill ok">${t("rsOk")}</span> TLS ${esc(r.tls)} · ${esc(r.alpn)} · ${esc(r.keyEx)} · ${esc(r.cert)} · ${r.latency} ms`
+        : `<span dir="auto" class="pill bad">${esc(r.reason || t("rsNo"))}</span>`;
       if (r && r.feasible && !f.r_sni.value.trim()) f.r_sni.value = r.sni;
     } catch (e) { out.textContent = e.message; }
   };
@@ -722,8 +723,8 @@ function renderUsers() {
     return `<div class="card">
       <div class="ib-head">
         <div class="ib-title"><b class="mono">${esc(u.email)}</b>${clientStatus(cl)}
-          <span class="pill gray">${fmtBytes(used)} / ${u.limitBytes ? fmtBytes(u.limitBytes) : t("unlimited")}</span>
-          <span class="pill gray">${u.inbounds.length ? u.inbounds.length + " " + t("ibCount") : t("noInboundsYet")}</span></div>
+          <span dir="auto" class="pill gray">${fmtBytes(used)} / ${u.limitBytes ? fmtBytes(u.limitBytes) : t("unlimited")}</span>
+          <span dir="auto" class="pill gray">${u.inbounds.length ? u.inbounds.length + " " + t("ibCount") : t("noInboundsYet")}</span></div>
         <div class="actions">
           <button class="btn small primary" data-u="edit" data-i="${i}">${t("editUser")}</button>
           <button class="btn small" data-u="qr" data-i="${i}">QR</button>
@@ -787,17 +788,6 @@ function openUser(u) {
   if (!isNew) $("#usReset").onclick = () => go({ resetTraffic: true });
 }
 $("#relaySelBtn").onclick = () => openRelay([...state.sel]);
-$("#portsBtn").onclick = () => {
-  const ports = [...new Set(state.inbounds.filter((i) => !i.system).flatMap((i) => String(i.port).split(",")).map((p) => p.trim()).filter(Boolean))]
-    .sort((a, b) => parseInt(a) - parseInt(b));
-  const text = ports.join(",");
-  openModal(`<h3>${t("portsTitle")} (${ports.length})</h3>
-  <p class="muted">${t("portsHint")}</p>
-  <textarea id="portsText" class="mono ports" rows="5" readonly>${esc(text)}</textarea>
-  <div class="actions"><button class="btn primary" id="portsCopy">${t("copy")}</button><button class="btn" data-close>${t("cancel")}</button></div>`);
-  $("#portsText").onclick = (e) => e.target.select();
-  $("#portsCopy").onclick = () => copyText(text);
-};
 $("#selAll").onchange = (e) => {
   state.sel = new Set(e.target.checked ? state.inbounds.filter((i) => !i.system).map((i) => i.id) : []);
   render();
@@ -935,11 +925,11 @@ function renderTunnels() {
     return `<div class="card">
       <div class="ib-head">
         <div class="ib-title"><span class="dot${s.online ? "" : " bad"}"></span><b>${esc(s.name)}</b>
-          <span class="pill gray">${esc(t("m" + cap(s.method)) || s.method)}</span>
-          <span class="pill ${s.online ? "" : "warn"}">${s.online ? t("tnOnline") : t("tnOffline")} · ${esc(seen)}</span>
-          ${s.publicIP || s.host ? `<span class="pill gray mono">${esc(s.publicIP || s.host)}</span>` : ""}
-          ${s.agentVer ? `<span class="pill gray">v${esc(s.agentVer)}</span>` : ""}
-          <span class="pill gray">${s.inbounds.length} ${t("ibCount")}</span></div>
+          <span dir="auto" class="pill gray">${esc(t("m" + cap(s.method)) || s.method)}</span>
+          <span dir="auto" class="pill ${s.online ? "" : "warn"}">${s.online ? t("tnOnline") : t("tnOffline")} · ${esc(seen)}</span>
+          ${s.publicIP || s.host ? `<span dir="auto" class="pill gray mono">${esc(s.publicIP || s.host)}</span>` : ""}
+          ${s.agentVer ? `<span dir="auto" class="pill gray">v${esc(s.agentVer)}</span>` : ""}
+          <span dir="auto" class="pill gray">${s.inbounds.length} ${t("ibCount")}</span></div>
         <div class="actions">
           ${s.host ? `<button class="btn small primary" data-tn="deploy" data-i="${i}">${t("tnDeploy")}</button>` : ""}
           <button class="btn small" data-tn="test" data-i="${i}">${t("tnTest")}</button>
@@ -1133,7 +1123,7 @@ function openRealityScan(use) {
       box.querySelector("#rsMsg").textContent = t("rsCount").replace("{a}", rows.filter((x) => x.feasible).length).replace("{b}", r.scanned);
       box.querySelector("#rsBody").innerHTML = rows.map((x, i) => `<tr>
         <td class="mono">${esc(x.sni && !x.target.startsWith(x.sni) ? x.target + " · " + x.sni : x.target)}</td>
-        <td>${x.feasible ? `<span class="pill ok">${t("rsOk")}</span>` : `<span class="pill bad" title="${esc(x.reason || "")}">${esc(x.reason || t("rsNo"))}</span>`}</td>
+        <td>${x.feasible ? `<span dir="auto" class="pill ok">${t("rsOk")}</span>` : `<span dir="auto" class="pill bad" title="${esc(x.reason || "")}">${esc(x.reason || t("rsNo"))}</span>`}</td>
         <td>${esc(x.tls || "—")}</td><td>${esc(x.alpn || "—")}</td><td>${esc(x.keyEx || "—")}</td>
         <td class="mono">${esc(x.cert || "—")}</td><td>${x.latency ? x.latency + " ms" : "—"}</td>
         <td>${x.feasible ? `<button class="btn small" data-use="${i}">${t("rsUse")}</button>` : ""}</td></tr>`).join("");
