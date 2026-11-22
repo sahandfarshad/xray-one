@@ -43,9 +43,12 @@ const T = {
     usersTab: "کلاینت‌ها", addUser: "کلاینت جدید", usersHint: "هر کلاینت یک اسم است که روی چند اینباند می‌نشیند، با یک محدودیت حجم و زمان و یک لینک سابسکریپشن برای همه.",
     noUsers: "هنوز کلاینتی نیست.", pickInbounds: "اینباندهای این کلاینت", editUser: "ویرایش", noInboundsYet: "بدون اینباند", confirmDelUser: "این کلاینت از همه‌ی اینباندها حذف شود؟",
     tunnels: "تانل", addTunnel: "سرور میانی جدید", tnName: "نام", tnHost: "IP یا دامنه‌ی سرور میانی (برای SSH)", tnSshPort: "پورت SSH", tnSshUser: "کاربر SSH",
-    tnMethod: "روش", tnDeploy: "Deploy با SSH", tnPass: "پسورد SSH (فقط یک بار؛ ذخیره نمی‌شود)", tnPassKey: "کلید پنل نصب شده؛ پسورد لازم نیست",
+    tnMethod: "روش", mWss: "Xray WS", mWssD: "WebSocket + TLS. ساده و پایدار.", mXhttp: "Xray XHTTP", mXhttpD: "HTTP/2 + TLS، شبیه HTTPS معمولی؛ جایگزین WS.",
+    mGrefrp: "GRE + FRP", mGrefrpD: "FRP روی لینک GRE.", mBackhaul: "Backhaul", mBackhaulD: "با یا بدون GRE؛ tcpmux، ws و …", mFrpssh: "FRP روی SSH", mFrpsshD: "وقتی فقط SSH رد می‌شود.",
+    mSoon: "به‌زودی", mActive: "فعال", mTrying: "در حال امتحان…", mAsk: "روش این سرور میانی به «{m}» عوض شود؟ اگر تا ۹۰ ثانیه وصل نشد، خودش به روش قبلی برمی‌گردد.",
+    mBack: "روش جدید وصل نشد و به روش قبلی برگشت: {x}", mNeedAgent: "برای عوض کردن روش، دستور نصب را یک بار دیگر روی سرور میانی بزنید (نسخه‌ی {v} به بالا).", tnDeploy: "Deploy با SSH", tnPass: "پسورد SSH (فقط یک بار؛ ذخیره نمی‌شود)", tnPassKey: "کلید پنل نصب شده؛ پسورد لازم نیست",
     tnOnline: "متصل", tnOffline: "قطع", tnNever: "هنوز وصل نشده", tnAgo: "پیش", tnQuick: "نصب سریع بدون پسورد: این دستور را روی سرور میانی (با root) بزنید. تا ۲۴ ساعت معتبر است و بعد از اتصال باطل می‌شود.",
-    tnNewCmd: "دستور نصب جدید", tnNoSrv: "هنوز سرور میانی اضافه نشده.", tnInfo: "روش WSS: سرور میانی با WebSocket+TLS به پورت {port} روی {domain} وصل می‌شود. کاربر ← سرور میانی ← این سرور ← اینترنت.",
+    tnNewCmd: "دستور نصب جدید", tnNoSrv: "هنوز سرور میانی اضافه نشده.", tnInfo: "سرور میانی به {domain} وصل می‌شود؛ روش هر سرور را از کارت‌هایش انتخاب کنید (WS روی پورت {port}{x}). کاربر ← سرور میانی ← این سرور ← اینترنت.",
     tnNeedSSL: "برای تانل WSS اول باید دامنه و SSL را از منوی SSH تنظیم کنید.", tnUse: "تانل", tnPick: "این اینباند از کدام سرورهای میانی استفاده کند؟ برای هر کدام یک لینک جدا ساخته می‌شود.",
     tnTest: "تست اتصال", tnTesting: "در حال تست…", tnTestOk: "وصل است · {ms} میلی‌ثانیه", tnTestBad: "پاسخی از سرور میانی نیامد",
     tnLastFail: "آخرین قطعی", tnFails: "{n} تلاش ناموفق",
@@ -97,9 +100,12 @@ const T = {
     usersTab: "Clients", addUser: "New client", usersHint: "A client is one name that sits on several inbounds, with one traffic/time limit and one subscription link for all of them.",
     noUsers: "No clients yet.", pickInbounds: "Inbounds of this client", editUser: "Edit", noInboundsYet: "no inbound", confirmDelUser: "Remove this client from every inbound?",
     tunnels: "Tunnel", addTunnel: "New middle server", tnName: "Name", tnHost: "Middle server IP or domain (for SSH)", tnSshPort: "SSH port", tnSshUser: "SSH user",
-    tnMethod: "Method", tnDeploy: "Deploy over SSH", tnPass: "SSH password (used once, never stored)", tnPassKey: "Panel key installed; no password needed",
+    tnMethod: "Method", mWss: "Xray WS", mWssD: "WebSocket + TLS. Simple and stable.", mXhttp: "Xray XHTTP", mXhttpD: "HTTP/2 + TLS, looks like normal HTTPS; WS successor.",
+    mGrefrp: "GRE + FRP", mGrefrpD: "FRP over a GRE link.", mBackhaul: "Backhaul", mBackhaulD: "With or without GRE; tcpmux, ws, …", mFrpssh: "FRP over SSH", mFrpsshD: "When only SSH gets through.",
+    mSoon: "Soon", mActive: "Active", mTrying: "Trying…", mAsk: "Switch this middle server to \"{m}\"? If it can't connect within 90 s it goes back by itself.",
+    mBack: "The new method did not connect and went back: {x}", mNeedAgent: "To switch methods, run the install command on the middle server once more (version {v} or newer).", tnDeploy: "Deploy over SSH", tnPass: "SSH password (used once, never stored)", tnPassKey: "Panel key installed; no password needed",
     tnOnline: "Connected", tnOffline: "Down", tnNever: "not connected yet", tnAgo: "ago", tnQuick: "Quick install without a password: run this on the middle server as root. Valid 24 h, void after it connects.",
-    tnNewCmd: "New install command", tnNoSrv: "No middle server yet.", tnInfo: "WSS method: the middle server connects with WebSocket+TLS to port {port} on {domain}. User → middle server → this server → internet.",
+    tnNewCmd: "New install command", tnNoSrv: "No middle server yet.", tnInfo: "The middle server connects to {domain}; pick each server's method on its cards (WS on port {port}{x}). User → middle server → this server → internet.",
     tnNeedSSL: "The WSS tunnel needs this server's domain and SSL: set them in the SSH menu first.", tnUse: "Tunnel", tnPick: "Which middle servers should this inbound use? Each one gets its own link.",
     tnTest: "Test connection", tnTesting: "Testing…", tnTestOk: "Connected · {ms} ms", tnTestBad: "No answer from the middle server",
     tnLastFail: "Last drop", tnFails: "{n} failed attempts",
@@ -902,19 +908,20 @@ async function loadTunnels() {
   try { tunnelData = await api("GET", "api/tunnels"); } catch (e) { return; }
   renderTunnels();
 }
-const tnTestRes = {};
+const tnTestRes = {}; let tnPoll;
 function renderTunnels() {
   const d = tunnelData; if (!d) return;
-  $("#tunnelInfo").textContent = d.ready ? t("tnInfo").replace("{port}", d.port || "—").replace("{domain}", d.domain) : t("tnNeedSSL");
+  $("#tunnelInfo").textContent = d.ready ? t("tnInfo").replace("{x}", d.xport ? ", XHTTP " + d.xport : "").replace("{port}", d.port || "—").replace("{domain}", d.domain) : t("tnNeedSSL");
   $("#addTunnelBtn").disabled = !d.ready;
   if (!d.servers.length) { $("#tunnelList").innerHTML = `<div class="card empty">${t("tnNoSrv")}</div>`; return; }
   const now = Date.now() / 1000;
+  clearTimeout(tnPoll); if (d.servers.some((s) => s.prevMethod)) tnPoll = setTimeout(() => { if (state.view === "tunnels") loadTunnels(); }, 3000);
   $("#tunnelList").innerHTML = d.servers.map((s, i) => {
     const seen = s.lastSeen ? ago(Math.max(0, Math.round(now - s.lastSeen))) + " " + t("tnAgo") : t("tnNever");
     return `<div class="card">
       <div class="ib-head">
         <div class="ib-title"><span class="dot${s.online ? "" : " bad"}"></span><b>${esc(s.name)}</b>
-          <span class="pill gray">${esc(s.method)}</span>
+          <span class="pill gray">${esc(t("m" + cap(s.method)) || s.method)}</span>
           <span class="pill ${s.online ? "" : "warn"}">${s.online ? t("tnOnline") : t("tnOffline")} · ${esc(seen)}</span>
           ${s.publicIP || s.host ? `<span class="pill gray mono">${esc(s.publicIP || s.host)}</span>` : ""}
           ${s.agentVer ? `<span class="pill gray">v${esc(s.agentVer)}</span>` : ""}
@@ -926,6 +933,8 @@ function renderTunnels() {
           <button class="btn small danger" data-tn="del" data-i="${i}">${t("del")}</button>
         </div>
       </div>
+      ${methodCards(s, i)}
+      ${s.methodErr ? `<p class="err">${esc(t("mBack").replace("{x}", s.methodErr))}</p>` : ""}
       ${tnTestRes[s.id] ? `<p class="${tnTestRes[s.id].ok ? "okmsg" : "err"}">${esc(tnTestRes[s.id].text)}</p>` : ""}
       ${s.lastFail ? `<p class="muted small">${t("tnLastFail")}: ${esc(s.failAt ? ago(Math.max(0, Math.round(now - s.failAt))) + " " + t("tnAgo") : "")} · ${t("tnFails").replace("{n}", s.fails || 0)} · <span class="mono">${esc(s.lastFail)}</span></p>` : ""}
       ${s.xrayErr ? `<p class="err">${t("tnXrayErr")}: ${esc(s.xrayErr)}</p>` : ""}
@@ -934,8 +943,31 @@ function renderTunnels() {
     </div>`;
   }).join("");
 }
+function versionLess(a, b) {
+  const pa = String(a).split(".").map(Number), pb = String(b).split(".").map(Number);
+  for (let i = 0; i < 3; i++) { const x = pa[i] || 0, y = pb[i] || 0; if (x !== y) return x < y; }
+  return false;
+}
+const cap = (m) => (m === "wss" ? "Wss" : m.charAt(0).toUpperCase() + m.slice(1));
+function methodCards(s, i) {
+  const ms = tunnelData.methods || [];
+  return `<div class="mcards">${ms.map((m) => {
+    const on = s.method === m.id, trying = on && s.prevMethod;
+    const cls = "mcard" + (on ? " on" : "") + (m.ready ? "" : " soon");
+    return `<button class="${cls}" data-tn="method" data-i="${i}" data-m="${m.id}" ${m.ready && !on ? "" : "disabled"}>
+      <b>${esc(t("m" + cap(m.id)))}</b><small>${esc(t("m" + cap(m.id) + "D"))}</small>
+      <em>${on ? (trying ? t("mTrying") : "✓ " + t("mActive")) : m.ready ? "" : t("mSoon")}</em></button>`;
+  }).join("")}</div>`;
+}
 $("#tunnelList").addEventListener("click", guard(async (e) => {
   const cp = e.target.closest("[data-copy]"); if (cp) { copyText(cp.dataset.copy); return; }
+  const mb = e.target.closest("button[data-tn=method]");
+  if (mb) {
+    const s = tunnelData.servers[+mb.dataset.i], m = mb.dataset.m;
+    if (!s.agentVer || versionLess(s.agentVer, tunnelData.methodVer)) { alert(t("mNeedAgent").replace("{v}", tunnelData.methodVer)); return; }
+    if (!confirm(t("mAsk").replace("{m}", t("m" + cap(m))))) return;
+    await api("POST", "api/tunnels/" + s.id + "/method", { method: m }); toast(t("done")); loadTunnels(); return;
+  }
   const b = e.target.closest("button[data-tn]"); if (!b) return;
   const s = tunnelData.servers[+b.dataset.i];
   if (b.dataset.tn === "del") {
@@ -978,7 +1010,7 @@ $("#addTunnelBtn").onclick = () => {
   openModal(`<h3>${t("addTunnel")}</h3>
   <form id="tnForm" class="form">
     <label>${t("tnName")}<input name="name" placeholder="iran-1"></label>
-    <label>${t("tnMethod")}<select name="method"><option value="wss">WSS (WebSocket + TLS)</option></select></label>
+    <label>${t("tnMethod")}<select name="method"><option value="wss">Xray WS (WebSocket + TLS)</option><option value="xhttp">Xray XHTTP (HTTP/2 + TLS)</option></select></label>
     <details><summary>${t("tnSshOpt")}</summary>
     <label>${t("tnHost")}<input name="host" placeholder="1.2.3.4"></label>
     <label>${t("tnSshPort")}<input name="sshPort" type="number" min="1" max="65535" value="22"></label>

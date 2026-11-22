@@ -195,6 +195,7 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("POST /api/tunnels/{id}/deploy", a.api(a.handleDeployTunnel))
 	mux.HandleFunc("POST /api/tunnels/{id}/join", a.api(a.handleNewJoin))
 	mux.HandleFunc("POST /api/tunnels/{id}/test", a.api(a.handleTestTunnel))
+	mux.HandleFunc("POST /api/tunnels/{id}/method", a.api(a.handleTunnelMethod))
 	mux.HandleFunc("POST /api/tunnels/assign", a.api(a.handleTunnelAssign))
 	mux.HandleFunc("POST /api/tunnels/bulk", a.api(a.handleTunnelBulk))
 	mux.HandleFunc("POST /api/reality/scan", a.api(a.handleRealityScan))
@@ -278,13 +279,13 @@ func (a *App) handleInbounds(w http.ResponseWriter, r *http.Request) {
 		network, security := streamInfo(ib)
 		iv := InboundView{ID: inboundID(ib, i), Tag: asStr(ib.Get("tag")), Protocol: asStr(ib.Get("protocol")),
 			Port: asStr(ib.Get("port")), Listen: asStr(ib.Get("listen")), Network: network, Security: security,
-			Managed: supportsClients(ib), System: (atag != "" && asStr(ib.Get("tag")) == atag) || asStr(ib.Get("tag")) == tunnelTag, Clients: []ClientView{}}
+			Managed: supportsClients(ib), System: (atag != "" && asStr(ib.Get("tag")) == atag) || isTunnelTag(asStr(ib.Get("tag"))), Clients: []ClientView{}}
 		relays := a.relaysFor(iv.ID)
 		iv.Relays = relays
 		iv.Tunnels = a.tunnelStatus(iv.ID, ib)
 		iv.Single = singleUserSS(ib, host, Relay{})
 		cls := clientsOf(ib)
-		if iv.Tag == tunnelTag {
+		if isTunnelTag(iv.Tag) {
 			iv.Managed, cls = false, nil
 		}
 		for _, cv := range cls {
@@ -637,7 +638,7 @@ func (a *App) handleAllSub(w http.ResponseWriter, r *http.Request) {
 	var links []string
 	for i, v := range asArr(root.Get("inbounds")) {
 		ib := asMap(v)
-		if ib == nil || (atag != "" && asStr(ib.Get("tag")) == atag) || asStr(ib.Get("tag")) == tunnelTag {
+		if ib == nil || (atag != "" && asStr(ib.Get("tag")) == atag) || isTunnelTag(asStr(ib.Get("tag"))) {
 			continue
 		}
 		relays := a.relaysFor(inboundID(ib, i))

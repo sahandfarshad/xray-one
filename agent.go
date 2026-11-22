@@ -37,6 +37,28 @@ type agentState struct {
 	Token string   `json:"token,omitempty"`
 	Hash  string   `json:"hash,omitempty"`
 	Ctl   int      `json:"ctl,omitempty"`
+	// trying a new config (e.g. another tunnel method): when the panel can't
+	// be reached with it for methodTrial, go back to the previous one
+	PendingAt  int64  `json:"pendingAt,omitempty"`
+	PrevHash   string `json:"prevHash,omitempty"`
+	Rejected   string `json:"rejected,omitempty"`
+	RejectedAt int64  `json:"rejectedAt,omitempty"`
+}
+
+// revertPending puts the previous wanted config back.
+func revertPending(st *agentState, rc *reconciler) {
+	prev, err := os.ReadFile(filepath.Join(agentDir, "xray.prev.json"))
+	if err != nil || len(prev) == 0 {
+		st.PendingAt = 0
+		_ = saveAgent(*st)
+		return
+	}
+	_ = os.WriteFile(filepath.Join(agentDir, "xray.want.json"), prev, 0o600)
+	st.Rejected, st.RejectedAt = st.Hash, time.Now().Unix()
+	st.Hash, st.PendingAt = st.PrevHash, 0
+	rc.failed = ""
+	_ = saveAgent(*st)
+	fmt.Println("new relay config did not work; went back to the previous one")
 }
 
 func agentMain(args []string) {
@@ -217,6 +239,10 @@ func agentRun() {
 			ipAt = time.Now()
 		}
 		pstate, busy, rerr := rc.run()
+		if st.PendingAt > 0 && rc.failed != "" { // the new config does not even start
+			revertPending(&st, &rc)
+			pstate, busy, rerr = rc.run()
+		}
 		if rerr != "" {
 			lastErr = rerr
 		} else if fails == 0 {
@@ -224,7 +250,8 @@ func agentRun() {
 		}
 		active, _ := run(5*time.Second, "systemctl", "is-active", agentRelay)
 		req := beatReq{Version: version, PublicIP: ip, XrayOK: active == "active", XrayErr: lastErr, Applied: st.Hash, CtlPort: st.Ctl, Busy: busy,
-			Wait: true, Fails: fails, LastFail: lastFail, PortState: pstate}
+			Wait: true, Fails: fails, LastFail: lastFail, PortState: pstate, Rejected: st.Rejected, Pending: st.PendingAt > 0}
+		wasPending := st.PendingAt > 0
 		body, _ := json.Marshal(req)
 		hr, _ := http.NewRequest("POST", strings.TrimSuffix(st.Join.Panel, "/")+"/api/agent/beat", bytes.NewReader(body))
 		hr.Header.Set("Content-Type", "application/json")
@@ -245,6 +272,10 @@ func agentRun() {
 			if fails%3 == 0 {
 				_, _ = run(30*time.Second, "systemctl", "restart", agentRelay)
 			}
+			if st.PendingAt > 0 && time.Since(time.Unix(st.PendingAt, 0)) > methodTrial {
+				revertPending(&st, &rc)
+				next = 200 * time.Millisecond
+			}
 		} else {
 			var br beatResp
 			b, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
@@ -261,7 +292,22 @@ func agentRun() {
 					_ = saveAgent(st)
 				}
 				newCfg := false
+				if wasPending && st.PendingAt > 0 { // reached the panel with the new config
+					st.PendingAt = 0
+					_ = saveAgent(st)
+				}
+				if st.Rejected != "" && br.Hash != st.Rejected {
+					st.Rejected, st.RejectedAt = "", 0
+					_ = saveAgent(st)
+				}
+				if st.Rejected != "" && br.Hash == st.Rejected && time.Since(time.Unix(st.RejectedAt, 0)) < 10*time.Minute {
+					br.Config = nil // just went back from it
+				}
 				if len(br.Config) > 0 && br.Hash != st.Hash {
+					if cur, e := os.ReadFile(filepath.Join(agentDir, "xray.want.json")); e == nil && st.Hash != "" {
+						_ = os.WriteFile(filepath.Join(agentDir, "xray.prev.json"), cur, 0o600)
+						st.PrevHash, st.PendingAt = st.Hash, time.Now().Unix()
+					}
 					// keep what the panel wants; rc.run() applies it minus busy ports
 					if e := os.WriteFile(filepath.Join(agentDir, "xray.want.json"), br.Config, 0o600); e == nil {
 						st.Hash = br.Hash

@@ -38,33 +38,58 @@ const (
 	joinTTL        = 24 * time.Hour
 	tunnelInstall  = "https://raw.githubusercontent.com/sahandfarshad/xray-one/main/tunnel.sh"
 	tunnelMethodWS = "wss"
+	// XHTTP: same Xray core, its own inbound and port on the main server.
+	tunnelTagXH       = "xo-tunnel-xh"
+	tunnelMethodXHTTP = "xhttp"
+	// how long a middle server tries a new method before going back
+	methodTrial = 90 * time.Second
 )
 
+func isTunnelTag(t string) bool { return t == tunnelTag || t == tunnelTagXH }
+
+func validMethod(m string) bool { return m == tunnelMethodWS || m == tunnelMethodXHTTP }
+
+// tunnelMethods: the method cards. Ready ones can be switched on per server.
+var tunnelMethods = []map[string]any{
+	{"id": tunnelMethodWS, "ready": true},
+	{"id": tunnelMethodXHTTP, "ready": true},
+	{"id": "grefrp", "ready": false},
+	{"id": "backhaul", "ready": false},
+	{"id": "frpssh", "ready": false},
+}
+
+// minimum agent able to try a method and fall back by itself
+const agentMethodVer = "0.6.1"
+
 type TunnelServer struct {
-	ID        string            `json:"id"`
-	Name      string            `json:"name"`
-	Method    string            `json:"method"`
-	Host      string            `json:"host,omitempty"` // SSH address / public address
-	SSHPort   int               `json:"sshPort,omitempty"`
-	SSHUser   string            `json:"sshUser,omitempty"`
-	HostKey   string            `json:"hostKey,omitempty"` // TOFU, "ssh-ed25519 AAAA..."
-	KeyOK     bool              `json:"keyInstalled,omitempty"`
-	UUID      string            `json:"uuid"`
-	Token     string            `json:"token,omitempty"`
-	Join      string            `json:"join,omitempty"`
-	JoinExp   int64             `json:"joinExp,omitempty"`
-	LastSeen  int64             `json:"lastSeen,omitempty"`
-	PublicIP  string            `json:"publicIP,omitempty"`
-	AgentVer  string            `json:"agentVer,omitempty"`
-	XrayOK    bool              `json:"xrayOk,omitempty"`
-	XrayErr   string            `json:"xrayErr,omitempty"`
-	Applied   string            `json:"applied,omitempty"` // config hash the agent runs
-	CtlPort   int               `json:"ctlPort,omitempty"` // agent's local control port
-	Busy      []int             `json:"busy,omitempty"`    // ports already taken on the middle server
-	Fails     int               `json:"fails,omitempty"`   // heartbeats that failed before the last one got through
-	LastFail  string            `json:"lastFail,omitempty"`
-	FailAt    int64             `json:"failAt,omitempty"`
-	PortState map[string]string `json:"portState,omitempty"`
+	ID         string            `json:"id"`
+	Name       string            `json:"name"`
+	Method     string            `json:"method"`
+	Host       string            `json:"host,omitempty"` // SSH address / public address
+	SSHPort    int               `json:"sshPort,omitempty"`
+	SSHUser    string            `json:"sshUser,omitempty"`
+	HostKey    string            `json:"hostKey,omitempty"` // TOFU, "ssh-ed25519 AAAA..."
+	KeyOK      bool              `json:"keyInstalled,omitempty"`
+	UUID       string            `json:"uuid"`
+	Token      string            `json:"token,omitempty"`
+	Join       string            `json:"join,omitempty"`
+	JoinExp    int64             `json:"joinExp,omitempty"`
+	LastSeen   int64             `json:"lastSeen,omitempty"`
+	PublicIP   string            `json:"publicIP,omitempty"`
+	AgentVer   string            `json:"agentVer,omitempty"`
+	XrayOK     bool              `json:"xrayOk,omitempty"`
+	XrayErr    string            `json:"xrayErr,omitempty"`
+	PrevMethod string            `json:"prevMethod,omitempty"` // set while a switch is being tried
+	SentHash   string            `json:"sentHash,omitempty"`
+	SentMethod string            `json:"sentMethod,omitempty"`
+	MethodErr  string            `json:"methodErr,omitempty"`
+	Applied    string            `json:"applied,omitempty"` // config hash the agent runs
+	CtlPort    int               `json:"ctlPort,omitempty"` // agent's local control port
+	Busy       []int             `json:"busy,omitempty"`    // ports already taken on the middle server
+	Fails      int               `json:"fails,omitempty"`   // heartbeats that failed before the last one got through
+	LastFail   string            `json:"lastFail,omitempty"`
+	FailAt     int64             `json:"failAt,omitempty"`
+	PortState  map[string]string `json:"portState,omitempty"`
 }
 
 // agentHub wakes held heartbeats (long-poll) and lets a manual test wait for
@@ -135,8 +160,35 @@ func (u TunnelUse) ListenPort(inboundPort int) int {
 }
 
 type TunnelSettings struct {
-	Port int    `json:"port,omitempty"`
-	Path string `json:"path,omitempty"`
+	Port  int    `json:"port,omitempty"`
+	Path  string `json:"path,omitempty"`
+	XPort int    `json:"xport,omitempty"` // XHTTP inbound
+	XPath string `json:"xpath,omitempty"`
+}
+
+// pickTunnelPort: a free Cloudflare-style HTTPS port, else any free port.
+func pickTunnelPort(root *OMap, skip int) int {
+	used := usedPorts(root)
+	for _, p := range cfPorts {
+		if p != skip && !used[strconv.Itoa(p)] && portFree(p) {
+			return p
+		}
+	}
+	for i := 0; i < 20; i++ {
+		if p := suggestPort(); p != skip {
+			return p
+		}
+	}
+	return 0
+}
+
+func usesMethod(servers []TunnelServer, m string) bool {
+	for _, s := range servers {
+		if s.Method == m || s.PrevMethod == m {
+			return true
+		}
+	}
+	return false
 }
 
 // ---------- store ----------
@@ -186,22 +238,21 @@ func (a *App) ensureTunnelSettings(root *OMap) error {
 		if c.Path == "" {
 			c.Path = "/" + randHex(6)
 		}
+		if c.XPath == "" {
+			c.XPath = "/" + randHex(6)
+		}
+		if c.XPort == 0 {
+			if ib, _ := findInbound(root, tunnelTagXH); ib != nil {
+				c.XPort, _ = strconv.Atoi(asStr(ib.Get("port")))
+			}
+		}
 		if c.Port == 0 {
 			if ib, _ := findInbound(root, tunnelTag); ib != nil {
 				c.Port, _ = strconv.Atoi(asStr(ib.Get("port")))
 			}
 		}
 		if c.Port == 0 {
-			used := usedPorts(root)
-			for _, p := range cfPorts {
-				if !used[strconv.Itoa(p)] && portFree(p) {
-					c.Port = p
-					break
-				}
-			}
-			if c.Port == 0 {
-				c.Port = suggestPort()
-			}
+			c.Port = pickTunnelPort(root, 0)
 		}
 		if c.Port == 0 {
 			return errors.New("no free port for the tunnel")
@@ -231,7 +282,7 @@ func (a *App) applyTunnelConfig(root *OMap) error {
 	if len(servers) == 0 {
 		var keep []any
 		for _, v := range asArr(root.Get("inbounds")) {
-			if asStr(asMap(v).Get("tag")) != tunnelTag {
+			if !isTunnelTag(asStr(asMap(v).Get("tag"))) {
 				keep = append(keep, v)
 			}
 		}
@@ -270,6 +321,37 @@ func (a *App) applyTunnelConfig(root *OMap) error {
 		"tlsSettings", om("serverName", dom, "certificates", []any{om("certificateFile", rcf, "keyFile", rkf)}),
 		"wsSettings", om("path", set.Path)))
 	ib.Delete("sniffing")
+
+	// XHTTP inbound, only while a middle server uses (or is trying) it
+	xh, _ := findInbound(root, tunnelTagXH)
+	if usesMethod(servers, tunnelMethodXHTTP) {
+		if set.XPort == 0 || (xh == nil && (usedPorts(root)[strconv.Itoa(set.XPort)] || !portFree(set.XPort))) {
+			p := pickTunnelPort(root, set.Port)
+			if p == 0 {
+				return errors.New("no free port for the XHTTP tunnel")
+			}
+			set.XPort = p
+			_ = a.store.EditTunnels(func() error { a.store.TunnelCfg.XPort = p; return nil })
+		}
+		if xh == nil {
+			xh = om("tag", tunnelTagXH, "listen", "0.0.0.0", "port", set.XPort, "protocol", "vless")
+			root.Set("inbounds", append(asArr(root.Get("inbounds")), xh))
+		}
+		xh.Set("port", set.XPort)
+		xh.Set("protocol", "vless")
+		xh.Set("settings", om("clients", clients, "decryption", "none"))
+		xh.Set("streamSettings", om("network", "xhttp", "security", "tls",
+			"tlsSettings", om("serverName", dom, "alpn", []any{"h2", "http/1.1"}, "certificates", []any{om("certificateFile", rcf, "keyFile", rkf)}),
+			"xhttpSettings", om("path", set.XPath, "mode", "auto")))
+	} else if xh != nil {
+		var keep []any
+		for _, v := range asArr(root.Get("inbounds")) {
+			if asStr(asMap(v).Get("tag")) != tunnelTagXH {
+				keep = append(keep, v)
+			}
+		}
+		root.Set("inbounds", keep)
+	}
 
 	// allowed destinations
 	ips := map[string]bool{"127.0.0.1": true}
@@ -336,9 +418,9 @@ func setTunnelRules(root *OMap, r *tunnelRule) {
 			ips = append(ips, ip)
 		}
 		rules = append(rules,
-			om("type", "field", "ruleTag", "xo-tunnel-allow", "inboundTag", []any{tunnelTag}, "ip", ips,
+			om("type", "field", "ruleTag", "xo-tunnel-allow", "inboundTag", []any{tunnelTag, tunnelTagXH}, "ip", ips,
 				"port", strings.Join(r.ports, ","), "outboundTag", tunnelDirect),
-			om("type", "field", "ruleTag", "xo-tunnel-block", "inboundTag", []any{tunnelTag}, "outboundTag", tunnelBlock))
+			om("type", "field", "ruleTag", "xo-tunnel-block", "inboundTag", []any{tunnelTag, tunnelTagXH}, "outboundTag", tunnelBlock))
 	}
 	for _, v := range asArr(rt.Get("rules")) {
 		if m := asMap(v); m != nil && strings.HasPrefix(asStr(m.Get("ruleTag")), "xo-tunnel") {
@@ -393,6 +475,9 @@ type joinInfo struct {
 	Port   int    `json:"port"`
 	Path   string `json:"path"`
 	UUID   string `json:"uuid"`
+	Method string `json:"method,omitempty"` // wss (default) or xhttp
+	XPort  int    `json:"xport,omitempty"`
+	XPath  string `json:"xpath,omitempty"`
 	Panel  string `json:"panel"` // URL of the panel as seen from this server, e.g. https://127.0.0.1:24995/base/
 }
 
@@ -415,14 +500,22 @@ func relayXrayConfig(j joinInfo, fwd []fwdPort, ctl int) []byte {
 		inbounds = append(inbounds, om("tag", fmt.Sprintf("fwd-%d", f.Listen), "listen", "0.0.0.0", "port", f.Listen,
 			"protocol", "dokodemo-door", "settings", om("address", f.Host, "port", f.Port, "network", "tcp,udp")))
 	}
+	port := j.Port
+	stream := om("network", "ws", "security", "tls",
+		"tlsSettings", om("serverName", j.Domain, "fingerprint", "chrome"),
+		"wsSettings", om("path", j.Path, "host", j.Domain))
+	if j.Method == tunnelMethodXHTTP && j.XPort > 0 {
+		port = j.XPort
+		stream = om("network", "xhttp", "security", "tls",
+			"tlsSettings", om("serverName", j.Domain, "fingerprint", "chrome", "alpn", []any{"h2"}),
+			"xhttpSettings", om("path", j.XPath, "host", j.Domain, "mode", "auto"))
+	}
 	root := om("log", om("loglevel", "warning"),
 		"inbounds", inbounds,
 		"outbounds", []any{om("tag", "main", "protocol", "vless",
-			"settings", om("vnext", []any{om("address", j.Domain, "port", j.Port,
+			"settings", om("vnext", []any{om("address", j.Domain, "port", port,
 				"users", []any{om("id", j.UUID, "encryption", "none")})}),
-			"streamSettings", om("network", "ws", "security", "tls",
-				"tlsSettings", om("serverName", j.Domain, "fingerprint", "chrome"),
-				"wsSettings", om("path", j.Path, "host", j.Domain)))})
+			"streamSettings", stream)})
 	return EncodeIndent(root)
 }
 
@@ -434,8 +527,12 @@ type fwdPort struct {
 
 func (a *App) joinFor(s TunnelServer) joinInfo {
 	_, set, _ := a.store.TunnelsCopy()
-	return joinInfo{V: 1, ID: s.ID, Join: s.Join, Domain: a.store.Cfg.Domain, Port: set.Port, Path: set.Path,
+	j := joinInfo{V: 1, ID: s.ID, Join: s.Join, Domain: a.store.Cfg.Domain, Port: set.Port, Path: set.Path,
 		UUID: s.UUID, Panel: a.panelLocalURL()}
+	if s.Method == tunnelMethodXHTTP {
+		j.Method, j.XPort, j.XPath = s.Method, set.XPort, set.XPath
+	}
+	return j
 }
 
 func encodeJoin(j joinInfo) string {
@@ -519,7 +616,7 @@ func (a *App) handleTunnels(w http.ResponseWriter, r *http.Request) {
 		out = append(out, v)
 	}
 	writeJSONResp(w, 200, map[string]any{"servers": out, "port": set.Port, "domain": a.store.Cfg.Domain,
-		"ready": a.store.Cfg.Domain != "" && a.store.Cfg.CertFile != "", "methods": []string{tunnelMethodWS}})
+		"ready": a.store.Cfg.Domain != "" && a.store.Cfg.CertFile != "", "methods": tunnelMethods, "xport": set.XPort, "methodVer": agentMethodVer})
 }
 
 func (a *App) handleAddTunnel(w http.ResponseWriter, r *http.Request) {
@@ -541,7 +638,7 @@ func (a *App) handleAddTunnel(w http.ResponseWriter, r *http.Request) {
 	if b.Method == "" {
 		b.Method = tunnelMethodWS
 	}
-	if b.Method != tunnelMethodWS {
+	if !validMethod(b.Method) {
 		fail(w, 400, errors.New("unsupported tunnel method"))
 		return
 	}
@@ -781,7 +878,7 @@ func (a *App) handleTunnelBulk(w http.ResponseWriter, r *http.Request) {
 					skipped = append(skipped, skip{id, "inbound not found"})
 					continue
 				}
-				if t := asStr(ib.Get("tag")); t == tunnelTag || (apiTag(root) != "" && t == apiTag(root)) {
+				if t := asStr(ib.Get("tag")); isTunnelTag(t) || (apiTag(root) != "" && t == apiTag(root)) {
 					skipped = append(skipped, skip{id, "system inbound"})
 					continue
 				}
@@ -857,6 +954,8 @@ type beatReq struct {
 	Fails     int               `json:"fails"`               // failed heartbeats since the last good one
 	LastFail  string            `json:"lastFail"`            // why the last one failed
 	PortState map[string]string `json:"portState,omitempty"` // forwarded port -> ok / busy / down (0.5.1+)
+	Rejected  string            `json:"rejected,omitempty"`  // config hash the agent tried and went back from (0.6.1+)
+	Pending   bool              `json:"pending,omitempty"`   // still trying the newest config
 }
 
 type beatResp struct {
@@ -921,11 +1020,41 @@ func (a *App) handleBeat(w http.ResponseWriter, r *http.Request) {
 	if lerr == nil {
 		fwd = a.fwdFor(root, srv.ID)
 	}
+	// the agent tried our newest config and could not reach us with it: go
+	// back to the method it had
+	if req.Rejected != "" && srv.SentHash == req.Rejected && srv.PrevMethod != "" && srv.SentMethod == srv.Method {
+		_ = a.store.EditTunnels(func() error {
+			if s := a.store.tunnelByID(srv.ID); s != nil && s.PrevMethod != "" {
+				s.MethodErr = s.Method + " → " + s.PrevMethod
+				s.Method, s.PrevMethod = s.PrevMethod, ""
+				srv = *s
+			}
+			return nil
+		})
+		go a.refreshTunnelInbounds()
+	}
 	cfg := relayXrayConfig(a.joinFor(srv), fwd, srv.CtlPort)
 	sum := sha256.Sum256(cfg)
 	resp.Hash = fmt.Sprintf("%x", sum[:8])
 	if req.Applied != resp.Hash {
 		resp.Config = cfg
+		if srv.SentHash != resp.Hash || srv.SentMethod != srv.Method {
+			_ = a.store.EditTunnels(func() error {
+				if s := a.store.tunnelByID(srv.ID); s != nil {
+					s.SentHash, s.SentMethod = resp.Hash, s.Method
+				}
+				return nil
+			})
+		}
+	} else if srv.PrevMethod != "" && !req.Pending && srv.SentMethod == srv.Method {
+		// the new method works: the agent reached us through it
+		_ = a.store.EditTunnels(func() error {
+			if s := a.store.tunnelByID(srv.ID); s != nil {
+				s.PrevMethod, s.MethodErr = "", ""
+			}
+			return nil
+		})
+		go a.refreshTunnelInbounds()
 	}
 	resp.Every = int(beatEvery / time.Second)
 	hub.Beat(srv.ID)
@@ -1097,4 +1226,80 @@ func (a *App) tunnelStatus(id string, ib *OMap) []TunnelLink {
 		}
 	}
 	return out
+}
+
+// refreshTunnelInbounds re-writes the tunnel inbounds (adds or drops the
+// XHTTP one) after a method switch settled.
+func (a *App) refreshTunnelInbounds() {
+	root, _, err := a.cfg.Load()
+	if err != nil {
+		return
+	}
+	servers, _, _ := a.store.TunnelsCopy()
+	_, has := findInbound(root, tunnelTagXH)
+	if (has >= 0) == usesMethod(servers, tunnelMethodXHTTP) {
+		return
+	}
+	_ = a.cfg.Mutate(func(root *OMap) error { return a.applyTunnelConfig(root) })
+}
+
+// POST /api/tunnels/{id}/method {method}: switch one middle server. The agent
+// tries it for a while and goes back by itself when it cannot reach us.
+func (a *App) handleTunnelMethod(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	var b struct {
+		Method string `json:"method"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&b); err != nil {
+		fail(w, 400, err)
+		return
+	}
+	if !validMethod(b.Method) {
+		fail(w, 400, errors.New("this method is not available yet"))
+		return
+	}
+	var old TunnelServer
+	err := a.store.EditTunnels(func() error {
+		s := a.store.tunnelByID(id)
+		if s == nil {
+			return errors.New("middle server not found")
+		}
+		if s.Method == b.Method {
+			return nil
+		}
+		if s.LastSeen == 0 || versionLess(s.AgentVer, agentMethodVer) {
+			return fmt.Errorf("update the middle server first (agent %s or newer): run the install command again there", agentMethodVer)
+		}
+		old = *s
+		if s.PrevMethod == "" {
+			s.PrevMethod = s.Method
+		} else if s.PrevMethod == b.Method {
+			s.PrevMethod = ""
+		}
+		s.Method, s.MethodErr = b.Method, ""
+		return nil
+	})
+	if err != nil {
+		fail(w, 400, err)
+		return
+	}
+	if old.ID != "" {
+		if err := a.cfg.Mutate(func(root *OMap) error {
+			if err := a.ensureTunnelSettings(root); err != nil {
+				return err
+			}
+			return a.applyTunnelConfig(root)
+		}); err != nil {
+			_ = a.store.EditTunnels(func() error {
+				if s := a.store.tunnelByID(id); s != nil {
+					s.Method, s.PrevMethod = old.Method, old.PrevMethod
+				}
+				return nil
+			})
+			fail(w, 400, err)
+			return
+		}
+		hub.Poke(id)
+	}
+	writeJSONResp(w, 200, map[string]bool{"ok": true})
 }

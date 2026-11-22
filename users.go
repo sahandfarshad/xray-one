@@ -40,7 +40,7 @@ func (a *App) handleUsers(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		tag := asStr(ib.Get("tag"))
-		if !supportsClients(ib) || tag == tunnelTag || (atag != "" && tag == atag) {
+		if !supportsClients(ib) || isTunnelTag(tag) || (atag != "" && tag == atag) {
 			continue
 		}
 		id := inboundID(ib, i)
@@ -101,7 +101,7 @@ func (a *App) setUserInbounds(email string, want []string) error {
 				continue
 			}
 			id := inboundID(ib, i)
-			if asStr(ib.Get("tag")) == tunnelTag {
+			if isTunnelTag(asStr(ib.Get("tag"))) {
 				if wantSet[id] {
 					return errors.New("the tunnel inbound is managed by XRay One")
 				}
@@ -123,7 +123,7 @@ func (a *App) setUserInbounds(email string, want []string) error {
 				removeClient(ib, email)
 				dropSaved[id] = true
 			case !present && wantSet[id]:
-				if !supportsClients(ib) || asStr(ib.Get("tag")) == tunnelTag {
+				if !supportsClients(ib) || isTunnelTag(asStr(ib.Get("tag"))) {
 					return errors.New("inbound " + id + " has no client list")
 				}
 				c, err := NewClient(ib, email)
@@ -252,7 +252,7 @@ func (a *App) handleDelInbounds(w http.ResponseWriter, r *http.Request) {
 			ib := asMap(v)
 			if ib != nil && drop[inboundID(ib, i)] {
 				tag := asStr(ib.Get("tag"))
-				if (atag != "" && tag == atag) || tag == tunnelTag {
+				if (atag != "" && tag == atag) || isTunnelTag(tag) {
 					keep = append(keep, v) // protected
 					continue
 				}

@@ -98,7 +98,7 @@ func inboundForm(ib *OMap) NewInbound {
 
 func editableInbound(root *OMap, ib *OMap) error {
 	tag := asStr(ib.Get("tag"))
-	if tag == tunnelTag || (apiTag(root) != "" && tag == apiTag(root)) {
+	if isTunnelTag(tag) || (apiTag(root) != "" && tag == apiTag(root)) {
 		return errors.New("system inbound cannot be edited")
 	}
 	switch asStr(ib.Get("protocol")) {
