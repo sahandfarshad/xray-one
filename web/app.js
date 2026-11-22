@@ -51,7 +51,7 @@ const T = {
     tnNewCmd: "دستور نصب جدید", tnNoSrv: "هنوز سرور میانی اضافه نشده.", tnInfo: "سرور میانی به {domain} وصل می‌شود؛ روش هر سرور را از کارت‌هایش انتخاب کنید (WS روی پورت {port}{x}). کاربر ← سرور میانی ← این سرور ← اینترنت.",
     tnNeedSSL: "برای تانل WSS اول باید دامنه و SSL را از منوی SSH تنظیم کنید.", tnUse: "تانل", tnPick: "این اینباند از کدام سرورهای میانی استفاده کند؟ برای هر کدام یک لینک جدا ساخته می‌شود.",
     tnTest: "تست اتصال", tnTesting: "در حال تست…", tnTestOk: "وصل است · {ms} میلی‌ثانیه", tnTestBad: "پاسخی از سرور میانی نیامد",
-    tnLastFail: "آخرین قطعی", tnFails: "{n} تلاش ناموفق", rvFwd: "مسیر مستقیم: وسط ← اصلی", rvRev: "مسیر برگشتی: اصلی ← وسط", rvDial: "اصلی دارد به وسط زنگ می‌زند (پورت {p})", rvReady: "اتصال دوطرفه آماده است (پورت REALITY روی وسط: {p})", rvOld: "برای اتصال دوطرفه و دامنه، دستور نصب را یک بار دیگر روی سرور وسط بزنید (نسخه‌ی {v} به بالا).", dmLabel: "دامنه‌ی سرور وسط", dmSave: "ذخیره", dmHint: "یک رکورد A به {ip} بسازید (در کلادفلر ابر خاکستری)، بعد ذخیره کنید. سرور وسط خودش SSL می‌گیرد؛ پورت ۸۰ آن باید آزاد باشد.", dmOk: "✓ SSL تأیید شد، معتبر تا {d}", dmBusy: "در حال گرفتن SSL…", dmWait: "منتظر سرور وسط…", dmErr: "SSL گرفته نشد",
+    tnLastFail: "آخرین قطعی", tnFails: "{n} تلاش ناموفق", rvFwd: "مسیر مستقیم: وسط ← اصلی", rvRev: "مسیر برگشتی: اصلی ← وسط", rvVia: "مسیر مستقیم با روش جایگزین {m} (پیدا شده در جستجو)", rvRevVia: "مسیر برگشتی: اصلی ← وسط ({m})", rvSearch: "اصلی دنبال سرور وسط می‌گردد: روش {m}", rvCool: "همه‌ی روش‌ها امتحان شد؛ استراحت تا {t}، بعد دوباره از اول", rvReady: "جستجوی دوطرفه آماده است (پورت‌های وسط: {p})", rvOld: "برای اتصال دوطرفه و دامنه، دستور نصب را یک بار دیگر روی سرور وسط بزنید (نسخه‌ی {v} به بالا).", dmLabel: "دامنه‌ی سرور وسط", dmSave: "ذخیره", dmHint: "یک رکورد A به {ip} بسازید (در کلادفلر ابر خاکستری)، بعد ذخیره کنید. سرور وسط خودش SSL می‌گیرد؛ پورت ۸۰ آن باید آزاد باشد.", dmOk: "✓ SSL تأیید شد، معتبر تا {d}", dmBusy: "در حال گرفتن SSL…", dmWait: "منتظر سرور وسط…", dmErr: "SSL گرفته نشد",
     tnInbounds: "اینباندها", tnSshOpt: "Deploy با SSH (اختیاری)", tnPortHere: "پورت روی سرور میانی", tnBusy: "اشغال روی سرور میانی",
     tnRemove: "حذف relay از سرور میانی (روی همان سرور بزنید):", tnCmdTitle: "دستور نصب سرور میانی",
     tnInbounds: "اینباندها", tnDeploying: "در حال نصب روی سرور میانی… (تا چند دقیقه)", tnConfirmDel: "این سرور میانی حذف شود؟ اینباندها دیگر از آن استفاده نمی‌کنند.", tnXrayErr: "خطای relay",
@@ -108,7 +108,7 @@ const T = {
     tnNewCmd: "New install command", tnNoSrv: "No middle server yet.", tnInfo: "The middle server connects to {domain}; pick each server's method on its cards (WS on port {port}{x}). User → middle server → this server → internet.",
     tnNeedSSL: "The WSS tunnel needs this server's domain and SSL: set them in the SSH menu first.", tnUse: "Tunnel", tnPick: "Which middle servers should this inbound use? Each one gets its own link.",
     tnTest: "Test connection", tnTesting: "Testing…", tnTestOk: "Connected · {ms} ms", tnTestBad: "No answer from the middle server",
-    tnLastFail: "Last drop", tnFails: "{n} failed attempts", rvFwd: "Direct path: middle → main", rvRev: "Reverse path: main → middle", rvDial: "Main is dialing the middle server (port {p})", rvReady: "Two-way reconnect ready (REALITY port on middle: {p})", rvOld: "For two-way reconnect and a domain, run the install command on the middle server once more (version {v} or newer).", dmLabel: "Middle server domain", dmSave: "Save", dmHint: "Add an A record to {ip} (gray cloud in Cloudflare), then save. The middle server gets SSL itself; its port 80 must be free.", dmOk: "✓ SSL confirmed, valid until {d}", dmBusy: "Getting SSL…", dmWait: "Waiting for the middle server…", dmErr: "SSL failed",
+    tnLastFail: "Last drop", tnFails: "{n} failed attempts", rvFwd: "Direct path: middle → main", rvRev: "Reverse path: main → middle", rvVia: "Direct path on fallback method {m} (found by searching)", rvRevVia: "Reverse path: main → middle ({m})", rvSearch: "Main is searching for the middle server: way {m}", rvCool: "Every way tried; resting until {t}, then starting over", rvReady: "Two-way search ready (middle ports: {p})", rvOld: "For two-way reconnect and a domain, run the install command on the middle server once more (version {v} or newer).", dmLabel: "Middle server domain", dmSave: "Save", dmHint: "Add an A record to {ip} (gray cloud in Cloudflare), then save. The middle server gets SSL itself; its port 80 must be free.", dmOk: "✓ SSL confirmed, valid until {d}", dmBusy: "Getting SSL…", dmWait: "Waiting for the middle server…", dmErr: "SSL failed",
     tnSshOpt: "Deploy over SSH (optional)", tnPortHere: "Port on middle server", tnBusy: "busy on middle server",
     tnRemove: "Remove the relay from the middle server (run there):", tnCmdTitle: "Middle server install command",
     tnInbounds: "Inbounds", tnDeploying: "Installing on the middle server… (a few minutes)", tnConfirmDel: "Remove this middle server? Inbounds stop using it.", tnXrayErr: "Relay error",
@@ -961,11 +961,15 @@ function renderTunnels() {
 function revBlock(s, i) {
   const d = tunnelData;
   if (!s.agentVer || versionLess(s.agentVer, d.revVer)) return s.lastSeen ? `<p class="muted small">${esc(t("rvOld").replace("{v}", d.revVer))}</p>` : "";
+  const mn = (m) => ({ wss: "WS", xhttp: "XHTTP", reality: "REALITY" })[m] || m || "REALITY";
   let rv = "";
   if (s.revPort) {
-    rv = s.mode === "rev" ? t("rvRev") : t("rvFwd");
-    if (s.bridge && s.mode !== "rev") rv += " · " + t("rvDial").replace("{p}", s.revPort);
-    else if (!s.bridge) rv += " · " + t("rvReady").replace("{p}", s.revPort);
+    const ports = [s.revPort, s.domain && s.certOk ? s.revPortW : 0, s.domain && s.certOk ? s.revPortX : 0].filter(Boolean).join("، ");
+    if (s.search === "search") rv = t("rvSearch").replace("{m}", s.searchN.split(" ").map((x, k) => k ? x : mn(x)).join(" "));
+    else if (s.search === "cool") rv = t("rvCool").replace("{t}", new Date(s.searchAt * 1000).toLocaleTimeString());
+    else if (s.mode === "rev") rv = t("rvRevVia").replace("{m}", mn(s.bridgeVia));
+    else if (s.via) rv = t("rvVia").replace("{m}", mn(s.via));
+    else rv = t("rvFwd") + " · " + t("rvReady").replace("{p}", ports);
   }
   const labels = (d.domain || "").split("."), base = labels.length > 2 ? labels.slice(1).join(".") : d.domain || "example.com";
   let st = "";

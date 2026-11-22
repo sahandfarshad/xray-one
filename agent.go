@@ -46,6 +46,7 @@ type agentState struct {
 	// path to the main server: "" forward (we dial it), "rev" reverse (it dials us)
 	Mode   string `json:"mode,omitempty"`
 	ModeAt int64  `json:"modeAt,omitempty"`
+	Via    string `json:"via,omitempty"` // forward: way found by searching ("" the admin's method)
 	// Let's Encrypt certificate for this server's own domain
 	CertDomain string `json:"certDomain,omitempty"`
 	CertExp    int64  `json:"certExp,omitempty"`
@@ -230,17 +231,24 @@ func agentRun() {
 	if st.Ctl == 0 {
 		st.Ctl = agentCtlPort
 	}
-	proxy, _ := url.Parse(fmt.Sprintf("socks5://127.0.0.1:%d", st.Ctl))
-	cl := &http.Client{Timeout: 75 * time.Second, Transport: &http.Transport{Proxy: http.ProxyURL(proxy),
-		// the hop runs inside the authenticated VLESS+TLS tunnel to 127.0.0.1
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}}
+	client := func(port int, to time.Duration) *http.Client {
+		proxy, _ := url.Parse(fmt.Sprintf("socks5://127.0.0.1:%d", port))
+		return &http.Client{Timeout: to, Transport: &http.Transport{Proxy: http.ProxyURL(proxy),
+			// the hop runs inside the authenticated VLESS tunnel to 127.0.0.1
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}}
+	}
+	// forward path (we dial the main server) and reverse path (a connection
+	// the main server opened to us), each with a long timeout for held
+	// heartbeats and a short one while searching
+	cl, clShort := client(st.Ctl, 75*time.Second), client(st.Ctl, 20*time.Second)
+	rv, rvShort := client(st.Ctl+1, 75*time.Second), client(st.Ctl+1, 12*time.Second)
 	every := beatEvery
 	var ip string
 	var ipAt time.Time
 	lastErr := ""
 	fails, lastFail := 0, ""
-	rc := reconciler{mode: st.Mode}
-	lastOK := time.Now()
+	var rc reconciler
+	var sr agentSearch
 	certCh := make(chan certResult, 1)
 	certBusy := false
 	for {
@@ -255,10 +263,12 @@ func agentRun() {
 			_ = saveAgent(st)
 		default:
 		}
-		if st.Mode == "rev" && !wantHasRev() { // the panel no longer offers the reverse path
-			st.Mode, st.ModeAt, rc.mode = "", time.Now().Unix(), ""
+		ways := wantWays()
+		if (st.Mode == "rev" && !wantHasRev()) || (st.Via != "" && !contains(ways, st.Via)) {
+			st.Mode, st.Via, st.ModeAt = "", "", time.Now().Unix()
 			_ = saveAgent(st)
 		}
+		rc.route = routeOf(st)
 		if time.Since(ipAt) > time.Hour || ip == "" {
 			if v := publicIP(); v != "" {
 				ip = v
@@ -276,131 +286,233 @@ func agentRun() {
 			lastErr = ""
 		}
 		active, _ := run(5*time.Second, "systemctl", "is-active", agentRelay)
-		req := beatReq{Version: version, PublicIP: ip, XrayOK: active == "active", XrayErr: lastErr, Applied: st.Hash, CtlPort: st.Ctl, Busy: busy,
-			Wait: true, Fails: fails, LastFail: lastFail, PortState: pstate, Rejected: st.Rejected, Pending: st.PendingAt > 0,
-			Mode: st.Mode, CertDom: st.CertDomain, CertExp: st.CertExp, CertErr: st.CertErr, CertBusy: certBusy}
-		wasPending := st.PendingAt > 0
-		body, _ := json.Marshal(req)
-		hr, _ := http.NewRequest("POST", strings.TrimSuffix(st.Join.Panel, "/")+"/api/agent/beat", bytes.NewReader(body))
-		hr.Header.Set("Content-Type", "application/json")
-		hr.Header.Set("X-Agent-ID", st.Join.ID)
-		tok := st.Token
-		if tok == "" {
-			tok = st.Join.Join
+		mkReq := func(mode string, wait bool) []byte {
+			req := beatReq{Version: version, PublicIP: ip, XrayOK: active == "active", XrayErr: lastErr, Applied: st.Hash, CtlPort: st.Ctl, Busy: busy,
+				Wait: wait, Fails: fails, LastFail: lastFail, PortState: pstate, Rejected: st.Rejected, Pending: st.PendingAt > 0,
+				Mode: mode, Via: st.Via, CertDom: st.CertDomain, CertExp: st.CertExp, CertErr: st.CertErr, CertBusy: certBusy}
+			if mode == "rev" {
+				req.Via = ""
+			}
+			b, _ := json.Marshal(req)
+			return b
 		}
-		hr.Header.Set("X-Agent-Token", tok)
-		resp, err := cl.Do(hr)
+		wasPending := st.PendingAt > 0
+		resting := !sr.active && time.Now().Before(sr.cool)
+		var br *beatResp
+		reached, ferr := false, "resting"
+		if !resting {
+			c := cl
+			if st.Mode == "rev" {
+				c = rv
+			}
+			if fails > 0 {
+				c = clShort
+				if st.Mode == "rev" {
+					c = rvShort
+				}
+			}
+			br, reached, ferr = sendBeat(c, st, mkReq(st.Mode, fails == 0))
+		}
+		// meanwhile the main server searches for us too: if a connection it
+		// opened is here, that path wins
+		if br == nil && !reached && st.Mode != "rev" && st.PendingAt == 0 && wantHasRev() {
+			if b2, _, _ := sendBeat(rvShort, st, mkReq("rev", false)); b2 != nil {
+				fmt.Println("the main server reached us (reverse path); using it")
+				st.Mode, st.Via, st.ModeAt = "rev", "", time.Now().Unix()
+				_ = saveAgent(st)
+				br = b2
+			}
+		}
 		next := every
-		if err != nil {
-			fmt.Println("heartbeat failed:", err)
-			fails++
-			lastFail = time.Now().UTC().Format("15:04:05Z ") + err.Error()
+		if br == nil {
+			if !resting {
+				fmt.Println("heartbeat failed:", ferr)
+				fails++
+				lastFail = time.Now().UTC().Format("15:04:05Z ") + ferr
+			}
 			// back off while the main server can't be reached: 5, 10, 20, 40, 60, 60 … s
-			next = 5 * time.Second << min(fails-1, 4)
+			next = 5 * time.Second << min(max(fails, 1)-1, 4)
 			if next > time.Minute {
 				next = time.Minute
 			}
-			if st.PendingAt > 0 && next > 10*time.Second { // trying a new method: decide quickly
+			if reached { // it answered but refused: searching would not help
 				next = 10 * time.Second
 			}
-			// self-heal: restart the relay after 3 failures in a row
-			if fails%3 == 0 {
-				_, _ = run(30*time.Second, "systemctl", "restart", agentRelay)
+			if st.PendingAt > 0 && next > 10*time.Second { // trying a new method: decide quickly
+				next = 10 * time.Second
 			}
 			if st.PendingAt > 0 && time.Since(time.Unix(st.PendingAt, 0)) > methodTrial {
 				revertPending(&st, &rc)
 				next = 200 * time.Millisecond
 			}
-			// two-way reconnect: after a while without reaching the main
-			// server, take the other path (the main server dials us on the
-			// reverse one), and keep alternating until one gets through
-			if st.PendingAt == 0 && wantHasRev() {
-				dwell := revAfter
-				if st.Mode == "rev" {
-					dwell = revDwell
+			canSearch := !reached && st.PendingAt == 0 && (len(ways) > 1 || wantHasRev())
+			switch {
+			case !canSearch:
+				// self-heal: restart the relay after 3 failures in a row
+				if fails > 0 && fails%3 == 0 {
+					_, _ = run(30*time.Second, "systemctl", "restart", agentRelay)
 				}
-				since := lastOK
-				if m := time.Unix(st.ModeAt, 0); m.After(since) {
-					since = m
+			case resting:
+				next = 10 * time.Second // only listening for the main server
+			case !sr.active && (fails >= searchTries || sr.fromStart):
+				// our way failed a few times: try the next ones, one by one
+				fromStart := sr.fromStart
+				sr = agentSearch{active: true, ways: ways}
+				if !fromStart && st.Mode != "rev" {
+					sr.idx = index(ways, st.Via) + 1
 				}
-				if time.Since(since) > dwell {
-					if st.Mode == "rev" {
-						st.Mode = ""
-						fmt.Println("reverse path did not connect; trying the direct path again")
-					} else {
-						st.Mode = "rev"
-						fmt.Println("main server unreachable; switching to the reverse path (main server dials us)")
-					}
-					st.ModeAt, rc.mode = time.Now().Unix(), st.Mode
-					_ = saveAgent(st)
-					next = 200 * time.Millisecond
+				sr.step(&st)
+				next = searchGap
+			case sr.active:
+				sr.tries++
+				if sr.tries >= searchTries {
+					sr.idx++
+					sr.step(&st)
 				}
+				next = searchGap
+			}
+			if !sr.active && !resting && time.Now().Before(sr.cool) {
+				next = 10 * time.Second
 			}
 		} else {
-			var br beatResp
-			b, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
-			resp.Body.Close()
-			if resp.StatusCode != 200 || json.Unmarshal(b, &br) != nil {
-				fmt.Println("heartbeat rejected:", resp.StatusCode, strings.TrimSpace(string(b)))
-				fails++
-				lastFail = time.Now().UTC().Format("15:04:05Z ") + fmt.Sprintf("HTTP %d", resp.StatusCode)
-				next = 10 * time.Second
-			} else {
-				fails = 0
-				lastOK = time.Now()
-				if br.Domain != "" && !certBusy && needCert(st, br.Domain) {
-					certBusy = true
-					go func(d string) {
-						r := certResult{domain: d}
-						cf, _, err := ObtainCert(agentDir, d, "", func(string, ...any) {})
-						if err != nil {
-							r.err = trimTo(err.Error(), 300)
-						} else if exp, _, e := certExpiry(cf); e == nil {
-							r.exp = exp.Unix()
-						}
-						certCh <- r
-					}(br.Domain)
-				}
-				if br.Token != "" {
-					st.Token = br.Token
-					_ = saveAgent(st)
-				}
-				newCfg := false
-				if wasPending && st.PendingAt > 0 { // reached the panel with the new config
-					st.PendingAt = 0
-					_ = saveAgent(st)
-				}
-				if st.Rejected != "" && br.Hash != st.Rejected {
-					st.Rejected, st.RejectedAt = "", 0
-					_ = saveAgent(st)
-				}
-				if st.Rejected != "" && br.Hash == st.Rejected && time.Since(time.Unix(st.RejectedAt, 0)) < 10*time.Minute {
-					br.Config = nil // just went back from it
-				}
-				if len(br.Config) > 0 && br.Hash != st.Hash {
-					if cur, e := os.ReadFile(filepath.Join(agentDir, "xray.want.json")); e == nil && st.Hash != "" {
-						_ = os.WriteFile(filepath.Join(agentDir, "xray.prev.json"), cur, 0o600)
-						st.PrevHash, st.PendingAt = st.Hash, time.Now().Unix()
+			if fails > 0 {
+				fmt.Printf("connected again (%s)\n", pathName(st))
+			}
+			fails, sr = 0, agentSearch{}
+			if br.Domain != "" && !certBusy && needCert(st, br.Domain) {
+				certBusy = true
+				go func(d string) {
+					r := certResult{domain: d}
+					cf, err := obtainCertAgent(d)
+					if err != nil {
+						r.err = trimTo(err.Error(), 300)
+					} else if exp, _, e := certExpiry(cf); e == nil {
+						r.exp = exp.Unix()
 					}
-					// keep what the panel wants; rc.run() applies it minus busy ports
-					if e := os.WriteFile(filepath.Join(agentDir, "xray.want.json"), br.Config, 0o600); e == nil {
-						st.Hash = br.Hash
-						_ = saveAgent(st)
-						rc.failed = ""
-						newCfg = true
+					certCh <- r
+				}(br.Domain)
+			}
+			if br.Token != "" {
+				st.Token = br.Token
+				_ = saveAgent(st)
+			}
+			newCfg := false
+			if wasPending && st.PendingAt > 0 { // reached the panel with the new config
+				st.PendingAt = 0
+				_ = saveAgent(st)
+			}
+			if st.Rejected != "" && br.Hash != st.Rejected {
+				st.Rejected, st.RejectedAt = "", 0
+				_ = saveAgent(st)
+			}
+			if st.Rejected != "" && br.Hash == st.Rejected && time.Since(time.Unix(st.RejectedAt, 0)) < 10*time.Minute {
+				br.Config = nil // just went back from it
+			}
+			if len(br.Config) > 0 && br.Hash != st.Hash {
+				if cur, e := os.ReadFile(filepath.Join(agentDir, "xray.want.json")); e == nil && st.Hash != "" {
+					_ = os.WriteFile(filepath.Join(agentDir, "xray.prev.json"), cur, 0o600)
+					st.PrevHash, st.PendingAt = st.Hash, time.Now().Unix()
+				}
+				// keep what the panel wants; rc.run() applies it minus busy ports
+				if e := os.WriteFile(filepath.Join(agentDir, "xray.want.json"), br.Config, 0o600); e == nil {
+					st.Hash = br.Hash
+					if st.Mode != "rev" {
+						st.Via = "" // a method the admin picked starts on its own way
+					} else {
+						st.PendingAt = 0 // nothing to try: we are on the reverse path
 					}
+					_ = saveAgent(st)
+					rc.failed = ""
+					newCfg = true
 				}
-				if br.Every >= 10 && br.Every <= 600 {
-					every = time.Duration(br.Every) * time.Second
-				}
-				next = every
-				if br.Held || br.Probe || newCfg {
-					next = 200 * time.Millisecond
-				}
+			}
+			if br.Every >= 10 && br.Every <= 600 {
+				every = time.Duration(br.Every) * time.Second
+			}
+			next = every
+			if br.Held || br.Probe || newCfg {
+				next = 200 * time.Millisecond
 			}
 		}
 		time.Sleep(next)
 	}
+}
+
+// agentSearch: the middle server trying its ways to the main server one by
+// one, then resting.
+type agentSearch struct {
+	active    bool
+	ways      []string // "" = the method the admin picked, then the others
+	idx       int
+	tries     int
+	cool      time.Time
+	fromStart bool // rested: next search starts from the first way
+}
+
+func (sr *agentSearch) step(st *agentState) {
+	sr.tries = 0
+	st.Mode, st.ModeAt = "", time.Now().Unix()
+	if sr.idx >= len(sr.ways) {
+		*sr = agentSearch{cool: time.Now().Add(revCool), fromStart: true}
+		st.Via = ""
+		fmt.Printf("no way to the main server worked; resting %v (still listening for it)\n", revCool)
+	} else {
+		st.Via = sr.ways[sr.idx]
+		fmt.Printf("trying way %d/%d to the main server: %s\n", sr.idx+1, len(sr.ways), orDefault(st.Via, "its own method"))
+	}
+	_ = saveAgent(*st)
+}
+
+func pathName(st agentState) string {
+	if st.Mode == "rev" {
+		return "reverse path"
+	}
+	return "direct, " + orDefault(st.Via, "own method")
+}
+
+// sendBeat posts one heartbeat. reached: the panel answered (even with an error).
+func sendBeat(c *http.Client, st agentState, body []byte) (*beatResp, bool, string) {
+	hr, _ := http.NewRequest("POST", strings.TrimSuffix(st.Join.Panel, "/")+"/api/agent/beat", bytes.NewReader(body))
+	hr.Header.Set("Content-Type", "application/json")
+	hr.Header.Set("X-Agent-ID", st.Join.ID)
+	tok := st.Token
+	if tok == "" {
+		tok = st.Join.Join
+	}
+	hr.Header.Set("X-Agent-Token", tok)
+	resp, err := c.Do(hr)
+	if err != nil {
+		return nil, false, err.Error()
+	}
+	var br beatResp
+	b, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	resp.Body.Close()
+	if resp.StatusCode != 200 || json.Unmarshal(b, &br) != nil {
+		fmt.Println("heartbeat rejected:", resp.StatusCode, strings.TrimSpace(string(b)))
+		return nil, true, fmt.Sprintf("HTTP %d", resp.StatusCode)
+	}
+	return &br, true, ""
+}
+
+func routeOf(st agentState) string {
+	switch {
+	case st.Mode == "rev":
+		return relayRevOut
+	case st.Via != "":
+		return relayAltPrefix + st.Via
+	}
+	return ""
+}
+
+func contains(l []string, s string) bool { return index(l, s) >= 0 }
+
+func index(l []string, s string) int {
+	for i, x := range l {
+		if x == s {
+			return i
+		}
+	}
+	return -1
 }
 
 // applyRelayConfig tests and applies a new relay config, rolling back when
@@ -624,7 +736,7 @@ func dropPorts(cfg []byte, drop map[int]bool) []byte {
 type reconciler struct {
 	failed   string // config that failed to start
 	failedAt time.Time
-	mode     string // "rev": keep the rule that sends traffic over the reverse path
+	route    string // outbound all traffic takes ("" the main one)
 }
 
 func (r *reconciler) run() (state map[string]string, busy []int, errMsg string) {
@@ -641,9 +753,7 @@ func (r *reconciler) run() (state map[string]string, busy []int, errMsg string) 
 	}
 	if len(want) > 0 {
 		next := dropPorts(want, drop)
-		if r.mode != "rev" {
-			next = stripRule(next, relayRevRule)
-		}
+		next = setPathRule(next, r.route)
 		cur, _ := os.ReadFile(filepath.Join(agentDir, "xray.json"))
 		if !bytes.Equal(next, cur) && !(string(next) == r.failed && time.Since(r.failedAt) < 10*time.Minute) {
 			if e := applyRelayConfig(next); e != nil {
@@ -691,8 +801,119 @@ func needCert(st agentState, d string) bool {
 	return true
 }
 
-// wantHasRev: the wanted relay config offers the reverse path.
+// wantHasRev: the wanted relay config has the reverse path.
 func wantHasRev() bool {
 	b, err := os.ReadFile(filepath.Join(agentDir, "xray.want.json"))
-	return err == nil && relayHasRule(b, relayRevRule)
+	return err == nil && relayHasRule(b, relayCtlRev)
+}
+
+// wantWays: our ways to the main server: "" (the admin's method) and the
+// other methods the panel offers.
+func wantWays() []string {
+	w := []string{""}
+	b, err := os.ReadFile(filepath.Join(agentDir, "xray.want.json"))
+	if err != nil {
+		return w
+	}
+	var c struct {
+		Outbounds []struct {
+			Tag string `json:"tag"`
+		} `json:"outbounds"`
+	}
+	if json.Unmarshal(b, &c) == nil {
+		for _, o := range c.Outbounds {
+			if strings.HasPrefix(o.Tag, relayAltPrefix) {
+				w = append(w, strings.TrimPrefix(o.Tag, relayAltPrefix))
+			}
+		}
+	}
+	return w
+}
+
+// setPathRule sends all traffic (heartbeat and forwarded ports) to outbound
+// tag; "" leaves it on the main one.
+func setPathRule(cfg []byte, tag string) []byte {
+	if tag == "" {
+		return cfg
+	}
+	v, err := ParseOrdered(cfg)
+	if err != nil {
+		return cfg
+	}
+	root := asMap(v)
+	var tags []any
+	for _, x := range asArr(root.Get("inbounds")) {
+		t := asStr(asMap(x).Get("tag"))
+		if t == "ctl" || strings.HasPrefix(t, "fwd-") {
+			tags = append(tags, t)
+		}
+	}
+	rt := asMap(root.Get("routing"))
+	if rt == nil {
+		rt = om()
+		root.Set("routing", rt)
+	}
+	rules := append([]any{om("type", "field", "ruleTag", relayPathRule, "inboundTag", tags, "outboundTag", tag)}, asArr(rt.Get("rules"))...)
+	rt.Set("rules", rules)
+	return EncodeIndent(root)
+}
+
+// obtainCertAgent gets the Let's Encrypt certificate on the middle server.
+// When a web server holds port 80, it is stopped for the moment it takes and
+// started again; tunnel programs are never stopped.
+func obtainCertAgent(d string) (string, error) {
+	if !portFree(80) {
+		unit := port80Unit()
+		if unit == "" {
+			return "", errors.New("port 80 is busy and the program holding it is not a service that can be paused; free port 80 for a minute")
+		}
+		low := strings.ToLower(unit)
+		for _, no := range []string{"xray", "muse", "x-ui", "3x-ui", "marzban", "sing-box", "hysteria", "docker", "containerd", "sshd"} {
+			if strings.Contains(low, no) {
+				return "", fmt.Errorf("port 80 is used by %s, which is not paused; free port 80 for a minute", unit)
+			}
+		}
+		fmt.Printf("pausing %s for a moment to get the certificate (port 80)\n", unit)
+		if out, err := run(30*time.Second, "systemctl", "stop", unit); err != nil {
+			return "", fmt.Errorf("could not pause %s: %s", unit, trimTo(out, 200))
+		}
+		defer func() {
+			if out, err := run(30*time.Second, "systemctl", "start", unit); err != nil {
+				fmt.Printf("could not start %s again: %s\n", unit, out)
+			} else {
+				fmt.Println(unit, "started again")
+			}
+		}()
+		for i := 0; i < 20 && !portFree(80); i++ {
+			time.Sleep(250 * time.Millisecond)
+		}
+	}
+	cf, _, err := ObtainCert(agentDir, d, "", func(string, ...any) {})
+	return cf, err
+}
+
+// port80Unit: the systemd service listening on port 80, if any.
+func port80Unit() string {
+	inodes := map[string]bool{}
+	for _, l := range scanListeners()[80] {
+		if l.inode != "0" {
+			inodes["socket:["+l.inode+"]"] = true
+		}
+	}
+	procs, _ := filepath.Glob("/proc/[0-9]*")
+	for _, p := range procs {
+		fds, _ := os.ReadDir(filepath.Join(p, "fd"))
+		for _, fd := range fds {
+			if l, err := os.Readlink(filepath.Join(p, "fd", fd.Name())); err == nil && inodes[l] {
+				cg, _ := os.ReadFile(filepath.Join(p, "cgroup"))
+				for _, part := range strings.Split(strings.TrimSpace(string(cg)), "/") {
+					if strings.HasSuffix(part, ".service") {
+						return part
+					}
+				}
+				return ""
+			}
+		}
+	}
+	return ""
 }

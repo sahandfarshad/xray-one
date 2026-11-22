@@ -106,6 +106,14 @@ type TunnelServer struct {
 	Bridge    bool   `json:"bridge,omitempty"` // this server is dialing the middle server
 	BridgeAt  int64  `json:"bridgeAt,omitempty"`
 	BridgeErr string `json:"bridgeErr,omitempty"`
+	BridgeVia string `json:"bridgeVia,omitempty"` // method this server dials it with
+	RevPortW  int    `json:"revPortW,omitempty"`  // WS+TLS listener (needs the middle server's domain)
+	RevPortX  int    `json:"revPortX,omitempty"`  // XHTTP+TLS listener
+	RevPath   string `json:"revPath,omitempty"`
+	Via       string `json:"via,omitempty"`      // fallback method the agent found when its own failed
+	Search    string `json:"search,omitempty"`   // this server looking for it: "search" or "cool"
+	SearchAt  int64  `json:"searchAt,omitempty"` // until when it rests
+	SearchN   string `json:"searchN,omitempty"`  // "2/3"
 	// domain + Let's Encrypt certificate on the middle server
 	Domain   string `json:"domain,omitempty"`
 	CertOK   bool   `json:"certOk,omitempty"`
@@ -594,6 +602,15 @@ func relayXrayConfig(j joinInfo, fwd []fwdPort, ctl int, rev *revInfo) []byte {
 		inbounds = append(inbounds, om("tag", fmt.Sprintf("fwd-%d", f.Listen), "listen", "0.0.0.0", "port", f.Listen,
 			"protocol", "dokodemo-door", "settings", om("address", f.Host, "port", f.Port, "network", "tcp,udp")))
 	}
+	root := om("log", om("loglevel", "warning"),
+		"inbounds", inbounds,
+		"outbounds", []any{mainOutbound(j)})
+	addRelayReverse(root, rev, ctl)
+	return EncodeIndent(root)
+}
+
+// mainOutbound: how a middle server dials this server with j's method.
+func mainOutbound(j joinInfo) *OMap {
 	port := j.Port
 	stream := om("network", "ws", "security", "tls",
 		"tlsSettings", om("serverName", j.Domain, "fingerprint", "chrome"),
@@ -611,14 +628,10 @@ func relayXrayConfig(j joinInfo, fwd []fwdPort, ctl int, rev *revInfo) []byte {
 		stream = om("network", "raw", "security", "reality",
 			"realitySettings", om("serverName", j.RSNI, "fingerprint", "chrome", "publicKey", j.RPub, "shortId", j.RSID))
 	}
-	root := om("log", om("loglevel", "warning"),
-		"inbounds", inbounds,
-		"outbounds", []any{om("tag", "main", "protocol", "vless",
-			"settings", om("vnext", []any{om("address", j.Domain, "port", port,
-				"users", []any{user})}),
-			"streamSettings", stream)})
-	addRelayReverse(root, rev)
-	return EncodeIndent(root)
+	return om("tag", "main", "protocol", "vless",
+		"settings", om("vnext", []any{om("address", j.Domain, "port", port,
+			"users", []any{user})}),
+		"streamSettings", stream)
 }
 
 type fwdPort struct {
@@ -1063,6 +1076,7 @@ type beatReq struct {
 	Rejected  string            `json:"rejected,omitempty"`  // config hash the agent tried and went back from (0.6.1+)
 	Pending   bool              `json:"pending,omitempty"`   // still trying the newest config
 	Mode      string            `json:"mode,omitempty"`      // "rev" when it reached us over the reverse path (0.6.4+)
+	Via       string            `json:"via,omitempty"`       // forward method it found by searching (0.6.5+)
 	CertDom   string            `json:"certDomain,omitempty"`
 	CertExp   int64             `json:"certExp,omitempty"`
 	CertErr   string            `json:"certErr,omitempty"`
@@ -1119,7 +1133,7 @@ func (a *App) handleBeat(w http.ResponseWriter, r *http.Request) {
 		if req.Fails > 0 {
 			s.Fails, s.LastFail, s.FailAt = req.Fails, trimTo(req.LastFail, 300), time.Now().Unix()
 		}
-		s.Mode = req.Mode
+		s.Mode, s.Via = req.Mode, req.Via
 		if revCapable(*s) && s.Domain != "" {
 			s.CertBusy, s.CertErr = req.CertBusy, trimTo(req.CertErr, 300)
 			s.CertOK = req.CertDom == s.Domain && req.CertExp > time.Now().Unix()
@@ -1143,7 +1157,9 @@ func (a *App) handleBeat(w http.ResponseWriter, r *http.Request) {
 	if revCapable(srv) {
 		_ = a.store.EditTunnels(func() error {
 			if s := a.store.tunnelByID(srv.ID); s != nil {
-				if ensureRevLocked(s, fwd) && s.Bridge {
+				// new listener settings: the relay config changes, and our
+				// tunnel rules learn this server's reverse inbound tag
+				if ensureRevLocked(s, fwd) {
 					defer a.reapplyTunnels(s.ID)
 				}
 				srv = *s
@@ -1151,13 +1167,9 @@ func (a *App) handleBeat(w http.ResponseWriter, r *http.Request) {
 			return nil
 		})
 	}
-	// reverse path: keep dialing while the agent uses it, stop once it is
-	// back on the forward path
-	if srv.Bridge && (req.Mode != "rev" || a.revFor(srv) == nil) {
-		a.setBridge(srv.ID, false)
-	} else if !srv.Bridge && req.Mode == "rev" && a.revFor(srv) != nil {
-		a.setBridge(srv.ID, true)
-	}
+	// the first path that got through wins: stop searching, and keep the
+	// bridge only while the agent uses it
+	a.pathFound(srv, req.Mode == "rev")
 	// the agent tried our newest config and could not reach us with it: go
 	// back to the method it had
 	if req.Rejected != "" && srv.SentHash == req.Rejected && srv.PrevMethod != "" && srv.SentMethod == srv.Method {
