@@ -61,6 +61,7 @@ const T = {
     dtOn: "روشن کن", dtOff: "خاموش کن", dtUp: "وصل", dtDown: "قطع", dtPending: "در حال بررسی…", dtOffline: "سرور میانی آفلاین", dtOffState: "خاموش", dtLastOk: "آخرین اتصال موفق {t}", dtPins: "{n} اینباند", dtNeedAgent: "تانل اختصاصی به ایجنت نسخه‌ی {v} یا جدیدتر نیاز دارد: دستور نصب را یک بار دیگر روی سرور میانی اجرا کنید.",
     dtAskOn: "WireGuard اختصاصی برای این سرور میانی روشن شود؟ پورت UDP {p} این سرور باید از سرور میانی باز باشد.", dtAskOff: "WireGuard اختصاصی خاموش شود؟ {n} اینباند وصل به آن به تانل چرخشی برمی‌گردند.",
     dtPort: "پورت WireGuard (UDP)", dtHost: "آدرس این سرور برای WireGuard", dtSave: "ذخیره", dtSetHint: "سرور میانی با UDP به این آدرس و پورت وصل می‌شود. IP مستقیم بدهید، نه دامنه‌ی پشت CDN. پورت باید آزاد باشد (TCP و UDP).",
+    pePort: "پورت", peEdit: "تغییر پورت", peSave: "ذخیره", peCancel: "لغو", tpBadNum: "پورت باید یک عدد بین ۱ تا ۶۵۵۳۵ باشد", peAskUsed: "سرورهای میانی روی «{m}» به پورت جدید {p} می‌روند. پورت قبلی تا ۳۰ دقیقه باز می‌ماند تا تانل قطع نشود؛ ممکن است اتصال کاربران چند ثانیه قطع و وصل شود. ادامه؟", peAskWg: "سرورهای میانیِ دارای تانل WireGuard روی پورت جدید {p} دوباره وصل می‌شوند (چند ثانیه قطعی برای اینباندهای وصل‌شده به آن). ادامه؟", peMoved: "پورت عوض شد. سرورهای میانی تا یک دقیقه به پورت جدید می‌روند؛ پورت قبلی ۳۰ دقیقه باز می‌ماند.",
     dtPath: "مسیر", dtRot: "چرخشی (پیش‌فرض)", dtPickHint: "مسیر «اختصاصی» ثابت است و جایگزین ندارد: اگر قطع شود این اینباند روی آن سرور قطع می‌ماند.",
   },
   en: {
@@ -124,6 +125,7 @@ const T = {
     dtOn: "Turn on", dtOff: "Turn off", dtUp: "Up", dtDown: "Down", dtPending: "Checking…", dtOffline: "Middle server offline", dtOffState: "Off", dtLastOk: "last good check {t}", dtPins: "{n} inbounds", dtNeedAgent: "Dedicated tunnels need agent {v} or newer: run the install command on the middle server once more.",
     dtAskOn: "Turn on dedicated WireGuard for this middle server? UDP port {p} on this server must be reachable from it.", dtAskOff: "Turn off dedicated WireGuard? {n} inbounds pinned to it go back to the rotating tunnel.",
     dtPort: "WireGuard port (UDP)", dtHost: "This server's address for WireGuard", dtSave: "Save", dtSetHint: "Middle servers dial this address and port over UDP. Use the direct IP, not a domain behind a CDN. The port must be free (TCP and UDP).",
+    pePort: "Port", peEdit: "Change port", peSave: "Save", peCancel: "Cancel", tpBadNum: "The port must be a number from 1 to 65535", peAskUsed: "Middle servers on \"{m}\" move to the new port {p}. The old port stays open for 30 minutes so the tunnel does not drop; users may see a few seconds of reconnect. Continue?", peAskWg: "Middle servers with the WireGuard tunnel reconnect on the new port {p} (a few seconds of drop for inbounds pinned to it). Continue?", peMoved: "Port changed. Middle servers move to it within a minute; the old port stays open for 30 minutes.",
     dtPath: "Path", dtRot: "Rotating (default)", dtPickHint: "A dedicated path is fixed with no fallback: if it drops, this inbound stays down on that server.",
   },
 };
@@ -951,16 +953,25 @@ async function loadTunnels() {
   renderTunnels();
 }
 const tnTestRes = {}; let tnPoll;
+// port fields accept Persian/Arabic digits too; "" keeps the current port
+function portNum(v) {
+  v = String(v || "").trim().replace(/[۰-۹]/g, (c) => "۰۱۲۳۴۵۶۷۸۹".indexOf(c)).replace(/[٠-٩]/g, (c) => "٠١٢٣٤٥٦٧٨٩".indexOf(c));
+  if (!v) return 0;
+  const n = /^\d+$/.test(v) ? +v : NaN;
+  if (!(n >= 1 && n <= 65535)) throw new Error(t("tpBadNum"));
+  return n;
+}
+let portEdit = ""; // "<server index>:<field>" being edited on a card
 $("#tunnelPorts").addEventListener("submit", guard(async (e) => {
   e.preventDefault();
   const f = e.target;
-  await api("POST", "api/tunnels/settings", { port: +f.port.value || 0, xport: +f.xport.value || 0, rport: +f.rport.value || 0, rtarget: f.rtarget.value.trim() });
+  await api("POST", "api/tunnels/settings", { port: portNum(f.port.value), xport: portNum(f.xport.value), rport: portNum(f.rport.value), rtarget: f.rtarget.value.trim() });
   toast(t("done")); document.activeElement?.blur(); loadTunnels();
 }));
 $("#dtPorts").addEventListener("submit", guard(async (e) => {
   e.preventDefault();
   const f = e.target;
-  await api("POST", "api/tunnels/dtsettings", { wgport: +f.wgport.value || 0, wghost: f.wghost.value.trim() });
+  await api("POST", "api/tunnels/dtsettings", { wgport: portNum(f.wgport.value), wghost: f.wghost.value.trim() });
   toast(t("done")); document.activeElement?.blur(); loadTunnels();
 }));
 function renderTunnels() {
@@ -969,16 +980,16 @@ function renderTunnels() {
   $("#addTunnelBtn").disabled = !d.ready;
   const tp = $("#tunnelPorts");
   if (d.ready && document.activeElement?.form !== tp) tp.innerHTML = `
-    <label>${t("tpWs")}<input name="port" type="number" min="1" max="65535" value="${d.port || ""}" placeholder="${t("tpAuto")}"></label>
-    <label>${t("tpXh")}<input name="xport" type="number" min="1" max="65535" value="${d.xport || ""}" placeholder="${t("tpAuto")}"></label>
-    <label>${t("tpRt")}<input name="rport" type="number" min="1" max="65535" value="${d.rport || ""}" placeholder="${t("tpAuto")}"></label>
+    <label>${t("tpWs")}<input name="port" inputmode="numeric" dir="ltr" value="${d.port || ""}" placeholder="${t("tpAuto")}"></label>
+    <label>${t("tpXh")}<input name="xport" inputmode="numeric" dir="ltr" value="${d.xport || ""}" placeholder="${t("tpAuto")}"></label>
+    <label>${t("tpRt")}<input name="rport" inputmode="numeric" dir="ltr" value="${d.rport || ""}" placeholder="${t("tpAuto")}"></label>
     <label>${t("tpRtT")}<input name="rtarget" dir="ltr" value="${esc(d.rtarget || "")}" placeholder="www.microsoft.com:443"></label>
     <button class="btn" type="submit">${t("tpSave")}</button><small class="muted">${t("tpHint")}</small>`;
   else if (!d.ready) tp.innerHTML = "";
   const dp = $("#dtPorts");
   if (d.ready && d.servers.length && document.activeElement?.form !== dp) dp.innerHTML = `
     <b class="dthead">${t("dtTitle")} · WireGuard</b>
-    <label>${t("dtPort")}<input name="wgport" type="number" min="1" max="65535" value="${d.wgport || ""}" placeholder="${t("tpAuto")}"></label>
+    <label>${t("dtPort")}<input name="wgport" inputmode="numeric" dir="ltr" value="${d.wgport || ""}" placeholder="${t("tpAuto")}"></label>
     <label>${t("dtHost")}<input name="wghost" dir="ltr" value="${esc(d.wghost || "")}" placeholder="${t("tpAuto")}"></label>
     <button class="btn" type="submit">${t("dtSave")}</button><small class="muted">${t("dtSetHint")}</small>`;
   else if (!d.ready || !d.servers.length) dp.innerHTML = "";
@@ -1031,6 +1042,7 @@ function dedBlock(s, i) {
     if (v.on) extra.push(t("dtPins").replace("{n}", v.pins || 0));
     return `<div class="mcard dcard${v.on ? " on" : ""}${v.on && v.state !== "up" && v.state !== "pending" ? " down" : ""}">
       <b>${esc(name)}</b><small>${esc(desc)}</small>
+      ${m.id === "wg" ? portLine(i, "wgport") : ""}
       <span class="dstate"><span dir="auto" class="pill ${st[0]}">${esc(st[1])}</span>${extra.length ? `<small dir="auto">${esc(extra.join(" · "))}</small>` : ""}</span>
       ${v.on && v.err && v.state === "down" ? `<small class="err mono">${esc(v.err)}</small>` : ""}
       <button class="btn small${v.on ? "" : " primary"}" data-tn="ded" data-i="${i}" data-m="${m.id}" data-on="${v.on ? 0 : 1}">${v.on ? t("dtOff") : t("dtOn")}</button></div>`;
@@ -1064,6 +1076,12 @@ function revBlock(s, i) {
       <button class="btn small" data-tn="domain" data-i="${i}">${t("dmSave")}</button> ${st}</div>
     ${s.domain && s.certOk ? "" : `<p class="muted small">${esc(t("dmHint").replace("{ip}", s.publicIP || s.host || "IP"))}</p>`}`;
 }
+$("#tunnelList").addEventListener("keydown", guard(async (e) => {
+  const inp = e.target.closest(".pedit input");
+  if (inp && e.key === "Enter") { e.preventDefault(); const [, i, k] = inp.id.split("-"); await savePort(i, k); return; }
+  if (inp && e.key === "Escape") { portEdit = ""; renderTunnels(); return; }
+  if ((e.key === "Enter" || e.key === " ") && e.target.matches("[role=button]")) { e.preventDefault(); e.target.click(); }
+}));
 const tnTyping = () => !!document.activeElement?.closest?.("#tunnelList input");
 function versionLess(a, b) {
   const pa = String(a).split(".").map(Number), pb = String(b).split(".").map(Number);
@@ -1071,19 +1089,48 @@ function versionLess(a, b) {
   return false;
 }
 const cap = (m) => (m === "wss" ? "Wss" : m.charAt(0).toUpperCase() + m.slice(1));
+const methodPort = { wss: "port", xhttp: "xport", reality: "rport" };
+// "Port: N ✎" on a card, or its inline editor
+function portLine(i, k) {
+  const v = tunnelData[k];
+  if (portEdit === i + ":" + k) return `<span class="pedit"><input id="pe-${i}-${k}" inputmode="numeric" dir="ltr" value="${esc(v || "")}" aria-label="${t("pePort")}">
+    <button type="button" class="btn small primary" data-pe-save="${k}" data-i="${i}" title="${t("peSave")}">✓</button><button type="button" class="btn small" data-pe-cancel="1" title="${t("peCancel")}">✕</button></span>`;
+  return `<span class="pport" role="button" tabindex="0" data-pe="${k}" data-i="${i}" title="${t("peEdit")}">${t("pePort")}: <b class="mono">${esc(v || t("tpAuto"))}</b> ✎</span>`;
+}
 function methodCards(s, i) {
   const ms = tunnelData.methods || [];
   return `<div class="mcards">${ms.map((m) => {
-    const on = s.method === m.id, trying = on && s.prevMethod;
+    const on = s.method === m.id, trying = on && s.prevMethod, can = m.ready && !on;
     const cls = "mcard" + (on ? " on" : "") + (m.ready ? "" : " soon");
-    return `<button class="${cls}" data-tn="method" data-i="${i}" data-m="${m.id}" ${m.ready && !on ? "" : "disabled"}>
+    return `<div class="${cls}" data-tn="method" data-i="${i}" data-m="${m.id}" ${can ? `role="button" tabindex="0"` : ""}>
       <b>${esc(t("m" + cap(m.id)))}</b><small>${esc(t("m" + cap(m.id) + "D"))}</small>
-      <em>${on ? (trying ? t("mTrying") : "✓ " + t("mActive")) : m.ready ? "" : t("mSoon")}</em></button>`;
+      ${m.ready && methodPort[m.id] && tunnelData.ready ? portLine(i, methodPort[m.id]) : ""}
+      <em>${on ? (trying ? t("mTrying") : "✓ " + t("mActive")) : m.ready ? "" : t("mSoon")}</em></div>`;
   }).join("")}</div>`;
+}
+async function savePort(i, k) {
+  const n = portNum($(`#pe-${i}-${k}`).value), d = tunnelData;
+  if (!n || n === d[k]) { portEdit = ""; renderTunnels(); return; }
+  if (k === "wgport") {
+    if (d.servers.some((x) => (x.dedView || []).some((v) => v.type === "wg" && v.on)) && !confirm(t("peAskWg").replace("{p}", n))) return;
+    await api("POST", "api/tunnels/dtsettings", { wgport: n });
+    toast(t("done"));
+  } else {
+    const m = Object.keys(methodPort).find((x) => methodPort[x] === k);
+    if (d.servers.some((x) => x.method === m || x.prevMethod === m) && !confirm(t("peAskUsed").replace("{m}", t("m" + cap(m))).replace("{p}", n))) return;
+    const r = await api("POST", "api/tunnels/settings", { [k]: n });
+    toast(r && r.moved && r.moved.length ? t("peMoved") : t("done"));
+  }
+  portEdit = ""; document.activeElement?.blur(); loadTunnels();
 }
 $("#tunnelList").addEventListener("click", guard(async (e) => {
   const cp = e.target.closest("[data-copy]"); if (cp) { copyText(cp.dataset.copy); return; }
-  const mb = e.target.closest("button[data-tn=method]");
+  const pe = e.target.closest("[data-pe]");
+  if (pe) { portEdit = pe.dataset.i + ":" + pe.dataset.pe; renderTunnels(); const inp = $(`#pe-${pe.dataset.i}-${pe.dataset.pe}`); inp?.focus(); inp?.select(); return; }
+  const ps = e.target.closest("[data-pe-save]"); if (ps) { await savePort(ps.dataset.i, ps.dataset.peSave); return; }
+  if (e.target.closest("[data-pe-cancel]")) { portEdit = ""; renderTunnels(); return; }
+  if (e.target.closest(".pedit")) return;
+  const mb = e.target.closest("[data-tn=method][role=button]");
   if (mb) {
     const s = tunnelData.servers[+mb.dataset.i], m = mb.dataset.m;
     if (!s.agentVer || versionLess(s.agentVer, tunnelData.methodVer)) { alert(t("mNeedAgent").replace("{v}", tunnelData.methodVer)); return; }

@@ -7,6 +7,7 @@ package main
 import (
 	"archive/zip"
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"crypto/tls"
 	"encoding/base64"
@@ -14,6 +15,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -23,6 +25,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"golang.org/x/term"
 )
 
 const (
@@ -160,7 +164,7 @@ func agentInstall(code string) error {
 	if out, err := run(30*time.Second, agentXray(), "run", "-test", "-config", filepath.Join(agentDir, "xray.json")); err != nil {
 		return fmt.Errorf("xray rejected the relay config: %s", out)
 	}
-	step(3, "services")
+	step(3, "services (starting relay and agent)")
 	self, _ := os.Executable()
 	units := map[string]string{
 		agentRelay: "[Unit]\nDescription=XRay One tunnel relay (xray)\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nExecStart=" +
@@ -180,13 +184,25 @@ func agentInstall(code string) error {
 			return fmt.Errorf("could not start %s: %s", n, out)
 		}
 	}
-	step(4, "connecting to the main server")
+	step(4, "connecting to the main server (up to 60 s)")
+	tty := isTTY()
 	for i := 0; i < 20; i++ {
 		time.Sleep(3 * time.Second)
 		if s, err := loadAgent(); err == nil && s.Token != "" {
+			if tty {
+				fmt.Println()
+			}
 			step(5, "connected. The tunnel shows green in the panel.")
 			return nil
 		}
+		if tty {
+			fmt.Printf("\r      waiting for the main server... %2d s left ", 60-3*(i+1))
+		} else if (i+1)%5 == 0 {
+			fmt.Printf("      waiting for the main server... %d s left\n", 60-3*(i+1))
+		}
+	}
+	if tty {
+		fmt.Println()
 	}
 	step(5, "installed, still waiting for the main server. Check: xray-one agent status")
 	return nil
@@ -546,53 +562,193 @@ func applyRelayConfig(cfg []byte) error {
 	return nil
 }
 
+// downloadXray gets the Xray core: GitHub (3 tries, 3 s apart), then the main
+// server's own xray binary when its architecture matches (checked against the
+// mirror's SHA256SUMS), then GitHub once more. No step can hang: 10 s to
+// connect, 20 s for an answer, and a transfer stalled for 30 s is dropped.
 func downloadXray(dir string) error {
 	name := "Xray-linux-64.zip"
-	if runtime.GOARCH == "arm64" {
+	arch := runtime.GOARCH
+	if arch == "arm64" {
 		name = "Xray-linux-arm64-v8a.zip"
 	}
-	c := &http.Client{Timeout: 3 * time.Minute}
-	resp, err := c.Get("https://github.com/XTLS/Xray-core/releases/latest/download/" + name)
-	if err != nil {
-		return err
+	gh := os.Getenv("XO_XRAY_BASE")
+	if gh == "" {
+		gh = "https://github.com/XTLS/Xray-core/releases/latest/download"
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		return fmt.Errorf("HTTP %d", resp.StatusCode)
+	mirror := strings.TrimRight(os.Getenv("XO_MIRROR"), "/")
+	fromZip := func(data []byte) ([]byte, error) {
+		zr, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+		if err != nil {
+			return nil, err
+		}
+		for _, f := range zr.File {
+			if f.Name != "xray" {
+				continue
+			}
+			rc, err := f.Open()
+			if err != nil {
+				return nil, err
+			}
+			b, err := io.ReadAll(rc)
+			rc.Close()
+			return b, err
+		}
+		return nil, errors.New("xray binary not found in archive")
 	}
-	data, err := io.ReadAll(io.LimitReader(resp.Body, 200<<20))
-	if err != nil {
-		return err
+	github := func(label string) ([]byte, error) {
+		data, err := dlProgress(label, gh+"/"+name, 200<<20)
+		if err != nil {
+			return nil, err
+		}
+		return fromZip(data)
 	}
-	zr, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
-	if err != nil {
-		return err
+	fromMirror := func() ([]byte, error) {
+		file := "xray-linux-" + arch
+		sums, err := dlProgress("", mirror+"/SHA256SUMS", 1<<16)
+		if err != nil {
+			return nil, err
+		}
+		want := ""
+		for _, l := range strings.Split(string(sums), "\n") {
+			if f := strings.Fields(l); len(f) == 2 && f[1] == file {
+				want = f[0]
+			}
+		}
+		if want == "" {
+			return nil, errors.New("the main server has no Xray for " + arch)
+		}
+		b, err := dlProgress("main server", mirror+"/"+file, 200<<20)
+		if err != nil {
+			return nil, err
+		}
+		if s := sha256.Sum256(b); fmt.Sprintf("%x", s) != want {
+			return nil, errors.New("checksum mismatch")
+		}
+		fmt.Println("      checksum verified")
+		return b, nil
+	}
+	var b []byte
+	var err error
+	for i := 1; i <= 3 && b == nil; i++ {
+		if i > 1 {
+			fmt.Println("      waiting 3 s...")
+			time.Sleep(3 * time.Second)
+		}
+		if b, err = github(fmt.Sprintf("GitHub (try %d/3)", i)); err != nil {
+			fmt.Println("      GitHub failed:", err)
+			b = nil
+		}
+	}
+	if b == nil && mirror != "" {
+		fmt.Println("      GitHub did not answer; trying the main server (backup)...")
+		if b, err = fromMirror(); err != nil {
+			fmt.Println("      main server failed:", err)
+			b = nil
+		}
+	}
+	if b == nil {
+		fmt.Println("      trying GitHub again...")
+		if b, err = github("GitHub again"); err != nil {
+			return err
+		}
 	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
-	for _, f := range zr.File {
-		if f.Name != "xray" {
-			continue
-		}
-		rc, err := f.Open()
-		if err != nil {
-			return err
-		}
-		b, err := io.ReadAll(rc)
-		rc.Close()
-		if err != nil {
-			return err
-		}
-		if err := os.WriteFile(filepath.Join(dir, "xray"), b, 0o755); err != nil {
-			return err
-		}
-		sum := sha256.Sum256(b)
-		fmt.Printf("      xray downloaded (%x)\n", sum[:6])
-		return nil
+	tmp := filepath.Join(dir, "xray.tmp")
+	if err := os.WriteFile(tmp, b, 0o755); err != nil {
+		return err
 	}
-	return errors.New("xray binary not found in archive")
+	if err := os.Rename(tmp, filepath.Join(dir, "xray")); err != nil {
+		return err
+	}
+	sum := sha256.Sum256(b)
+	fmt.Printf("      xray downloaded (%x)\n", sum[:6])
+	return nil
 }
+
+// dlProgress downloads u with a percent line (label "" = quiet). A dead
+// connection fails in 10 s, a missing answer in 20 s, a stall in 30 s.
+func dlProgress(label, u string, limit int64) ([]byte, error) {
+	tr := &http.Transport{Proxy: http.ProxyFromEnvironment,
+		DialContext:           (&net.Dialer{Timeout: 10 * time.Second}).DialContext,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ResponseHeaderTimeout: 20 * time.Second}
+	defer tr.CloseIdleConnections()
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
+	if err != nil {
+		return nil, err
+	}
+	if label != "" {
+		fmt.Printf("      %s: connecting...\n", label)
+	}
+	resp, err := (&http.Client{Transport: tr}).Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("HTTP %d", resp.StatusCode)
+	}
+	tty := isTTY()
+	total := resp.ContentLength
+	var buf bytes.Buffer
+	chunk := make([]byte, 64<<10)
+	stall := time.AfterFunc(30*time.Second, cancel)
+	defer stall.Stop()
+	last := -1
+	for {
+		n, rerr := resp.Body.Read(chunk)
+		if n > 0 {
+			stall.Reset(30 * time.Second)
+			buf.Write(chunk[:n])
+			if int64(buf.Len()) > limit {
+				return nil, errors.New("file too large")
+			}
+			if label != "" {
+				pct := -1
+				if total > 0 {
+					pct = int(int64(buf.Len()) * 100 / total)
+				}
+				switch {
+				case tty && pct >= 0 && pct != last:
+					fmt.Printf("\r      %s: %3d%%  %.1f / %.1f MB", label, pct, float64(buf.Len())/1e6, float64(total)/1e6)
+				case tty && pct < 0:
+					fmt.Printf("\r      %s: %.1f MB", label, float64(buf.Len())/1e6)
+				case !tty && pct >= 0 && pct/25 != last/25:
+					fmt.Printf("      %s: %d%%\n", label, pct)
+				}
+				if pct >= 0 {
+					last = pct
+				}
+			}
+		}
+		if rerr == io.EOF {
+			break
+		}
+		if rerr != nil {
+			if tty && label != "" {
+				fmt.Println()
+			}
+			if ctx.Err() != nil {
+				return nil, errors.New("download stalled or too slow")
+			}
+			return nil, rerr
+		}
+	}
+	if tty && label != "" {
+		fmt.Println()
+	}
+	if total > 0 && int64(buf.Len()) != total {
+		return nil, errors.New("download incomplete")
+	}
+	return buf.Bytes(), nil
+}
+
+func isTTY() bool { return term.IsTerminal(int(os.Stdout.Fd())) }
 
 // ---------- ports on the middle server ----------
 

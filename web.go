@@ -210,6 +210,7 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("GET /api/traffic/daily", a.api(a.handleTrafficDaily))
 	mux.HandleFunc("POST /api/agent/beat", a.handleBeat)
 	mux.HandleFunc("GET /sub/{token}", a.handleSub)
+	mux.HandleFunc("GET /dl/{token}/{file}", a.handleMirror)
 
 	var h http.Handler = mux
 	h = securityHeaders(h)

@@ -176,7 +176,9 @@ mark{background:#ffe58a;color:inherit;border-radius:3px;padding:0 2px}
 .tnvia{font-size:12px}
 .tnvia select{width:100%}
 .dvia{opacity:.85}
-.mcard:not(:disabled):hover{border-color:#2f80ed}
+.mcard[role=button]:hover{border-color:#2f80ed}
+.pport{display:inline-flex;align-items:center;gap:.25rem;font-size:.78rem;padding:.1rem .45rem;border-radius:6px;background:rgba(127,127,127,.13);cursor:pointer;white-space:nowrap}.pport:hover{background:rgba(47,128,237,.18)}
+.pedit{display:inline-flex;align-items:center;gap:.25rem;flex-wrap:nowrap}.pedit input{width:6.5rem;padding:.2rem .4rem;font:inherit;font-size:.85rem}.pedit .btn{margin:0!important;padding:.15rem .5rem}
 .tports{display:flex;flex-wrap:wrap;align-items:flex-end;gap:.5rem;margin:.4rem 0 .8rem}.tports label{display:flex;flex-direction:column;font-size:.8rem;gap:.2rem}.tports input{width:8rem}.tports input[name=wghost]{width:12rem}.tports small{flex-basis:100%}
 
 .dmrow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0 2px; font-size: 13px; }

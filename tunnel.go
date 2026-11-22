@@ -49,7 +49,7 @@ const (
 )
 
 func isTunnelTag(t string) bool {
-	return t == tunnelTag || t == tunnelTagXH || t == tunnelTagRT || t == dedTagWG
+	return t == tunnelTag || t == tunnelTagXH || t == tunnelTagRT || t == dedTagWG || isGraceTag(t)
 }
 
 func validMethod(m string) bool {
@@ -210,6 +210,8 @@ type TunnelSettings struct {
 	WGKey  string `json:"wgkey,omitempty"`
 	WGPub  string `json:"wgpub,omitempty"`
 	WGHost string `json:"wghost,omitempty"` // address middle servers dial (public IP)
+	// old ports of moved methods, still listening until Until (tunnelgrace.go)
+	Grace []tunnelGrace `json:"grace,omitempty"`
 }
 
 // armPort returns the port a pre-armed method listens on: the chosen one
@@ -217,7 +219,8 @@ type TunnelSettings struct {
 func (a *App) armPort(root *OMap, name string, p int, save func(int), tag string, skip ...int) (int, error) {
 	ib, _ := findInbound(root, tag)
 	if p != 0 {
-		mine := ib != nil && asStr(ib.Get("port")) == strconv.Itoa(p)
+		// a grace inbound (old port of a moved method) is ours too
+		mine := (ib != nil && asStr(ib.Get("port")) == strconv.Itoa(p)) || graceHas(root, p)
 		if !mine && (usedPorts(root)[strconv.Itoa(p)] || !portFree(p)) {
 			return 0, fmt.Errorf("%s tunnel port %d is busy: choose another port in the Tunnels tab", name, p)
 		}
@@ -460,6 +463,10 @@ func (a *App) applyTunnelConfig(root *OMap) error {
 		"realitySettings", om("show", false, "target", set.RTarget, "xver", 0, "serverNames", []any{host},
 			"privateKey", set.RKey, "shortIds", []any{set.RSID})))
 
+	// old ports of moved methods keep listening for a while
+	_, now, _ := a.store.TunnelsCopy()
+	graceTags := applyGrace(root, now)
+
 	// allowed destinations
 	ips := map[string]bool{"127.0.0.1": true}
 	ports := map[int]bool{}
@@ -479,7 +486,7 @@ func (a *App) applyTunnelConfig(root *OMap) error {
 	tr := &tunnelRule{ips: keys(ips), ports: intKeys(ports)}
 	ensureTaggedOutbounds(root, tr)
 	// after ensureTaggedOutbounds, so a bridge is never the default outbound
-	tr.extra = a.addBridges(root, servers)
+	tr.extra = append(a.addBridges(root, servers), graceTags...)
 	// dedicated tunnels: their own inbound, outbounds and rules
 	if tr.dt, tr.dtTags, err = a.applyDedicated(root, servers, tmap); err != nil {
 		return err
@@ -762,7 +769,7 @@ func (a *App) handleTunnels(w http.ResponseWriter, r *http.Request) {
 	for _, s := range servers {
 		v := tunnelView{TunnelServer: s, Online: s.LastSeen > 0 && now.Sub(time.Unix(s.LastSeen, 0)) < onlineWindow, Inbound: []string{}, Ports: map[string]int{}, Vias: map[string]string{}, DedView: []dedView{}}
 		if s.Join != "" && s.JoinExp > now.Unix() {
-			v.Command = "bash <(curl -fsSL " + tunnelInstall + ") " + encodeJoin(a.joinFor(s))
+			v.Command = a.installCmd(s)
 		}
 		for ibid, us := range tmap {
 			for _, u := range us {
@@ -1328,7 +1335,7 @@ func (a *App) handleDeployTunnel(w http.ResponseWriter, r *http.Request) {
 		fail(w, 400, err)
 		return
 	}
-	cmd := "curl -fsSL " + tunnelInstall + " -o /tmp/xo-tunnel.sh && bash /tmp/xo-tunnel.sh " + encodeJoin(a.joinFor(s))
+	cmd := a.installCmd(s)
 	out, hostKey, keyOK, err := sshDeploy(a.store.dir, s, b.Password, cmd)
 	_ = a.store.EditTunnels(func() error {
 		if x := a.store.tunnelByID(id); x != nil {
@@ -1544,7 +1551,12 @@ func (a *App) handleTunnelSettings(w http.ResponseWriter, r *http.Request) {
 			others[asStr(x.Get("port"))] = true
 		}
 	}
-	ours := map[int]bool{cur.Port: true, cur.XPort: true, cur.RPort: true}
+	grace := map[int]bool{}
+	for _, g := range cur.Grace {
+		if g.Until > time.Now().Unix() {
+			grace[g.Port] = true
+		}
+	}
 	pick := func(p, old int) int {
 		if p == 0 {
 			return old
@@ -1559,13 +1571,22 @@ func (a *App) handleTunnelSettings(w http.ResponseWriter, r *http.Request) {
 		if p < 1 || p > 65535 {
 			return fmt.Errorf("%s port %d is not valid", name, p)
 		}
+		if p == dedReserved {
+			return fmt.Errorf("%s port %d is reserved for another service", name, p)
+		}
 		if p == panel {
 			return fmt.Errorf("%s port %d is the panel's port", name, p)
 		}
 		if others[strconv.Itoa(p)] {
 			return fmt.Errorf("%s port %d is used by another inbound", name, p)
 		}
-		if !ours[p] && !portFree(p) {
+		if cur.WGPort != 0 && p == cur.WGPort {
+			return fmt.Errorf("%s port %d is used by the dedicated WireGuard tunnel", name, p)
+		}
+		if p == cur.Port || p == cur.XPort || p == cur.RPort {
+			return fmt.Errorf("%s port %d is used by another tunnel method", name, p)
+		}
+		if !grace[p] && !portFree(p) {
 			return fmt.Errorf("%s port %d is busy on this server (another program uses it)", name, p)
 		}
 		return nil
@@ -1602,12 +1623,33 @@ func (a *App) handleTunnelSettings(w http.ResponseWriter, r *http.Request) {
 	set := func(c TunnelSettings) {
 		_ = a.store.EditTunnels(func() error {
 			t := &a.store.TunnelCfg
-			t.Port, t.XPort, t.RPort, t.RTarget = c.Port, c.XPort, c.RPort, c.RTarget
+			t.Port, t.XPort, t.RPort, t.RTarget, t.Grace = c.Port, c.XPort, c.RPort, c.RTarget, c.Grace
 			return nil
 		})
 	}
-	set(TunnelSettings{Port: np, XPort: nx, RPort: nr, RTarget: nt})
 	servers, _, _ := a.store.TunnelsCopy()
+	// a moved port keeps listening for a while so connected middle servers
+	// can fetch their new config over it (no drop)
+	ng := []tunnelGrace{}
+	nowU := time.Now().Unix()
+	moved := []string{}
+	for _, c := range []struct {
+		tag, m   string
+		old, new int
+	}{{tunnelTag, tunnelMethodWS, cur.Port, np}, {tunnelTagXH, tunnelMethodXHTTP, cur.XPort, nx}, {tunnelTagRT, tunnelMethodRT, cur.RPort, nr}} {
+		if c.old != 0 && c.old != c.new && len(servers) > 0 {
+			ng = append(ng, tunnelGrace{Tag: c.tag, Port: c.old, Until: time.Now().Add(graceFor).Unix()})
+			if usesMethod(servers, c.m) {
+				moved = append(moved, c.m)
+			}
+		}
+	}
+	for _, g := range cur.Grace {
+		if g.Until > nowU && g.Port != np && g.Port != nx && g.Port != nr {
+			ng = append(ng, g)
+		}
+	}
+	set(TunnelSettings{Port: np, XPort: nx, RPort: nr, RTarget: nt, Grace: ng})
 	if len(servers) > 0 {
 		if err := a.cfg.Mutate(func(root *OMap) error {
 			if err := a.ensureTunnelSettings(root); err != nil {
@@ -1624,8 +1666,11 @@ func (a *App) handleTunnelSettings(w http.ResponseWriter, r *http.Request) {
 			ids = append(ids, s.ID)
 		}
 		hub.PokeAll(ids)
+		if len(ng) > 0 {
+			a.graceLater()
+		}
 	}
-	writeJSONResp(w, 200, map[string]bool{"ok": true})
+	writeJSONResp(w, 200, map[string]any{"ok": true, "moved": moved})
 }
 
 // holdFor: how long a quiet heartbeat is held open. Agents from 0.6.3 wait up
