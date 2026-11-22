@@ -96,6 +96,22 @@ type TunnelServer struct {
 	LastFail   string            `json:"lastFail,omitempty"`
 	FailAt     int64             `json:"failAt,omitempty"`
 	PortState  map[string]string `json:"portState,omitempty"`
+	// two-way reconnect (agent 0.6.4+)
+	RevPort   int    `json:"revPort,omitempty"` // REALITY listener on the middle server
+	RevUUID   string `json:"revUUID,omitempty"`
+	RevKey    string `json:"revKey,omitempty"`
+	RevPub    string `json:"revPub,omitempty"`
+	RevSID    string `json:"revSID,omitempty"`
+	Mode      string `json:"mode,omitempty"`   // path the agent uses: "" forward, "rev" reverse
+	Bridge    bool   `json:"bridge,omitempty"` // this server is dialing the middle server
+	BridgeAt  int64  `json:"bridgeAt,omitempty"`
+	BridgeErr string `json:"bridgeErr,omitempty"`
+	// domain + Let's Encrypt certificate on the middle server
+	Domain   string `json:"domain,omitempty"`
+	CertOK   bool   `json:"certOk,omitempty"`
+	CertExp  int64  `json:"certExp,omitempty"`
+	CertErr  string `json:"certErr,omitempty"`
+	CertBusy bool   `json:"certBusy,omitempty"`
 }
 
 // agentHub wakes held heartbeats (long-poll) and lets a manual test wait for
@@ -364,6 +380,7 @@ func (a *App) applyTunnelConfig(root *OMap) error {
 		}
 		root.Set("inbounds", keep)
 		setTunnelRules(root, nil)
+		dropBridges(root)
 		return nil
 	}
 	cf, kf := a.store.Cfg.CertFile, a.store.Cfg.KeyFile
@@ -439,14 +456,17 @@ func (a *App) applyTunnelConfig(root *OMap) error {
 		}
 	}
 	tr := &tunnelRule{ips: keys(ips), ports: intKeys(ports)}
-	setTunnelRules(root, tr)
 	ensureTaggedOutbounds(root, tr)
+	// after ensureTaggedOutbounds, so a bridge is never the default outbound
+	tr.extra = a.addBridges(root, servers)
+	setTunnelRules(root, tr)
 	return nil
 }
 
 type tunnelRule struct {
 	ips   []string
 	ports []string
+	extra []any // more inbound tags (reverse traffic)
 }
 
 func keys(m map[string]bool) []string {
@@ -486,10 +506,11 @@ func setTunnelRules(root *OMap, r *tunnelRule) {
 		for _, ip := range r.ips {
 			ips = append(ips, ip)
 		}
+		in := append([]any{tunnelTag, tunnelTagXH, tunnelTagRT}, r.extra...)
 		rules = append(rules,
-			om("type", "field", "ruleTag", "xo-tunnel-allow", "inboundTag", []any{tunnelTag, tunnelTagXH, tunnelTagRT}, "ip", ips,
+			om("type", "field", "ruleTag", "xo-tunnel-allow", "inboundTag", in, "ip", ips,
 				"port", strings.Join(r.ports, ","), "outboundTag", tunnelDirect),
-			om("type", "field", "ruleTag", "xo-tunnel-block", "inboundTag", []any{tunnelTag, tunnelTagXH, tunnelTagRT}, "outboundTag", tunnelBlock))
+			om("type", "field", "ruleTag", "xo-tunnel-block", "inboundTag", in, "outboundTag", tunnelBlock))
 	}
 	for _, v := range asArr(rt.Get("rules")) {
 		if m := asMap(v); m != nil && strings.HasPrefix(asStr(m.Get("ruleTag")), "xo-tunnel") {
@@ -563,7 +584,7 @@ func (a *App) panelLocalURL() string {
 	return scheme + "://127.0.0.1" + portOf(c.Listen) + c.BasePath
 }
 
-func relayXrayConfig(j joinInfo, fwd []fwdPort, ctl int) []byte {
+func relayXrayConfig(j joinInfo, fwd []fwdPort, ctl int, rev *revInfo) []byte {
 	if ctl == 0 {
 		ctl = agentCtlPort
 	}
@@ -596,6 +617,7 @@ func relayXrayConfig(j joinInfo, fwd []fwdPort, ctl int) []byte {
 			"settings", om("vnext", []any{om("address", j.Domain, "port", port,
 				"users", []any{user})}),
 			"streamSettings", stream)})
+	addRelayReverse(root, rev)
 	return EncodeIndent(root)
 }
 
@@ -696,11 +718,11 @@ func (a *App) handleTunnels(w http.ResponseWriter, r *http.Request) {
 		}
 		v.Remove = "xray-one agent remove"
 		sort.Strings(v.Inbound)
-		v.Token, v.Join, v.UUID = "", "", ""
+		v.Token, v.Join, v.UUID, v.RevKey, v.RevUUID = "", "", "", "", ""
 		out = append(out, v)
 	}
 	writeJSONResp(w, 200, map[string]any{"servers": out, "port": set.Port, "domain": a.store.Cfg.Domain,
-		"ready": a.store.Cfg.Domain != "" && a.store.Cfg.CertFile != "", "methods": tunnelMethods, "xport": set.XPort, "rport": set.RPort, "rtarget": set.RTarget, "methodVer": agentMethodVer})
+		"ready": a.store.Cfg.Domain != "" && a.store.Cfg.CertFile != "", "methods": tunnelMethods, "xport": set.XPort, "rport": set.RPort, "rtarget": set.RTarget, "methodVer": agentMethodVer, "revVer": agentRevVer})
 }
 
 func (a *App) handleAddTunnel(w http.ResponseWriter, r *http.Request) {
@@ -1040,6 +1062,11 @@ type beatReq struct {
 	PortState map[string]string `json:"portState,omitempty"` // forwarded port -> ok / busy / down (0.5.1+)
 	Rejected  string            `json:"rejected,omitempty"`  // config hash the agent tried and went back from (0.6.1+)
 	Pending   bool              `json:"pending,omitempty"`   // still trying the newest config
+	Mode      string            `json:"mode,omitempty"`      // "rev" when it reached us over the reverse path (0.6.4+)
+	CertDom   string            `json:"certDomain,omitempty"`
+	CertExp   int64             `json:"certExp,omitempty"`
+	CertErr   string            `json:"certErr,omitempty"`
+	CertBusy  bool              `json:"certBusy,omitempty"`
 }
 
 type beatResp struct {
@@ -1047,8 +1074,9 @@ type beatResp struct {
 	Hash   string          `json:"hash"`
 	Config json.RawMessage `json:"config,omitempty"`
 	Every  int             `json:"every"`
-	Held   bool            `json:"held,omitempty"`  // reply was held; beat again at once
-	Probe  bool            `json:"probe,omitempty"` // beat again at once (test or new config)
+	Held   bool            `json:"held,omitempty"`   // reply was held; beat again at once
+	Probe  bool            `json:"probe,omitempty"`  // beat again at once (test or new config)
+	Domain string          `json:"domain,omitempty"` // get a certificate for this domain (0.6.4+)
 }
 
 func (a *App) handleBeat(w http.ResponseWriter, r *http.Request) {
@@ -1091,6 +1119,14 @@ func (a *App) handleBeat(w http.ResponseWriter, r *http.Request) {
 		if req.Fails > 0 {
 			s.Fails, s.LastFail, s.FailAt = req.Fails, trimTo(req.LastFail, 300), time.Now().Unix()
 		}
+		s.Mode = req.Mode
+		if revCapable(*s) && s.Domain != "" {
+			s.CertBusy, s.CertErr = req.CertBusy, trimTo(req.CertErr, 300)
+			s.CertOK = req.CertDom == s.Domain && req.CertExp > time.Now().Unix()
+			if s.CertOK {
+				s.CertExp, s.CertErr = req.CertExp, ""
+			}
+		}
 		srv = *s
 		return nil
 	})
@@ -1103,6 +1139,24 @@ func (a *App) handleBeat(w http.ResponseWriter, r *http.Request) {
 	var fwd []fwdPort
 	if lerr == nil {
 		fwd = a.fwdFor(root, srv.ID)
+	}
+	if revCapable(srv) {
+		_ = a.store.EditTunnels(func() error {
+			if s := a.store.tunnelByID(srv.ID); s != nil {
+				if ensureRevLocked(s, fwd) && s.Bridge {
+					defer a.reapplyTunnels(s.ID)
+				}
+				srv = *s
+			}
+			return nil
+		})
+	}
+	// reverse path: keep dialing while the agent uses it, stop once it is
+	// back on the forward path
+	if srv.Bridge && (req.Mode != "rev" || a.revFor(srv) == nil) {
+		a.setBridge(srv.ID, false)
+	} else if !srv.Bridge && req.Mode == "rev" && a.revFor(srv) != nil {
+		a.setBridge(srv.ID, true)
 	}
 	// the agent tried our newest config and could not reach us with it: go
 	// back to the method it had
@@ -1117,7 +1171,10 @@ func (a *App) handleBeat(w http.ResponseWriter, r *http.Request) {
 		})
 		go a.refreshTunnelInbounds()
 	}
-	cfg := relayXrayConfig(a.joinFor(srv), fwd, srv.CtlPort)
+	cfg := relayXrayConfig(a.joinFor(srv), fwd, srv.CtlPort, a.revFor(srv))
+	if revCapable(srv) {
+		resp.Domain = srv.Domain
+	}
 	sum := sha256.Sum256(cfg)
 	resp.Hash = fmt.Sprintf("%x", sum[:8])
 	if req.Applied != resp.Hash {
@@ -1338,6 +1395,9 @@ func (a *App) handleTunnelMethod(w http.ResponseWriter, r *http.Request) {
 		}
 		if s.Method == b.Method {
 			return nil
+		}
+		if s.Mode == "rev" {
+			return errors.New("this middle server is connected over the reverse path right now; switch the method when it is back on the direct path")
 		}
 		if s.LastSeen == 0 || versionLess(s.AgentVer, agentMethodVer) {
 			return fmt.Errorf("update the middle server first (agent %s or newer): run the install command again there", agentMethodVer)

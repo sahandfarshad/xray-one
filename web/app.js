@@ -51,7 +51,7 @@ const T = {
     tnNewCmd: "دستور نصب جدید", tnNoSrv: "هنوز سرور میانی اضافه نشده.", tnInfo: "سرور میانی به {domain} وصل می‌شود؛ روش هر سرور را از کارت‌هایش انتخاب کنید (WS روی پورت {port}{x}). کاربر ← سرور میانی ← این سرور ← اینترنت.",
     tnNeedSSL: "برای تانل WSS اول باید دامنه و SSL را از منوی SSH تنظیم کنید.", tnUse: "تانل", tnPick: "این اینباند از کدام سرورهای میانی استفاده کند؟ برای هر کدام یک لینک جدا ساخته می‌شود.",
     tnTest: "تست اتصال", tnTesting: "در حال تست…", tnTestOk: "وصل است · {ms} میلی‌ثانیه", tnTestBad: "پاسخی از سرور میانی نیامد",
-    tnLastFail: "آخرین قطعی", tnFails: "{n} تلاش ناموفق",
+    tnLastFail: "آخرین قطعی", tnFails: "{n} تلاش ناموفق", rvFwd: "مسیر مستقیم: وسط ← اصلی", rvRev: "مسیر برگشتی: اصلی ← وسط", rvDial: "اصلی دارد به وسط زنگ می‌زند (پورت {p})", rvReady: "اتصال دوطرفه آماده است (پورت REALITY روی وسط: {p})", rvOld: "برای اتصال دوطرفه و دامنه، دستور نصب را یک بار دیگر روی سرور وسط بزنید (نسخه‌ی {v} به بالا).", dmLabel: "دامنه‌ی سرور وسط", dmSave: "ذخیره", dmHint: "یک رکورد A به {ip} بسازید (در کلادفلر ابر خاکستری)، بعد ذخیره کنید. سرور وسط خودش SSL می‌گیرد؛ پورت ۸۰ آن باید آزاد باشد.", dmOk: "✓ SSL تأیید شد، معتبر تا {d}", dmBusy: "در حال گرفتن SSL…", dmWait: "منتظر سرور وسط…", dmErr: "SSL گرفته نشد",
     tnInbounds: "اینباندها", tnSshOpt: "Deploy با SSH (اختیاری)", tnPortHere: "پورت روی سرور میانی", tnBusy: "اشغال روی سرور میانی",
     tnRemove: "حذف relay از سرور میانی (روی همان سرور بزنید):", tnCmdTitle: "دستور نصب سرور میانی",
     tnInbounds: "اینباندها", tnDeploying: "در حال نصب روی سرور میانی… (تا چند دقیقه)", tnConfirmDel: "این سرور میانی حذف شود؟ اینباندها دیگر از آن استفاده نمی‌کنند.", tnXrayErr: "خطای relay",
@@ -108,7 +108,7 @@ const T = {
     tnNewCmd: "New install command", tnNoSrv: "No middle server yet.", tnInfo: "The middle server connects to {domain}; pick each server's method on its cards (WS on port {port}{x}). User → middle server → this server → internet.",
     tnNeedSSL: "The WSS tunnel needs this server's domain and SSL: set them in the SSH menu first.", tnUse: "Tunnel", tnPick: "Which middle servers should this inbound use? Each one gets its own link.",
     tnTest: "Test connection", tnTesting: "Testing…", tnTestOk: "Connected · {ms} ms", tnTestBad: "No answer from the middle server",
-    tnLastFail: "Last drop", tnFails: "{n} failed attempts",
+    tnLastFail: "Last drop", tnFails: "{n} failed attempts", rvFwd: "Direct path: middle → main", rvRev: "Reverse path: main → middle", rvDial: "Main is dialing the middle server (port {p})", rvReady: "Two-way reconnect ready (REALITY port on middle: {p})", rvOld: "For two-way reconnect and a domain, run the install command on the middle server once more (version {v} or newer).", dmLabel: "Middle server domain", dmSave: "Save", dmHint: "Add an A record to {ip} (gray cloud in Cloudflare), then save. The middle server gets SSL itself; its port 80 must be free.", dmOk: "✓ SSL confirmed, valid until {d}", dmBusy: "Getting SSL…", dmWait: "Waiting for the middle server…", dmErr: "SSL failed",
     tnSshOpt: "Deploy over SSH (optional)", tnPortHere: "Port on middle server", tnBusy: "busy on middle server",
     tnRemove: "Remove the relay from the middle server (run there):", tnCmdTitle: "Middle server install command",
     tnInbounds: "Inbounds", tnDeploying: "Installing on the middle server… (a few minutes)", tnConfirmDel: "Remove this middle server? Inbounds stop using it.", tnXrayErr: "Relay error",
@@ -929,7 +929,7 @@ function renderTunnels() {
   else if (!d.ready) tp.innerHTML = "";
   if (!d.servers.length) { $("#tunnelList").innerHTML = `<div class="card empty">${t("tnNoSrv")}</div>`; return; }
   const now = Date.now() / 1000;
-  clearTimeout(tnPoll); if (d.servers.some((s) => s.prevMethod)) tnPoll = setTimeout(() => { if (state.view === "tunnels") loadTunnels(); }, 3000);
+  clearTimeout(tnPoll); if (d.servers.some((s) => s.prevMethod || (s.domain && !s.certOk && !s.certErr))) tnPoll = setTimeout(() => { if (state.view === "tunnels" && !tnTyping()) loadTunnels(); }, 3000);
   $("#tunnelList").innerHTML = d.servers.map((s, i) => {
     const seen = s.lastSeen ? ago(Math.max(0, Math.round(now - s.lastSeen))) + " " + t("tnAgo") : t("tnNever");
     return `<div class="card">
@@ -948,6 +948,7 @@ function renderTunnels() {
         </div>
       </div>
       ${methodCards(s, i)}
+      ${revBlock(s, i)}
       ${s.methodErr ? `<p class="err">${esc(t("mBack").replace("{x}", s.methodErr))}</p>` : ""}
       ${tnTestRes[s.id] ? `<p class="${tnTestRes[s.id].ok ? "okmsg" : "err"}">${esc(tnTestRes[s.id].text)}</p>` : ""}
       ${s.lastFail ? `<p class="muted small">${t("tnLastFail")}: ${esc(s.failAt ? ago(Math.max(0, Math.round(now - s.failAt))) + " " + t("tnAgo") : "")} · ${t("tnFails").replace("{n}", s.fails || 0)} · <span class="mono">${esc(s.lastFail)}</span></p>` : ""}
@@ -957,6 +958,28 @@ function renderTunnels() {
     </div>`;
   }).join("");
 }
+function revBlock(s, i) {
+  const d = tunnelData;
+  if (!s.agentVer || versionLess(s.agentVer, d.revVer)) return s.lastSeen ? `<p class="muted small">${esc(t("rvOld").replace("{v}", d.revVer))}</p>` : "";
+  let rv = "";
+  if (s.revPort) {
+    rv = s.mode === "rev" ? t("rvRev") : t("rvFwd");
+    if (s.bridge && s.mode !== "rev") rv += " · " + t("rvDial").replace("{p}", s.revPort);
+    else if (!s.bridge) rv += " · " + t("rvReady").replace("{p}", s.revPort);
+  }
+  const labels = (d.domain || "").split("."), base = labels.length > 2 ? labels.slice(1).join(".") : d.domain || "example.com";
+  let st = "";
+  if (s.domain) {
+    if (s.certOk) st = `<span class="okmsg">${esc(t("dmOk").replace("{d}", new Date(s.certExp * 1000).toLocaleDateString()))}</span>`;
+    else if (s.certErr) st = `<span class="err">${esc(t("dmErr"))}: ${esc(s.certErr)}</span>`;
+    else st = `<span class="muted">${s.certBusy ? t("dmBusy") : t("dmWait")}</span>`;
+  }
+  return `${rv ? `<p class="muted small">↔ ${esc(rv)}</p>` : ""}${s.bridgeErr ? `<p class="err">${esc(s.bridgeErr)}</p>` : ""}
+    <div class="dmrow"><label>${t("dmLabel")} <input id="tnDom-${i}" dir="ltr" value="${esc(s.domain || "")}" placeholder="mid.${esc(base)}"></label>
+      <button class="btn small" data-tn="domain" data-i="${i}">${t("dmSave")}</button> ${st}</div>
+    ${s.domain && s.certOk ? "" : `<p class="muted small">${esc(t("dmHint").replace("{ip}", s.publicIP || s.host || "IP"))}</p>`}`;
+}
+const tnTyping = () => !!document.activeElement?.closest?.("#tunnelList input");
 function versionLess(a, b) {
   const pa = String(a).split(".").map(Number), pb = String(b).split(".").map(Number);
   for (let i = 0; i < 3; i++) { const x = pa[i] || 0, y = pb[i] || 0; if (x !== y) return x < y; }
@@ -989,6 +1012,9 @@ $("#tunnelList").addEventListener("click", guard(async (e) => {
     await api("DELETE", "api/tunnels/" + s.id); toast(t("done")); loadTunnels(); refreshInbounds();
   } else if (b.dataset.tn === "join") {
     await api("POST", "api/tunnels/" + s.id + "/join"); loadTunnels();
+  } else if (b.dataset.tn === "domain") {
+    await api("POST", "api/tunnels/" + s.id + "/domain", { domain: $("#tnDom-" + b.dataset.i).value.trim() });
+    document.activeElement?.blur(); toast(t("done")); loadTunnels();
   } else if (b.dataset.tn === "deploy") openDeploy(s);
   else if (b.dataset.tn === "test") {
     tnTestRes[s.id] = { ok: true, text: t("tnTesting") }; renderTunnels();
@@ -1076,7 +1102,7 @@ async function openTunnelPick(ib) {
     catch (e) { $("#tpErr").textContent = e.message; }
   };
 }
-setInterval(() => { if (state.view === "tunnels" && !$("#app").classList.contains("hidden")) loadTunnels(); }, 15000);
+setInterval(() => { if (state.view === "tunnels" && !tnTyping() && !$("#app").classList.contains("hidden")) loadTunnels(); }, 15000);
 
 // ---------- REALITY target scanner ----------
 function openRealityScan(use) {

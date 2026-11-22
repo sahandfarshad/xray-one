@@ -43,6 +43,15 @@ type agentState struct {
 	PrevHash   string `json:"prevHash,omitempty"`
 	Rejected   string `json:"rejected,omitempty"`
 	RejectedAt int64  `json:"rejectedAt,omitempty"`
+	// path to the main server: "" forward (we dial it), "rev" reverse (it dials us)
+	Mode   string `json:"mode,omitempty"`
+	ModeAt int64  `json:"modeAt,omitempty"`
+	// Let's Encrypt certificate for this server's own domain
+	CertDomain string `json:"certDomain,omitempty"`
+	CertExp    int64  `json:"certExp,omitempty"`
+	CertErr    string `json:"certErr,omitempty"`
+	CertTried  string `json:"certTried,omitempty"`
+	CertTryAt  int64  `json:"certTryAt,omitempty"`
 }
 
 // revertPending puts the previous wanted config back.
@@ -139,7 +148,7 @@ func agentInstall(code string) error {
 			st.Ctl = suggestPort()
 		}
 	}
-	cfg := relayXrayConfig(j, nil, st.Ctl)
+	cfg := relayXrayConfig(j, nil, st.Ctl, nil)
 	if err := os.WriteFile(filepath.Join(agentDir, "xray.json"), cfg, 0o600); err != nil {
 		return err
 	}
@@ -230,8 +239,26 @@ func agentRun() {
 	var ipAt time.Time
 	lastErr := ""
 	fails, lastFail := 0, ""
-	var rc reconciler
+	rc := reconciler{mode: st.Mode}
+	lastOK := time.Now()
+	certCh := make(chan certResult, 1)
+	certBusy := false
 	for {
+		select {
+		case c := <-certCh:
+			certBusy = false
+			st.CertTried, st.CertTryAt, st.CertErr = c.domain, time.Now().Unix(), c.err
+			if c.err == "" {
+				st.CertDomain, st.CertExp = c.domain, c.exp
+				fmt.Println("certificate ready for", c.domain)
+			}
+			_ = saveAgent(st)
+		default:
+		}
+		if st.Mode == "rev" && !wantHasRev() { // the panel no longer offers the reverse path
+			st.Mode, st.ModeAt, rc.mode = "", time.Now().Unix(), ""
+			_ = saveAgent(st)
+		}
 		if time.Since(ipAt) > time.Hour || ip == "" {
 			if v := publicIP(); v != "" {
 				ip = v
@@ -250,7 +277,8 @@ func agentRun() {
 		}
 		active, _ := run(5*time.Second, "systemctl", "is-active", agentRelay)
 		req := beatReq{Version: version, PublicIP: ip, XrayOK: active == "active", XrayErr: lastErr, Applied: st.Hash, CtlPort: st.Ctl, Busy: busy,
-			Wait: true, Fails: fails, LastFail: lastFail, PortState: pstate, Rejected: st.Rejected, Pending: st.PendingAt > 0}
+			Wait: true, Fails: fails, LastFail: lastFail, PortState: pstate, Rejected: st.Rejected, Pending: st.PendingAt > 0,
+			Mode: st.Mode, CertDom: st.CertDomain, CertExp: st.CertExp, CertErr: st.CertErr, CertBusy: certBusy}
 		wasPending := st.PendingAt > 0
 		body, _ := json.Marshal(req)
 		hr, _ := http.NewRequest("POST", strings.TrimSuffix(st.Join.Panel, "/")+"/api/agent/beat", bytes.NewReader(body))
@@ -283,6 +311,31 @@ func agentRun() {
 				revertPending(&st, &rc)
 				next = 200 * time.Millisecond
 			}
+			// two-way reconnect: after a while without reaching the main
+			// server, take the other path (the main server dials us on the
+			// reverse one), and keep alternating until one gets through
+			if st.PendingAt == 0 && wantHasRev() {
+				dwell := revAfter
+				if st.Mode == "rev" {
+					dwell = revDwell
+				}
+				since := lastOK
+				if m := time.Unix(st.ModeAt, 0); m.After(since) {
+					since = m
+				}
+				if time.Since(since) > dwell {
+					if st.Mode == "rev" {
+						st.Mode = ""
+						fmt.Println("reverse path did not connect; trying the direct path again")
+					} else {
+						st.Mode = "rev"
+						fmt.Println("main server unreachable; switching to the reverse path (main server dials us)")
+					}
+					st.ModeAt, rc.mode = time.Now().Unix(), st.Mode
+					_ = saveAgent(st)
+					next = 200 * time.Millisecond
+				}
+			}
 		} else {
 			var br beatResp
 			b, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
@@ -294,6 +347,20 @@ func agentRun() {
 				next = 10 * time.Second
 			} else {
 				fails = 0
+				lastOK = time.Now()
+				if br.Domain != "" && !certBusy && needCert(st, br.Domain) {
+					certBusy = true
+					go func(d string) {
+						r := certResult{domain: d}
+						cf, _, err := ObtainCert(agentDir, d, "", func(string, ...any) {})
+						if err != nil {
+							r.err = trimTo(err.Error(), 300)
+						} else if exp, _, e := certExpiry(cf); e == nil {
+							r.exp = exp.Unix()
+						}
+						certCh <- r
+					}(br.Domain)
+				}
 				if br.Token != "" {
 					st.Token = br.Token
 					_ = saveAgent(st)
@@ -557,6 +624,7 @@ func dropPorts(cfg []byte, drop map[int]bool) []byte {
 type reconciler struct {
 	failed   string // config that failed to start
 	failedAt time.Time
+	mode     string // "rev": keep the rule that sends traffic over the reverse path
 }
 
 func (r *reconciler) run() (state map[string]string, busy []int, errMsg string) {
@@ -573,6 +641,9 @@ func (r *reconciler) run() (state map[string]string, busy []int, errMsg string) 
 	}
 	if len(want) > 0 {
 		next := dropPorts(want, drop)
+		if r.mode != "rev" {
+			next = stripRule(next, relayRevRule)
+		}
 		cur, _ := os.ReadFile(filepath.Join(agentDir, "xray.json"))
 		if !bytes.Equal(next, cur) && !(string(next) == r.failed && time.Since(r.failedAt) < 10*time.Minute) {
 			if e := applyRelayConfig(next); e != nil {
@@ -598,4 +669,30 @@ func (r *reconciler) run() (state map[string]string, busy []int, errMsg string) 
 		}
 	}
 	return state, pv.busy(), errMsg
+}
+
+type certResult struct {
+	domain, err string
+	exp         int64
+}
+
+// needCert: no valid certificate for the domain yet (or under 30 days left),
+// retrying a failed attempt every 30 minutes.
+func needCert(st agentState, d string) bool {
+	if st.CertDomain == d && time.Until(time.Unix(st.CertExp, 0)) > 30*24*time.Hour {
+		return false
+	}
+	if st.CertTried == d && st.CertErr != "" && time.Since(time.Unix(st.CertTryAt, 0)) < 30*time.Minute {
+		return false
+	}
+	if st.CertTried == d && st.CertErr == "" && st.CertDomain == d && time.Since(time.Unix(st.CertTryAt, 0)) < 12*time.Hour {
+		return false
+	}
+	return true
+}
+
+// wantHasRev: the wanted relay config offers the reverse path.
+func wantHasRev() bool {
+	b, err := os.ReadFile(filepath.Join(agentDir, "xray.want.json"))
+	return err == nil && relayHasRule(b, relayRevRule)
 }
