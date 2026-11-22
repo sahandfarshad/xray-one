@@ -209,6 +209,11 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("GET /api/live", a.api(a.handleLive))
 	mux.HandleFunc("GET /api/traffic/daily", a.api(a.handleTrafficDaily))
 	mux.HandleFunc("POST /api/agent/beat", a.handleBeat)
+	mux.HandleFunc("POST /api/tunnels/{id}/speed", a.api(a.handleSpeedTest))
+	mux.HandleFunc("GET /api/agent/t/ping", a.handleTestPing)
+	mux.HandleFunc("GET /api/agent/t/dl", a.handleTestDown)
+	mux.HandleFunc("POST /api/agent/t/ul", a.handleTestUp)
+	mux.HandleFunc("POST /api/agent/t/res", a.handleTestResult)
 	mux.HandleFunc("GET /sub/{token}", a.handleSub)
 	mux.HandleFunc("GET /dl/{token}/{file}", a.handleMirror)
 

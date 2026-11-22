@@ -49,7 +49,7 @@ const (
 )
 
 func isTunnelTag(t string) bool {
-	return t == tunnelTag || t == tunnelTagXH || t == tunnelTagRT || t == dedTagWG || isGraceTag(t)
+	return t == tunnelTag || t == tunnelTagXH || t == tunnelTagRT || t == dedTagWG || t == dedTagKCP || isGraceTag(t)
 }
 
 func validMethod(m string) bool {
@@ -85,6 +85,7 @@ type TunnelServer struct {
 	LastSeen   int64             `json:"lastSeen,omitempty"`
 	PublicIP   string            `json:"publicIP,omitempty"`
 	AgentVer   string            `json:"agentVer,omitempty"`
+	XrayVer    string            `json:"xrayVer,omitempty"` // Xray on the middle server (agent 0.7.0+)
 	XrayOK     bool              `json:"xrayOk,omitempty"`
 	XrayErr    string            `json:"xrayErr,omitempty"`
 	PrevMethod string            `json:"prevMethod,omitempty"` // set while a switch is being tried
@@ -209,7 +210,10 @@ type TunnelSettings struct {
 	WGPort int    `json:"wgport,omitempty"`
 	WGKey  string `json:"wgkey,omitempty"`
 	WGPub  string `json:"wgpub,omitempty"`
-	WGHost string `json:"wghost,omitempty"` // address middle servers dial (public IP)
+	WGHost string `json:"wghost,omitempty"` // address middle servers dial (public IP), WireGuard and mKCP
+	// dedicated mKCP tunnel (dedicated.go)
+	KPort int    `json:"kport,omitempty"`
+	KSeed string `json:"kseed,omitempty"`
 	// old ports of moved methods, still listening until Until (tunnelgrace.go)
 	Grace []tunnelGrace `json:"grace,omitempty"`
 }
@@ -742,13 +746,14 @@ func (a *App) relaysFor(id string) []Relay {
 
 type tunnelView struct {
 	TunnelServer
-	Online  bool              `json:"online"`
-	Command string            `json:"command,omitempty"`
-	Inbound []string          `json:"inbounds"`
-	Remove  string            `json:"remove"`
-	Ports   map[string]int    `json:"ports"` // inbound id -> chosen port on the middle server (0 = same)
-	Vias    map[string]string `json:"vias"`  // inbound id -> dedicated tunnel it is pinned to ("" rotating)
-	DedView []dedView         `json:"dedView"`
+	Online  bool                 `json:"online"`
+	Command string               `json:"command,omitempty"`
+	Inbound []string             `json:"inbounds"`
+	Remove  string               `json:"remove"`
+	Ports   map[string]int       `json:"ports"` // inbound id -> chosen port on the middle server (0 = same)
+	Vias    map[string]string    `json:"vias"`  // inbound id -> dedicated tunnel it is pinned to ("" rotating)
+	DedView []dedView            `json:"dedView"`
+	Speed   map[string]speedView `json:"speed"` // last speed test per card (wss, xhttp, reality, wg, kcp)
 }
 
 type dedView struct {
@@ -795,11 +800,13 @@ func (a *App) handleTunnels(w http.ResponseWriter, r *http.Request) {
 			v.DedView = append(v.DedView, dv)
 		}
 		v.Ded = nil
+		v.Speed = speeds.view(s.ID)
 		out = append(out, v)
 	}
 	writeJSONResp(w, 200, map[string]any{"servers": out, "port": set.Port, "domain": a.store.Cfg.Domain,
 		"ready": a.store.Cfg.Domain != "" && a.store.Cfg.CertFile != "", "methods": tunnelMethods, "xport": set.XPort, "rport": set.RPort, "rtarget": set.RTarget, "methodVer": agentMethodVer, "revVer": agentRevVer,
-		"dedTypes": dedTypes, "dedVer": agentDedVer, "wgport": set.WGPort, "wghost": set.WGHost})
+		"dedTypes": dedTypes, "dedVer": agentDedVer, "wgport": set.WGPort, "wghost": set.WGHost, "kport": set.KPort,
+		"testVer": agentTestVer, "kcpXray": minKCPXray})
 }
 
 func (a *App) handleAddTunnel(w http.ResponseWriter, r *http.Request) {
@@ -880,6 +887,7 @@ func (s *Store) removeTunnel(id string) {
 func (a *App) handleDelTunnel(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	_ = a.store.EditTunnels(func() error { a.store.removeTunnel(id); return nil })
+	speeds.forget(id)
 	if err := a.cfg.Mutate(a.applyTunnelConfig); err != nil {
 		fail(w, 400, err)
 		return
@@ -994,11 +1002,9 @@ func (s *Store) checkUsesLocked(id string, uses []TunnelUse, ibPort int, ibPorts
 		if u.Via != "" && !dedOn(*srv, u.Via) {
 			return nil, fmt.Errorf("the dedicated tunnel %q is not on for %s; turn it on in the Tunnels tab", u.Via, srv.Name)
 		}
-		if len(srv.Ded) > 0 && lp == probePort(*srv) {
-			for _, d := range srv.Ded {
-				if d.On {
-					return nil, fmt.Errorf("port %d on %s is used by the dedicated tunnel's status check", lp, srv.Name)
-				}
+		for _, d := range srv.Ded {
+			if d.On && lp == probePort(*srv, d.Type) {
+				return nil, fmt.Errorf("port %d on %s is used by the dedicated tunnel's status check", lp, srv.Name)
 			}
 		}
 		mine := false
@@ -1156,6 +1162,7 @@ type beatReq struct {
 	CertErr   string               `json:"certErr,omitempty"`
 	CertBusy  bool                 `json:"certBusy,omitempty"`
 	Ded       map[string]dedReport `json:"dedicated,omitempty"` // check through each dedicated tunnel (0.6.8+)
+	XrayVer   string               `json:"xrayVer,omitempty"`   // Xray core on the middle server (0.7.0+)
 }
 
 type beatResp struct {
@@ -1166,6 +1173,7 @@ type beatResp struct {
 	Held   bool            `json:"held,omitempty"`   // reply was held; beat again at once
 	Probe  bool            `json:"probe,omitempty"`  // beat again at once (test or new config)
 	Domain string          `json:"domain,omitempty"` // get a certificate for this domain (0.6.4+)
+	Test   *speedSpec      `json:"test,omitempty"`   // run this speed test (0.7.0+)
 }
 
 func (a *App) handleBeat(w http.ResponseWriter, r *http.Request) {
@@ -1197,6 +1205,9 @@ func (a *App) handleBeat(w http.ResponseWriter, r *http.Request) {
 			s.PublicIP = ip.String()
 		}
 		s.AgentVer, s.XrayOK, s.XrayErr, s.Applied = req.Version, req.XrayOK, trimTo(req.XrayErr, 400), req.Applied
+		if v := strings.TrimSpace(req.XrayVer); reClientVer.MatchString(v) {
+			s.XrayVer = v
+		}
 		if req.CtlPort > 0 {
 			s.CtlPort = req.CtlPort
 		}
@@ -1287,12 +1298,14 @@ func (a *App) handleBeat(w http.ResponseWriter, r *http.Request) {
 	}
 	resp.Every = int(beatEvery / time.Second)
 	hub.Beat(srv.ID)
-	if req.Wait && resp.Config == nil && resp.Token == "" {
+	resp.Test = speeds.take(srv)
+	if req.Wait && resp.Config == nil && resp.Token == "" && resp.Test == nil {
 		resp.Held = true
 		pc := hub.pokeChan(srv.ID)
 		select {
 		case <-pc:
 			resp.Probe = true
+			resp.Test = speeds.take(srv)
 		case <-time.After(holdFor(srv.AgentVer)):
 		case <-r.Context().Done():
 			return
@@ -1582,6 +1595,9 @@ func (a *App) handleTunnelSettings(w http.ResponseWriter, r *http.Request) {
 		}
 		if cur.WGPort != 0 && p == cur.WGPort {
 			return fmt.Errorf("%s port %d is used by the dedicated WireGuard tunnel", name, p)
+		}
+		if cur.KPort != 0 && p == cur.KPort {
+			return fmt.Errorf("%s port %d is used by the dedicated mKCP tunnel", name, p)
 		}
 		if p == cur.Port || p == cur.XPort || p == cur.RPort {
 			return fmt.Errorf("%s port %d is used by another tunnel method", name, p)

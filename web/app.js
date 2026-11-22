@@ -58,9 +58,13 @@ const T = {
     selectAll: "انتخاب همه", wgTitle: "فایل WireGuard", wgHint: "در اپ WireGuard دکمه‌ی + را بزنید، بعد فایل را وارد کنید یا QR را اسکن کنید.", wgFile: "دانلود فایل", ports: "پورت‌ها", portsTitle: "پورت‌های استفاده‌شده", portsHint: "همه‌ی پورت‌های این‌باندها، جدا با کاما؛ برای ساخت relay و تانل.", gSS: "Shadowsocks", gProxy: "پراکسی ساده (SOCKS / HTTP، با یوزر و پسورد جدا)", relayLinks: "لینک‌های relay", singleUser: "تک‌کاربره", confirmDelRelay: "این relay حذف شود؟",
     dtTitle: "تانل‌های اختصاصی", dtHint: "مسیر ثابت و جدا از تانل چرخشی: هرگز عوض نمی‌شود و جایگزین ندارد. اینباندهایی که به آن وصل شوند فقط از همین مسیر می‌روند و اگر قطع شود، قطع می‌مانند.",
     dtWg: "WireGuard اختصاصی", dtWgD: "Xray WireGuard روی UDP؛ سرور میانی مستقیم به IP این سرور وصل می‌شود. اگر UDP بین دو سرور بسته باشد کار نمی‌کند.", dtBackhaul: "Backhaul", dtBackhaulD: "تانل اختصاصی Backhaul.",
+    dtKcp: "mKCP اختصاصی", dtKcpD: "Xray VLESS روی mKCP (UDP)، تنظیم‌شده برای بازی و رمزشده با seed؛ سرور میانی مستقیم به IP این سرور وصل می‌شود. روی مسیر پراُفت پایدارتر است، ولی ترافیک بیشتری مصرف می‌کند.",
+    dtAskOnKcp: "mKCP اختصاصی برای این سرور میانی روشن شود؟ پورت UDP {p} این سرور باید از سرور میانی باز باشد (فایروال را باز کنید).", peAskKcp: "سرورهای میانیِ دارای تانل mKCP روی پورت جدید {p} دوباره وصل می‌شوند (چند ثانیه قطعی برای اینباندهای وصل‌شده به آن). ادامه؟", dtPortK: "پورت mKCP (UDP)",
+    spTest: "⏱ تست", spTitle: "پینگ و سرعت از همین مسیر بین این سرور و سرور میانی (حداکثر حدود ۴۸ مگابایت ترافیک)", spQueued: "در انتظار سرور میانی…", spRunning: "در حال تست… (حدود ۱۵ ثانیه)", spUpd: "برای تست، ایجنت سرور میانی را به‌روز کنید (نسخه‌ی {v})", spOff: "اول روشنش کنید", spBusy: "تست دیگری روی همین سرور در جریان است",
+    spPing: "پینگ {ms} میلی‌ثانیه (کمینه {min}، بیشینه {max}، نوسان ±{j})", spPingL: "پینگ", spFail: "تست ناموفق: {e}",
     dtOn: "روشن کن", dtOff: "خاموش کن", dtUp: "وصل", dtDown: "قطع", dtPending: "در حال بررسی…", dtOffline: "سرور میانی آفلاین", dtOffState: "خاموش", dtLastOk: "آخرین اتصال موفق {t}", dtPins: "{n} اینباند", dtNeedAgent: "تانل اختصاصی به ایجنت نسخه‌ی {v} یا جدیدتر نیاز دارد: دستور نصب را یک بار دیگر روی سرور میانی اجرا کنید.",
-    dtAskOn: "WireGuard اختصاصی برای این سرور میانی روشن شود؟ پورت UDP {p} این سرور باید از سرور میانی باز باشد.", dtAskOff: "WireGuard اختصاصی خاموش شود؟ {n} اینباند وصل به آن به تانل چرخشی برمی‌گردند.",
-    dtPort: "پورت WireGuard (UDP)", dtHost: "آدرس این سرور برای WireGuard", dtSave: "ذخیره", dtSetHint: "سرور میانی با UDP به این آدرس و پورت وصل می‌شود. IP مستقیم بدهید، نه دامنه‌ی پشت CDN. پورت باید آزاد باشد (TCP و UDP).",
+    dtAskOn: "WireGuard اختصاصی برای این سرور میانی روشن شود؟ پورت UDP {p} این سرور باید از سرور میانی باز باشد.", dtAskOff: "«{t}» خاموش شود؟ {n} اینباند وصل به آن به تانل چرخشی برمی‌گردند.",
+    dtPort: "پورت WireGuard (UDP)", dtHost: "آدرس این سرور (WireGuard و mKCP)", dtSave: "ذخیره", dtSetHint: "سرور میانی با UDP به این آدرس و پورت‌ها وصل می‌شود. IP مستقیم بدهید، نه دامنه‌ی پشت CDN. پورت باید آزاد باشد (TCP و UDP).",
     pePort: "پورت", peEdit: "تغییر پورت", peSave: "ذخیره", peCancel: "لغو", tpBadNum: "پورت باید یک عدد بین ۱ تا ۶۵۵۳۵ باشد", peAskUsed: "سرورهای میانی روی «{m}» به پورت جدید {p} می‌روند. پورت قبلی تا ۳۰ دقیقه باز می‌ماند تا تانل قطع نشود؛ ممکن است اتصال کاربران چند ثانیه قطع و وصل شود. ادامه؟", peAskWg: "سرورهای میانیِ دارای تانل WireGuard روی پورت جدید {p} دوباره وصل می‌شوند (چند ثانیه قطعی برای اینباندهای وصل‌شده به آن). ادامه؟", peMoved: "پورت عوض شد. سرورهای میانی تا یک دقیقه به پورت جدید می‌روند؛ پورت قبلی ۳۰ دقیقه باز می‌ماند.",
     dtPath: "مسیر", dtRot: "چرخشی (پیش‌فرض)", dtPickHint: "مسیر «اختصاصی» ثابت است و جایگزین ندارد: اگر قطع شود این اینباند روی آن سرور قطع می‌ماند.",
   },
@@ -122,9 +126,13 @@ const T = {
     selectAll: "Select all", wgTitle: "WireGuard file", wgHint: "For the official WireGuard app: download the file and tap + then Import from file, or scan the QR with Create from QR code.", wgFile: "Download .conf", ports: "Ports", portsTitle: "Used ports", portsHint: "Every inbound port, comma separated, for building relays and tunnels.", gSS: "Shadowsocks", gProxy: "Plain proxies (SOCKS / HTTP, own user and password)", relayLinks: "Relay links", singleUser: "single user", confirmDelRelay: "Remove this relay?",
     dtTitle: "Dedicated tunnels", dtHint: "A fixed path, separate from the rotating tunnel: it never switches and has no fallback. Inbounds pinned to it go only this way, and stay down if it drops.",
     dtWg: "Dedicated WireGuard", dtWgD: "Xray WireGuard over UDP; the middle server dials this server's IP directly. Won't work if UDP is blocked between the servers.", dtBackhaul: "Backhaul", dtBackhaulD: "Dedicated Backhaul tunnel.",
+    dtKcp: "Dedicated mKCP", dtKcpD: "Xray VLESS over mKCP (UDP), tuned for gaming and encrypted with a seed; the middle server dials this server's IP directly. Steadier on lossy links, but uses more traffic.",
+    dtAskOnKcp: "Turn on dedicated mKCP for this middle server? UDP port {p} on this server must be reachable from it (open it in the firewall).", peAskKcp: "Middle servers with the mKCP tunnel reconnect on the new port {p} (a few seconds of drop for inbounds pinned to it). Continue?", dtPortK: "mKCP port (UDP)",
+    spTest: "⏱ Test", spTitle: "Ping and speed through this exact path between this server and the middle server (about 48 MB of traffic at most)", spQueued: "Waiting for the middle server…", spRunning: "Testing… (about 15 s)", spUpd: "To test, update the middle server's agent (version {v})", spOff: "Turn it on first", spBusy: "Another test is running on this server",
+    spPing: "ping {ms} ms (min {min}, max {max}, jitter ±{j})", spPingL: "ping", spFail: "Test failed: {e}",
     dtOn: "Turn on", dtOff: "Turn off", dtUp: "Up", dtDown: "Down", dtPending: "Checking…", dtOffline: "Middle server offline", dtOffState: "Off", dtLastOk: "last good check {t}", dtPins: "{n} inbounds", dtNeedAgent: "Dedicated tunnels need agent {v} or newer: run the install command on the middle server once more.",
-    dtAskOn: "Turn on dedicated WireGuard for this middle server? UDP port {p} on this server must be reachable from it.", dtAskOff: "Turn off dedicated WireGuard? {n} inbounds pinned to it go back to the rotating tunnel.",
-    dtPort: "WireGuard port (UDP)", dtHost: "This server's address for WireGuard", dtSave: "Save", dtSetHint: "Middle servers dial this address and port over UDP. Use the direct IP, not a domain behind a CDN. The port must be free (TCP and UDP).",
+    dtAskOn: "Turn on dedicated WireGuard for this middle server? UDP port {p} on this server must be reachable from it.", dtAskOff: "Turn off \"{t}\"? {n} inbounds pinned to it go back to the rotating tunnel.",
+    dtPort: "WireGuard port (UDP)", dtHost: "This server's address (WireGuard and mKCP)", dtSave: "Save", dtSetHint: "Middle servers dial this address and these ports over UDP. Use the direct IP, not a domain behind a CDN. The port must be free (TCP and UDP).",
     pePort: "Port", peEdit: "Change port", peSave: "Save", peCancel: "Cancel", tpBadNum: "The port must be a number from 1 to 65535", peAskUsed: "Middle servers on \"{m}\" move to the new port {p}. The old port stays open for 30 minutes so the tunnel does not drop; users may see a few seconds of reconnect. Continue?", peAskWg: "Middle servers with the WireGuard tunnel reconnect on the new port {p} (a few seconds of drop for inbounds pinned to it). Continue?", peMoved: "Port changed. Middle servers move to it within a minute; the old port stays open for 30 minutes.",
     dtPath: "Path", dtRot: "Rotating (default)", dtPickHint: "A dedicated path is fixed with no fallback: if it drops, this inbound stays down on that server.",
   },
@@ -971,7 +979,7 @@ $("#tunnelPorts").addEventListener("submit", guard(async (e) => {
 $("#dtPorts").addEventListener("submit", guard(async (e) => {
   e.preventDefault();
   const f = e.target;
-  await api("POST", "api/tunnels/dtsettings", { wgport: portNum(f.wgport.value), wghost: f.wghost.value.trim() });
+  await api("POST", "api/tunnels/dtsettings", { wgport: portNum(f.wgport.value), kport: portNum(f.kport.value), wghost: f.wghost.value.trim() });
   toast(t("done")); document.activeElement?.blur(); loadTunnels();
 }));
 function renderTunnels() {
@@ -988,14 +996,15 @@ function renderTunnels() {
   else if (!d.ready) tp.innerHTML = "";
   const dp = $("#dtPorts");
   if (d.ready && d.servers.length && document.activeElement?.form !== dp) dp.innerHTML = `
-    <b class="dthead">${t("dtTitle")} · WireGuard</b>
+    <b class="dthead">${t("dtTitle")} · WireGuard · mKCP</b>
     <label>${t("dtPort")}<input name="wgport" inputmode="numeric" dir="ltr" value="${d.wgport || ""}" placeholder="${t("tpAuto")}"></label>
+    <label>${t("dtPortK")}<input name="kport" inputmode="numeric" dir="ltr" value="${d.kport || ""}" placeholder="${t("tpAuto")}"></label>
     <label>${t("dtHost")}<input name="wghost" dir="ltr" value="${esc(d.wghost || "")}" placeholder="${t("tpAuto")}"></label>
     <button class="btn" type="submit">${t("dtSave")}</button><small class="muted">${t("dtSetHint")}</small>`;
   else if (!d.ready || !d.servers.length) dp.innerHTML = "";
   if (!d.servers.length) { $("#tunnelList").innerHTML = `<div class="card empty">${t("tnNoSrv")}</div>`; return; }
   const now = Date.now() / 1000;
-  clearTimeout(tnPoll); if (d.servers.some((s) => s.prevMethod || (s.domain && !s.certOk && !s.certErr) || (s.dedView || []).some((x) => x.state === "pending"))) tnPoll = setTimeout(() => { if (state.view === "tunnels" && !tnTyping()) loadTunnels(); }, 3000);
+  clearTimeout(tnPoll); if (d.servers.some((s) => s.prevMethod || (s.domain && !s.certOk && !s.certErr) || (s.dedView || []).some((x) => x.state === "pending")) || spActive()) tnPoll = setTimeout(() => { if (state.view === "tunnels" && !tnTyping()) loadTunnels(); }, spActive() ? 1500 : 3000);
   $("#tunnelList").innerHTML = d.servers.map((s, i) => {
     const seen = s.lastSeen ? ago(Math.max(0, Math.round(now - s.lastSeen))) + " " + t("tnAgo") : t("tnNever");
     return `<div class="card">
@@ -1042,13 +1051,15 @@ function dedBlock(s, i) {
     if (v.on) extra.push(t("dtPins").replace("{n}", v.pins || 0));
     return `<div class="mcard dcard${v.on ? " on" : ""}${v.on && v.state !== "up" && v.state !== "pending" ? " down" : ""}">
       <b>${esc(name)}</b><small>${esc(desc)}</small>
-      ${m.id === "wg" ? portLine(i, "wgport") : ""}
+      ${m.id === "wg" ? portLine(i, "wgport") : m.id === "kcp" ? portLine(i, "kport") : ""}
       <span class="dstate"><span dir="auto" class="pill ${st[0]}">${esc(st[1])}</span>${extra.length ? `<small dir="auto">${esc(extra.join(" · "))}</small>` : ""}</span>
       ${v.on && v.err && v.state === "down" ? `<small class="err mono">${esc(v.err)}</small>` : ""}
-      <button class="btn small${v.on ? "" : " primary"}" data-tn="ded" data-i="${i}" data-m="${m.id}" data-on="${v.on ? 0 : 1}">${v.on ? t("dtOff") : t("dtOn")}</button></div>`;
+      <span class="dbtns"><button class="btn small${v.on ? "" : " primary"}" data-tn="ded" data-i="${i}" data-m="${m.id}" data-on="${v.on ? 0 : 1}">${v.on ? t("dtOff") : t("dtOn")}</button>${v.on ? spButton(s, i, m.id) : ""}</span>
+      ${v.on ? spLine(s, m.id) : ""}</div>`;
   }).join("");
   return `<div class="dtbox"><b>${t("dtTitle")}</b><p class="muted small">${t("dtHint")}</p>
     ${old && s.lastSeen ? `<p class="muted small">${esc(t("dtNeedAgent").replace("{v}", d.dedVer))}</p>` : ""}
+    ${!old && s.lastSeen && versionLess(s.agentVer, "0.7.0") ? `<p class="muted small">${esc(t("dtNeedAgent").replace("{v}", "0.7.0"))} (mKCP)</p>` : ""}
     <div class="mcards">${cards}</div></div>`;
 }
 function revBlock(s, i) {
@@ -1105,15 +1116,47 @@ function methodCards(s, i) {
     return `<div class="${cls}" data-tn="method" data-i="${i}" data-m="${m.id}" ${can ? `role="button" tabindex="0"` : ""}>
       <b>${esc(t("m" + cap(m.id)))}</b><small>${esc(t("m" + cap(m.id) + "D"))}</small>
       ${m.ready && methodPort[m.id] && tunnelData.ready ? portLine(i, methodPort[m.id]) : ""}
-      <em>${on ? (trying ? t("mTrying") : "✓ " + t("mActive")) : m.ready ? "" : t("mSoon")}</em></div>`;
+      <em>${on ? (trying ? t("mTrying") : "✓ " + t("mActive")) : m.ready ? "" : t("mSoon")}</em>
+      ${m.ready && tunnelData.ready ? spButton(s, i, m.id) + spLine(s, m.id) : ""}</div>`;
   }).join("")}</div>`;
+}
+// manual test of one card's path: ping + speed, run by the middle server
+const spActive = () => (tunnelData?.servers || []).some((s) => Object.values(s.speed || {}).some((x) => x.state === "queued" || x.state === "running"));
+function spButton(s, i, k) {
+  const old = !s.agentVer || versionLess(s.agentVer, tunnelData.testVer || "0.7.0");
+  const cur = (s.speed || {})[k], busy = cur && (cur.state === "queued" || cur.state === "running");
+  if (old) return `<button type="button" class="btn small sbtn" disabled title="${esc(t("spUpd").replace("{v}", tunnelData.testVer || "0.7.0"))}">${t("spTest")}</button>`;
+  return `<button type="button" class="btn small sbtn" data-sp="${k}" data-i="${i}" title="${esc(t("spTitle"))}" ${busy || spActiveOn(s) || !s.online ? "disabled" : ""}>${t("spTest")}</button>`;
+}
+const spActiveOn = (s) => Object.values(s.speed || {}).some((x) => x.state === "queued" || x.state === "running");
+function spLine(s, k) {
+  const v = (s.speed || {})[k];
+  if (!s.agentVer || versionLess(s.agentVer, tunnelData.testVer || "0.7.0")) return s.lastSeen ? `<small class="spres muted">${esc(t("spUpd").replace("{v}", tunnelData.testVer || "0.7.0"))}</small>` : "";
+  if (!v) return "";
+  if (v.state === "queued") return `<small class="spres muted">${t("spQueued")}</small>`;
+  if (v.state === "running") return `<small class="spres muted">${t("spRunning")}</small>`;
+  const when = v.done ? ago(Math.max(0, Math.round(Date.now() / 1000 - v.done))) + " " + t("tnAgo") : "";
+  if (v.state === "failed" || !v.res) return `<small class="spres err" dir="auto">${esc(t("spFail").replace("{e}", v.err || "?"))} · ${esc(when)}</small>`;
+  const r = v.res, num = (x) => (x >= 100 ? Math.round(x) : Math.round(x * 10) / 10).toString();
+  const tip = [t("spPing").replace("{ms}", num(r.ms)).replace("{min}", num(r.min)).replace("{max}", num(r.max)).replace("{j}", num(r.jitter)), r.dlErr, r.ulErr, r.err].filter(Boolean).join(" · ");
+  const dl = r.down ? "↓ " + num(r.down) : "↓ ✕", ul = r.up ? "↑ " + num(r.up) : "↑ ✕";
+  return `<small class="spres ok" title="${esc(tip)}"><span>${t("spPingL")} <bdi dir="ltr" class="mono">${num(r.ms)} ms</bdi></span>
+    <bdi dir="ltr" class="mono">${num(r.min)}–${num(r.max)} ms · ±${num(r.jitter)}</bdi>
+    <bdi dir="ltr" class="mono">${dl}  ${ul} Mbps</bdi><span class="muted">${esc(when)}</span></small>`;
+}
+async function startSpeed(s, k) {
+  if (!s) return;
+  await api("POST", "api/tunnels/" + s.id + "/speed", { kind: k });
+  s.speed = s.speed || {}; s.speed[k] = { kind: k, state: "queued" };
+  renderTunnels();
 }
 async function savePort(i, k) {
   const n = portNum($(`#pe-${i}-${k}`).value), d = tunnelData;
   if (!n || n === d[k]) { portEdit = ""; renderTunnels(); return; }
-  if (k === "wgport") {
-    if (d.servers.some((x) => (x.dedView || []).some((v) => v.type === "wg" && v.on)) && !confirm(t("peAskWg").replace("{p}", n))) return;
-    await api("POST", "api/tunnels/dtsettings", { wgport: n });
+  if (k === "wgport" || k === "kport") {
+    const ty = k === "wgport" ? "wg" : "kcp";
+    if (d.servers.some((x) => (x.dedView || []).some((v) => v.type === ty && v.on)) && !confirm(t(ty === "wg" ? "peAskWg" : "peAskKcp").replace("{p}", n))) return;
+    await api("POST", "api/tunnels/dtsettings", { [k]: n });
     toast(t("done"));
   } else {
     const m = Object.keys(methodPort).find((x) => methodPort[x] === k);
@@ -1130,6 +1173,9 @@ $("#tunnelList").addEventListener("click", guard(async (e) => {
   const ps = e.target.closest("[data-pe-save]"); if (ps) { await savePort(ps.dataset.i, ps.dataset.peSave); return; }
   if (e.target.closest("[data-pe-cancel]")) { portEdit = ""; renderTunnels(); return; }
   if (e.target.closest(".pedit")) return;
+  const sb = e.target.closest("button[data-sp]");
+  if (sb) { await startSpeed(tunnelData.servers[+sb.dataset.i], sb.dataset.sp); return; }
+  if (e.target.closest(".spres")) return;
   const mb = e.target.closest("[data-tn=method][role=button]");
   if (mb) {
     const s = tunnelData.servers[+mb.dataset.i], m = mb.dataset.m;
@@ -1142,7 +1188,9 @@ $("#tunnelList").addEventListener("click", guard(async (e) => {
   if (b.dataset.tn === "ded") {
     const on = b.dataset.on === "1", v = (s.dedView || []).find((x) => x.type === b.dataset.m) || {};
     if (on && (!s.agentVer || versionLess(s.agentVer, tunnelData.dedVer))) { alert(t("dtNeedAgent").replace("{v}", tunnelData.dedVer)); return; }
-    if (!confirm(on ? t("dtAskOn").replace("{p}", tunnelData.wgport || t("tpAuto")) : t("dtAskOff").replace("{n}", v.pins || 0))) return;
+    const kcp = b.dataset.m === "kcp";
+    if (on && kcp && versionLess(s.agentVer, "0.7.0")) { alert(t("dtNeedAgent").replace("{v}", "0.7.0")); return; }
+    if (!confirm(on ? t(kcp ? "dtAskOnKcp" : "dtAskOn").replace("{p}", (kcp ? tunnelData.kport : tunnelData.wgport) || t("tpAuto")) : t("dtAskOff").replace("{t}", t("dt" + cap(b.dataset.m))).replace("{n}", v.pins || 0))) return;
     await api("POST", "api/tunnels/" + s.id + "/dedicated", { type: b.dataset.m, on }); toast(t("done")); loadTunnels(); refreshInbounds(); return;
   }
   if (b.dataset.tn === "del") {

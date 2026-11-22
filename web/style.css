@@ -243,3 +243,8 @@ img,canvas,svg,input,select,textarea,pre{max-width:100%}
 .wgrow{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.4rem;padding:.4rem 0;border-bottom:1px solid var(--line)}
 .wgrow .qr{flex-basis:100%}
 .wgrow .btn{white-space:nowrap}
+.mcard .sbtn{margin-top:.3rem;padding:.15rem .55rem;font-size:.78rem}
+.dcard .dbtns{display:flex;flex-wrap:wrap;gap:.35rem;align-items:center}
+.dcard .dbtns .btn{margin-top:.25rem}
+.spres{display:flex;flex-direction:column;gap:.05rem;font-size:.74rem!important;line-height:1.35;opacity:1!important;cursor:text}
+.spres.ok span:first-child{font-weight:600}

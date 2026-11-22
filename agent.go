@@ -137,6 +137,13 @@ func agentInstall(code string) error {
 		if err := downloadXray(agentXrayDir); err != nil {
 			return fmt.Errorf("could not download Xray: %v", err)
 		}
+	} else if v := agentXrayVersion(agentXray()); v == "" || versionLess(v, minKCPXray) {
+		// too old for the dedicated mKCP tunnel: get the current one (the
+		// old one stays when the download fails)
+		fmt.Printf("      Xray %s is old; updating\n", orDefault(v, "(unknown)"))
+		if err := downloadXray(agentXrayDir); err != nil {
+			fmt.Println("      could not update Xray, keeping the old one:", err)
+		}
 	}
 	step(2, "relay config")
 	if err := os.MkdirAll(agentDir, 0o700); err != nil {
@@ -270,6 +277,7 @@ func agentRun() {
 	// dedicated tunnels are checked on their own, apart from the heartbeat
 	probes := &dedProbes{}
 	go dedProbeLoop(probes, st.Join.Panel)
+	xrayVer := agentXrayVersion(agentXray())
 	for {
 		select {
 		case c := <-certCh:
@@ -292,6 +300,9 @@ func agentRun() {
 			if v := publicIP(); v != "" {
 				ip = v
 			}
+			if v := agentXrayVersion(agentXray()); v != "" {
+				xrayVer = v
+			}
 			ipAt = time.Now()
 		}
 		pstate, busy, rerr := rc.run()
@@ -309,7 +320,7 @@ func agentRun() {
 			req := beatReq{Version: version, PublicIP: ip, XrayOK: active == "active", XrayErr: lastErr, Applied: st.Hash, CtlPort: st.Ctl, Busy: busy,
 				Wait: wait, Fails: fails, LastFail: lastFail, PortState: pstate, Rejected: st.Rejected, Pending: st.PendingAt > 0,
 				Mode: mode, Via: st.Via, CertDom: st.CertDomain, CertExp: st.CertExp, CertErr: st.CertErr, CertBusy: certBusy,
-				Ded: probes.snapshot()}
+				Ded: probes.snapshot(), XrayVer: xrayVer}
 			if mode == "rev" {
 				req.Via = ""
 			}
@@ -416,6 +427,7 @@ func agentRun() {
 				st.Token = br.Token
 				_ = saveAgent(st)
 			}
+			agentStartTest(br.Test, st) // a manual tunnel test, in the background
 			newCfg := false
 			if wasPending && st.PendingAt > 0 { // reached the panel with the new config
 				st.PendingAt = 0

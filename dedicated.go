@@ -5,7 +5,7 @@ package main
 // tunnel never rotates, never searches and never falls back: inbounds pinned
 // to it go only through it, and when it drops they stay down. Its state is
 // never read by the rotating side, and the rotating side's state is never
-// read here. WireGuard is the first type; more types plug into dedTypes.
+// read here. Types: WireGuard and mKCP; more types plug into dedTypes.
 //
 //   user -> middle :P (dokodemo dfwd-wg-P, target 10.77.1.N:port)
 //        -> xo-dt-wg-out (Xray WireGuard outbound, UDP to this server)
@@ -15,6 +15,11 @@ package main
 //
 // The target goes through a virtual address because the WireGuard netstack
 // does not carry 127.0.0.1 through the tunnel.
+//
+//   mKCP: user -> middle :P (dokodemo dfwd-kcp-P, target host:port)
+//        -> xo-dt-kcp-out (VLESS over mKCP, UDP to this server)
+//        -> xo-dt-kcp (VLESS + mKCP inbound here)
+//        -> xo-dt-k (freedom; only the mKCP-pinned ports and the panel)
 
 import (
 	"crypto/tls"
@@ -47,15 +52,49 @@ const (
 	dedWGPortPref  = 51820
 	dedReserved    = 2054 // never used (another service's port)
 	dedStale       = 3 * time.Minute
+	// mKCP
+	dedKCP      = "kcp"
+	dedTagKCP   = "xo-dt-kcp"     // VLESS + mKCP inbound on this server
+	dedOutKCP   = "xo-dt-kcp-out" // its outbound on the middle server
+	dedFreeKCP  = "xo-dt-k"       // freedom here: only mKCP-pinned ports + panel
+	agentKCPVer = "0.7.0"         // reports its Xray version
+	// Xray 26.6.1 replaced kcpSettings seed/header with finalmask "mkcp-legacy"
+	minKCPXray = "26.6.1"
 )
+
+// kcpStream: mKCP tuned for a low-latency path between two servers, the same
+// on both ends. Xray 26 has no congestion/readBufferSize/writeBufferSize any
+// more (silently ignored), so only these knobs exist:
+//   - mtu 1350: room for the UDP/IP headers and the mask's 28 bytes (nonce + tag) on
+//     a 1500 path, and under 1400 so PPPoE/tunnelled links do not fragment.
+//   - tti 10 ms (the minimum; default 50): while a connection is busy, KCP
+//     sends and acks only on its tick, so each hop can wait up to one tti.
+//     Measured on one host: tti 20 gave ~30 ms round trips, tti 10 about half.
+//     A lost packet is also resent sooner. Costs a little more overhead (acks
+//     and pings every 10 ms, only while the connection is active).
+//   - uplinkCapacity 20 / downlinkCapacity 100 (MB/s): the send window of one
+//     connection (~160 Mbit/s) and the receive window. mKCP has no congestion
+//     control, so a modest send window keeps bursts from flooding a lossy
+//     link (which would add loss and latency) while still far above what a
+//     game or a call needs; the big receive window never limits the sender.
+//
+// Obfuscation: finalmask "mkcp-legacy" with a value = AES-128-GCM over every
+// packet, key = SHA-256 of the seed (the old kcp "seed"): no fixed header to
+// match, and packets without the seed are dropped.
+func kcpStream(seed string) *OMap {
+	return om("network", "kcp",
+		"kcpSettings", om("mtu", 1350, "tti", 10, "uplinkCapacity", 20, "downlinkCapacity", 100),
+		"finalmask", om("udp", []any{om("type", "mkcp-legacy", "settings", om("value", seed))}))
+}
 
 // dedTypes: the dedicated tunnel cards. Ready ones can be switched on.
 var dedTypes = []map[string]any{
-	{"id": dedWG, "ready": true},
+	{"id": dedWG, "ready": true, "ver": agentDedVer},
+	{"id": dedKCP, "ready": true, "ver": agentKCPVer},
 	{"id": "backhaul", "ready": false},
 }
 
-func validDedType(t string) bool { return t == dedWG }
+func validDedType(t string) bool { return t == dedWG || t == dedKCP }
 
 // DedTunnel: one dedicated tunnel of a middle server.
 type DedTunnel struct {
@@ -89,11 +128,23 @@ func dedCapable(s TunnelServer) bool {
 	return s.AgentVer != "" && !versionLess(s.AgentVer, agentDedVer)
 }
 
-func probePort(s TunnelServer) int {
-	if s.CtlPort > 0 {
-		return s.CtlPort + 2
+// kcpCapable: the agent reports its Xray version and that Xray has the
+// finalmask mKCP mask.
+func kcpCapable(s TunnelServer) bool {
+	return s.AgentVer != "" && !versionLess(s.AgentVer, agentKCPVer) && s.XrayVer != "" && !versionLess(s.XrayVer, minKCPXray)
+}
+
+// probePort: the local port of a dedicated type's status check inbound on the
+// middle server (ctl+2 WireGuard, ctl+3 mKCP).
+func probePort(s TunnelServer, t string) int {
+	ctl := s.CtlPort
+	if ctl <= 0 {
+		ctl = agentCtlPort
 	}
-	return agentCtlPort + 2
+	if t == dedKCP {
+		return ctl + 3
+	}
+	return ctl + 2
 }
 
 // dedTargets: the hosts pinned inbounds live on (127.0.0.1 first, for the
@@ -173,8 +224,9 @@ func removeInboundTag(root *OMap, tag string) {
 	root.Set("inbounds", keep)
 }
 
-// dedPortBad: why port p cannot be the WireGuard port ("" when it can).
-func (a *App) dedPortBad(root *OMap, p int, set TunnelSettings) string {
+// dedPortBad: why port p cannot be the port of the dedicated inbound tag
+// (dedTagWG or dedTagKCP); "" when it can.
+func (a *App) dedPortBad(root *OMap, p int, set TunnelSettings, tag string) string {
 	if p < 1 || p > 65535 {
 		return fmt.Sprintf("port %d is not valid", p)
 	}
@@ -187,7 +239,13 @@ func (a *App) dedPortBad(root *OMap, p int, set TunnelSettings) string {
 	if p == set.Port || p == set.XPort || p == set.RPort {
 		return fmt.Sprintf("port %d is used by the rotating tunnel", p)
 	}
-	ib, _ := findInbound(root, dedTagWG)
+	if tag == dedTagWG && set.KPort != 0 && p == set.KPort {
+		return fmt.Sprintf("port %d is used by the dedicated mKCP tunnel", p)
+	}
+	if tag == dedTagKCP && set.WGPort != 0 && p == set.WGPort {
+		return fmt.Sprintf("port %d is used by the dedicated WireGuard tunnel", p)
+	}
+	ib, _ := findInbound(root, tag)
 	mine := ib != nil && asStr(ib.Get("port")) == strconv.Itoa(p)
 	if mine {
 		return ""
@@ -201,11 +259,56 @@ func (a *App) dedPortBad(root *OMap, p int, set TunnelSettings) string {
 	return ""
 }
 
-// applyDedicated writes the WireGuard inbound and its outbounds, and returns
-// the routing rules that let its traffic reach only the pinned inbounds (and
-// the panel, for the status check).
+// dedPort: the port a dedicated inbound listens on: the chosen one (checked),
+// else the one it has, else pref, else a free one picked now (and saved).
+func (a *App) dedPort(root *OMap, set TunnelSettings, tag, name string, chosen, pref int, save func(int)) (int, error) {
+	if chosen != 0 {
+		if why := a.dedPortBad(root, chosen, set, tag); why != "" {
+			return 0, fmt.Errorf("%s tunnel: %s; choose another port in the Tunnels tab", name, why)
+		}
+		return chosen, nil
+	}
+	port := 0
+	if ib, _ := findInbound(root, tag); ib != nil {
+		port, _ = strconv.Atoi(asStr(ib.Get("port")))
+	}
+	if port == 0 || a.dedPortBad(root, port, set, tag) != "" {
+		port = 0
+		if pref != 0 && a.dedPortBad(root, pref, set, tag) == "" {
+			port = pref
+		}
+		for i := 0; port == 0 && i < 30; i++ {
+			if p := suggestPort(); p != 0 && a.dedPortBad(root, p, set, tag) == "" {
+				port = p
+			}
+		}
+	}
+	if port == 0 {
+		return 0, fmt.Errorf("no free UDP port for the %s tunnel", name)
+	}
+	_ = a.store.EditTunnels(func() error { save(port); return nil })
+	return port, nil
+}
+
+// applyDedicated writes every dedicated type's inbound and outbounds, and
+// returns the routing rules that let their traffic reach only the inbounds
+// pinned to them (and the panel, for the status check), plus their inbound
+// tags (blocked for anything else).
 func (a *App) applyDedicated(root *OMap, servers []TunnelServer, tmap map[string][]TunnelUse) ([]any, []any, error) {
 	dropDedOutbounds(root)
+	r1, t1, err := a.applyDedWG(root, servers, tmap)
+	if err != nil {
+		return nil, nil, err
+	}
+	r2, t2, err := a.applyDedKCP(root, servers, tmap)
+	if err != nil {
+		return nil, nil, err
+	}
+	return append(r1, r2...), append(t1, t2...), nil
+}
+
+// applyDedWG writes the WireGuard inbound and its outbounds.
+func (a *App) applyDedWG(root *OMap, servers []TunnelServer, tmap map[string][]TunnelUse) ([]any, []any, error) {
 	var on []TunnelServer
 	for _, s := range servers {
 		if d := s.dedOf(dedWG); d != nil && d.On && d.Pub != "" && d.Addr != "" {
@@ -233,28 +336,9 @@ func (a *App) applyDedicated(root *OMap, servers []TunnelServer, tmap map[string
 	if err != nil {
 		return nil, nil, err
 	}
-	port := set.WGPort
-	if port == 0 {
-		if ib, _ := findInbound(root, dedTagWG); ib != nil {
-			port, _ = strconv.Atoi(asStr(ib.Get("port")))
-		}
-		if port == 0 || a.dedPortBad(root, port, set) != "" {
-			port = 0
-			if a.dedPortBad(root, dedWGPortPref, set) == "" {
-				port = dedWGPortPref
-			}
-			for i := 0; port == 0 && i < 30; i++ {
-				if p := suggestPort(); p != 0 && a.dedPortBad(root, p, set) == "" {
-					port = p
-				}
-			}
-		}
-		if port == 0 {
-			return nil, nil, errors.New("no free UDP port for the WireGuard tunnel")
-		}
-		_ = a.store.EditTunnels(func() error { a.store.TunnelCfg.WGPort = port; return nil })
-	} else if why := a.dedPortBad(root, port, set); why != "" {
-		return nil, nil, fmt.Errorf("WireGuard tunnel: %s; choose another port in the Tunnels tab", why)
+	port, err := a.dedPort(root, set, dedTagWG, "WireGuard", set.WGPort, dedWGPortPref, func(p int) { a.store.TunnelCfg.WGPort = p })
+	if err != nil {
+		return nil, nil, err
 	}
 	var peers []any
 	for _, s := range on {
@@ -294,10 +378,95 @@ func (a *App) applyDedicated(root *OMap, servers []TunnelServer, tmap map[string
 	return rules, []any{dedTagWG}, nil
 }
 
+// applyDedKCP writes the VLESS + mKCP inbound (one client per middle server)
+// and a freedom outbound that reaches only the inbounds pinned to mKCP and
+// the panel. No virtual addresses: VLESS carries the real target.
+func (a *App) applyDedKCP(root *OMap, servers []TunnelServer, tmap map[string][]TunnelUse) ([]any, []any, error) {
+	var on []TunnelServer
+	onID := map[string]bool{}
+	for _, s := range servers {
+		if d := s.dedOf(dedKCP); d != nil && d.On && d.Key != "" {
+			on = append(on, s)
+			onID[s.ID] = true
+		}
+	}
+	if len(on) == 0 {
+		removeInboundTag(root, dedTagKCP)
+		return nil, nil, nil
+	}
+	var set TunnelSettings
+	if err := a.store.EditTunnels(func() error {
+		if a.store.TunnelCfg.KSeed == "" {
+			a.store.TunnelCfg.KSeed = randHex(16)
+		}
+		set = a.store.TunnelCfg
+		return nil
+	}); err != nil {
+		return nil, nil, err
+	}
+	port, err := a.dedPort(root, set, dedTagKCP, "mKCP", set.KPort, 0, func(p int) { a.store.TunnelCfg.KPort = p })
+	if err != nil {
+		return nil, nil, err
+	}
+	var clients []any
+	for _, s := range on {
+		clients = append(clients, om("id", s.dedOf(dedKCP).Key, "email", "dt-kcp-"+s.ID, "level", 0))
+	}
+	ib, _ := findInbound(root, dedTagKCP)
+	if ib == nil {
+		ib = om("tag", dedTagKCP, "listen", "0.0.0.0", "port", port, "protocol", "vless")
+		root.Set("inbounds", append(asArr(root.Get("inbounds")), ib))
+	}
+	ib.Set("port", port)
+	ib.Set("protocol", "vless")
+	ib.Set("settings", om("clients", clients, "decryption", "none"))
+	ib.Set("streamSettings", kcpStream(set.KSeed))
+	ib.Delete("sniffing")
+
+	ports := map[string]map[int]bool{"127.0.0.1": {}}
+	if p, err := strconv.Atoi(strings.TrimPrefix(portOf(a.store.Cfg.Listen), ":")); err == nil {
+		ports["127.0.0.1"][p] = true
+	}
+	for i, v := range asArr(root.Get("inbounds")) {
+		x := asMap(v)
+		if x == nil {
+			continue
+		}
+		for _, u := range tmap[inboundID(x, i)] {
+			if u.Via != dedKCP || !onID[u.Server] {
+				continue
+			}
+			if h, p := targetOf(x); p > 0 {
+				if ports[h] == nil {
+					ports[h] = map[int]bool{}
+				}
+				ports[h][p] = true
+			}
+		}
+	}
+	hosts := []string{}
+	for h := range ports {
+		hosts = append(hosts, h)
+	}
+	sort.Strings(hosts)
+	var allow []any
+	for _, h := range hosts {
+		if len(ports[h]) > 0 {
+			allow = append(allow, om("action", "allow", "network", "tcp,udp", "ip", []any{h}, "port", strings.Join(intKeys(ports[h]), ",")))
+		}
+	}
+	allow = append(allow, om("action", "block"))
+	root.Set("outbounds", append(asArr(root.Get("outbounds")), om("protocol", "freedom", "tag", dedFreeKCP,
+		"settings", om("finalRules", allow))))
+	rule := om("type", "field", "ruleTag", dedRuleTag+dedKCP, "inboundTag", []any{dedTagKCP}, "outboundTag", dedFreeKCP)
+	return []any{rule}, []any{dedTagKCP}, nil
+}
+
 // ---------- the middle server's config ----------
 
 type dedRelay struct {
-	WG *wgRelay
+	WG  *wgRelay
+	KCP *kcpRelay
 }
 
 type wgRelay struct {
@@ -306,25 +475,48 @@ type wgRelay struct {
 	PanelPort                int
 }
 
-func (d *dedRelay) has(t string) bool { return d != nil && t == dedWG && d.WG != nil }
+type kcpRelay struct {
+	UUID, Host, Seed string
+	Port, PanelPort  int
+}
+
+func (d *dedRelay) has(t string) bool {
+	if d == nil {
+		return false
+	}
+	switch t {
+	case dedWG:
+		return d.WG != nil
+	case dedKCP:
+		return d.KCP != nil
+	}
+	return false
+}
 
 // dedFor: the dedicated tunnels a middle server runs (nil for old agents).
 func (a *App) dedFor(root *OMap, s TunnelServer) *dedRelay {
 	if root == nil || !dedCapable(s) {
 		return nil
 	}
-	d := s.dedOf(dedWG)
 	servers, set, tmap := a.store.TunnelsCopy()
-	if d == nil || !d.On || d.Key == "" || set.WGPub == "" || set.WGPort == 0 || set.WGHost == "" {
-		return nil
-	}
-	if ib, _ := findInbound(root, dedTagWG); ib == nil {
-		return nil
-	}
-	hosts, _ := a.dedTargets(root, servers, tmap)
 	panel, _ := strconv.Atoi(strings.TrimPrefix(portOf(a.store.Cfg.Listen), ":"))
-	return &dedRelay{WG: &wgRelay{Key: d.Key, Addr: d.Addr, Pub: set.WGPub,
-		Endpoint: net.JoinHostPort(set.WGHost, strconv.Itoa(set.WGPort)), Hosts: hosts, PanelPort: panel}}
+	out := &dedRelay{}
+	if d := s.dedOf(dedWG); d != nil && d.On && d.Key != "" && set.WGPub != "" && set.WGPort != 0 && set.WGHost != "" {
+		if ib, _ := findInbound(root, dedTagWG); ib != nil {
+			hosts, _ := a.dedTargets(root, servers, tmap)
+			out.WG = &wgRelay{Key: d.Key, Addr: d.Addr, Pub: set.WGPub,
+				Endpoint: net.JoinHostPort(set.WGHost, strconv.Itoa(set.WGPort)), Hosts: hosts, PanelPort: panel}
+		}
+	}
+	if d := s.dedOf(dedKCP); d != nil && d.On && d.Key != "" && kcpCapable(s) && set.KPort != 0 && set.KSeed != "" && set.WGHost != "" {
+		if ib, _ := findInbound(root, dedTagKCP); ib != nil {
+			out.KCP = &kcpRelay{UUID: d.Key, Host: set.WGHost, Port: set.KPort, Seed: set.KSeed, PanelPort: panel}
+		}
+	}
+	if out.WG == nil && out.KCP == nil {
+		return nil
+	}
+	return out
 }
 
 // relayDedFwd: the forwarder for a pinned port, or nil when its dedicated
@@ -333,44 +525,58 @@ func relayDedFwd(f fwdPort, ded *dedRelay) *OMap {
 	if !ded.has(f.Via) {
 		return nil
 	}
-	v := dedVirt(ded.WG.Hosts, f.Host)
-	if v == "" {
-		return nil
+	addr := f.Host // mKCP: VLESS carries the real target
+	if f.Via == dedWG {
+		if addr = dedVirt(ded.WG.Hosts, f.Host); addr == "" {
+			return nil
+		}
 	}
 	return om("tag", fmt.Sprintf("%s%s-%d", dedFwdPrefix, f.Via, f.Listen), "listen", "0.0.0.0", "port", f.Listen,
-		"protocol", "dokodemo-door", "settings", om("address", v, "port", f.Port, "network", "tcp,udp"))
+		"protocol", "dokodemo-door", "settings", om("address", addr, "port", f.Port, "network", "tcp,udp"))
 }
 
-// addRelayDedicated adds the WireGuard outbound, the status check inbound and
-// the rule that sends pinned forwarders only through it.
+// addRelayDedicated adds each dedicated tunnel's outbound, its status check
+// inbound and the rule that sends its pinned forwarders only through it.
 func addRelayDedicated(root *OMap, ded *dedRelay, ctl int) {
-	if !ded.has(dedWG) {
-		return
+	if ded.has(dedWG) {
+		w := ded.WG
+		addRelayDedType(root, dedWG, ctl+2, dedVirtNet+"1", w.PanelPort, om("tag", dedOutWG, "protocol", "wireguard",
+			"settings", om("secretKey", w.Key, "address", []any{w.Addr + "/32"},
+				"peers", []any{om("publicKey", w.Pub, "endpoint", w.Endpoint, "keepAlive", 25)},
+				"mtu", 1420, "noKernelTun", true)))
 	}
-	w := ded.WG
-	probe := "dt-" + dedWG + dedProbeSuffix
+	if ded.has(dedKCP) {
+		k := ded.KCP
+		addRelayDedType(root, dedKCP, ctl+3, "127.0.0.1", k.PanelPort, om("tag", dedOutKCP, "protocol", "vless",
+			"settings", om("vnext", []any{om("address", k.Host, "port", k.Port,
+				"users", []any{om("id", k.UUID, "encryption", "none")})}),
+			"streamSettings", kcpStream(k.Seed)))
+	}
+}
+
+// addRelayDedType: the status check inbound dt-<t>-probe (to the panel at
+// probeAddr:panel), the outbound, and the route of dfwd-<t>-* and the probe.
+func addRelayDedType(root *OMap, t string, probePort int, probeAddr string, panel int, out *OMap) {
+	probe := "dt-" + t + dedProbeSuffix
 	tags := []any{}
 	ins := asArr(root.Get("inbounds"))
 	for _, v := range ins {
-		if t := asStr(asMap(v).Get("tag")); strings.HasPrefix(t, dedFwdPrefix+dedWG+"-") {
-			tags = append(tags, t)
+		if tg := asStr(asMap(v).Get("tag")); strings.HasPrefix(tg, dedFwdPrefix+t+"-") {
+			tags = append(tags, tg)
 		}
 	}
-	ins = append(ins, om("tag", probe, "listen", "127.0.0.1", "port", ctl+2, "protocol", "dokodemo-door",
-		"settings", om("address", dedVirtNet+"1", "port", w.PanelPort, "network", "tcp")))
+	ins = append(ins, om("tag", probe, "listen", "127.0.0.1", "port", probePort, "protocol", "dokodemo-door",
+		"settings", om("address", probeAddr, "port", panel, "network", "tcp")))
 	tags = append(tags, probe)
 	root.Set("inbounds", ins)
-	root.Set("outbounds", append(asArr(root.Get("outbounds")), om("tag", dedOutWG, "protocol", "wireguard",
-		"settings", om("secretKey", w.Key, "address", []any{w.Addr + "/32"},
-			"peers", []any{om("publicKey", w.Pub, "endpoint", w.Endpoint, "keepAlive", 25)},
-			"mtu", 1420, "noKernelTun", true))))
+	root.Set("outbounds", append(asArr(root.Get("outbounds")), out))
 	rt := asMap(root.Get("routing"))
 	if rt == nil {
 		rt = om("rules", []any{})
 		root.Set("routing", rt)
 	}
-	rt.Set("rules", append(asArr(rt.Get("rules")), om("type", "field", "ruleTag", "xo-dt-"+dedWG+"-route",
-		"inboundTag", tags, "outboundTag", dedOutWG)))
+	rt.Set("rules", append(asArr(rt.Get("rules")), om("type", "field", "ruleTag", "xo-dt-"+t+"-route",
+		"inboundTag", tags, "outboundTag", out.Get("tag"))))
 }
 
 // ---------- agent side: status check through each dedicated tunnel ----------
@@ -528,6 +734,12 @@ func (a *App) handleDedicated(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	mainXray := ""
+	if b.On && b.Type == dedKCP {
+		if _, core, err := a.cfg.Load(); err == nil {
+			mainXray = core.Version
+		}
+	}
 	var backup []byte
 	var useBackup map[string][]TunnelUse
 	err := a.store.EditTunnels(func() error {
@@ -558,7 +770,18 @@ func (a *App) handleDedicated(w http.ResponseWriter, r *http.Request) {
 		if s.LastSeen == 0 || !dedCapable(*s) {
 			return fmt.Errorf("update the middle server first (agent %s or newer): run the install command again there", agentDedVer)
 		}
-		pp := probePort(*s)
+		if b.Type == dedKCP {
+			if versionLess(s.AgentVer, agentKCPVer) {
+				return fmt.Errorf("update the middle server first (agent %s or newer): run the install command again there", agentKCPVer)
+			}
+			if s.XrayVer == "" || versionLess(s.XrayVer, minKCPXray) {
+				return fmt.Errorf("Xray on %s is %s; mKCP needs Xray %s or newer: run the install command again there (it updates Xray)", s.Name, orDefault(s.XrayVer, "unknown"), minKCPXray)
+			}
+			if mainXray != "" && versionLess(mainXray, minKCPXray) {
+				return fmt.Errorf("Xray on this server is %s; mKCP needs Xray %s or newer: update Xray in Settings first", mainXray, minKCPXray)
+			}
+		}
+		pp := probePort(*s, b.Type)
 		for _, bp := range s.Busy {
 			if bp == pp {
 				return fmt.Errorf("port %d on %s is busy; the dedicated tunnel's status check needs it", pp, s.Name)
@@ -574,6 +797,13 @@ func (a *App) handleDedicated(w http.ResponseWriter, r *http.Request) {
 		if d == nil {
 			s.Ded = append(s.Ded, DedTunnel{Type: b.Type})
 			d = s.dedOf(b.Type)
+		}
+		if b.Type == dedKCP {
+			if d.Key == "" {
+				d.Key = newUUID() // its VLESS id on the mKCP inbound
+			}
+			d.On, d.Up, d.ChkAt, d.Err = true, false, 0, ""
+			return nil
 		}
 		if d.Key == "" || wgPub(d.Key) == "" {
 			pr, pb, err := wgKeyPair()
@@ -628,16 +858,17 @@ func (a *App) ensureWGHost() error {
 		h = publicIP()
 	}
 	if h == "" {
-		return errors.New("could not find this server's public IP: set the WireGuard address in the Tunnels tab")
+		return errors.New("could not find this server's public IP: set the dedicated tunnels' address in the Tunnels tab")
 	}
 	return a.store.EditTunnels(func() error { a.store.TunnelCfg.WGHost = h; return nil })
 }
 
-// POST /api/tunnels/dtsettings {wgport, wghost}: the WireGuard tunnel's port
-// and the address middle servers dial.
+// POST /api/tunnels/dtsettings {wgport, kport, wghost}: the WireGuard and
+// mKCP tunnels' ports and the address middle servers dial (both use it).
 func (a *App) handleDedSettings(w http.ResponseWriter, r *http.Request) {
 	var b struct {
 		WGPort int    `json:"wgport"`
+		KPort  int    `json:"kport"`
 		WGHost string `json:"wghost"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&b); err != nil {
@@ -650,32 +881,44 @@ func (a *App) handleDedSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	servers, cur, _ := a.store.TunnelsCopy()
-	np, nh := cur.WGPort, cur.WGHost
+	np, nk, nh := cur.WGPort, cur.KPort, cur.WGHost
 	if b.WGPort != 0 && b.WGPort != cur.WGPort {
-		if why := a.dedPortBad(root, b.WGPort, cur); why != "" {
+		if why := a.dedPortBad(root, b.WGPort, cur, dedTagWG); why != "" {
 			fail(w, 400, errors.New("WireGuard "+why))
 			return
 		}
 		np = b.WGPort
 	}
+	if b.KPort != 0 && b.KPort != cur.KPort {
+		c := cur
+		c.WGPort = np
+		if why := a.dedPortBad(root, b.KPort, c, dedTagKCP); why != "" {
+			fail(w, 400, errors.New("mKCP "+why))
+			return
+		}
+		nk = b.KPort
+	}
 	if h := strings.TrimSpace(b.WGHost); h != "" && h != cur.WGHost {
 		if net.ParseIP(h) == nil && !hostRe.MatchString(strings.ToLower(h)) {
-			fail(w, 400, errors.New("the WireGuard address must be an IP or a domain that points straight at this server"))
+			fail(w, 400, errors.New("the dedicated tunnels' address must be an IP or a domain that points straight at this server"))
 			return
 		}
 		nh = h
 	}
-	if np == cur.WGPort && nh == cur.WGHost {
+	if np == cur.WGPort && nk == cur.KPort && nh == cur.WGHost {
 		writeJSONResp(w, 200, map[string]bool{"ok": true})
 		return
 	}
-	set := func(p int, h string) {
-		_ = a.store.EditTunnels(func() error { a.store.TunnelCfg.WGPort, a.store.TunnelCfg.WGHost = p, h; return nil })
+	set := func(p, k int, h string) {
+		_ = a.store.EditTunnels(func() error {
+			a.store.TunnelCfg.WGPort, a.store.TunnelCfg.KPort, a.store.TunnelCfg.WGHost = p, k, h
+			return nil
+		})
 	}
-	set(np, nh)
+	set(np, nk, nh)
 	var ids []string
 	for _, s := range servers {
-		if dedOn(s, dedWG) {
+		if dedOn(s, dedWG) || dedOn(s, dedKCP) {
 			ids = append(ids, s.ID)
 		}
 	}
@@ -686,7 +929,7 @@ func (a *App) handleDedSettings(w http.ResponseWriter, r *http.Request) {
 			}
 			return a.applyTunnelConfig(root)
 		}); err != nil {
-			set(cur.WGPort, cur.WGHost)
+			set(cur.WGPort, cur.KPort, cur.WGHost)
 			fail(w, 400, err)
 			return
 		}
