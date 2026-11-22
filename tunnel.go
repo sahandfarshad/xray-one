@@ -34,25 +34,31 @@ const (
 	tunnelBlock    = "xo-block"
 	agentCtlPort   = 10885
 	beatEvery      = 30 * time.Second
-	onlineWindow   = 95 * time.Second
+	onlineWindow   = 130 * time.Second
 	joinTTL        = 24 * time.Hour
 	tunnelInstall  = "https://raw.githubusercontent.com/sahandfarshad/xray-one/main/tunnel.sh"
 	tunnelMethodWS = "wss"
 	// XHTTP: same Xray core, its own inbound and port on the main server.
 	tunnelTagXH       = "xo-tunnel-xh"
 	tunnelMethodXHTTP = "xhttp"
+	tunnelTagRT       = "xo-tunnel-rt"
+	tunnelMethodRT    = "reality"
+	defaultRTarget    = "www.microsoft.com:443"
 	// how long a middle server tries a new method before going back
 	methodTrial = 90 * time.Second
 )
 
-func isTunnelTag(t string) bool { return t == tunnelTag || t == tunnelTagXH }
+func isTunnelTag(t string) bool { return t == tunnelTag || t == tunnelTagXH || t == tunnelTagRT }
 
-func validMethod(m string) bool { return m == tunnelMethodWS || m == tunnelMethodXHTTP }
+func validMethod(m string) bool {
+	return m == tunnelMethodWS || m == tunnelMethodXHTTP || m == tunnelMethodRT
+}
 
 // tunnelMethods: the method cards. Ready ones can be switched on per server.
 var tunnelMethods = []map[string]any{
 	{"id": tunnelMethodWS, "ready": true},
 	{"id": tunnelMethodXHTTP, "ready": true},
+	{"id": tunnelMethodRT, "ready": true},
 	{"id": "grefrp", "ready": false},
 	{"id": "backhaul", "ready": false},
 	{"id": "frpssh", "ready": false},
@@ -164,18 +170,64 @@ type TunnelSettings struct {
 	Path  string `json:"path,omitempty"`
 	XPort int    `json:"xport,omitempty"` // XHTTP inbound
 	XPath string `json:"xpath,omitempty"`
+	// REALITY inbound
+	RPort   int    `json:"rport,omitempty"`
+	RTarget string `json:"rtarget,omitempty"` // host:port of the site it looks like
+	RKey    string `json:"rkey,omitempty"`    // x25519 private key
+	RPub    string `json:"rpub,omitempty"`
+	RSID    string `json:"rsid,omitempty"`
+}
+
+// armPort returns the port a pre-armed method listens on: the chosen one
+// (must be free unless it is already ours) or a free one picked now.
+func (a *App) armPort(root *OMap, name string, p int, save func(int), tag string, skip ...int) (int, error) {
+	ib, _ := findInbound(root, tag)
+	if p != 0 {
+		mine := ib != nil && asStr(ib.Get("port")) == strconv.Itoa(p)
+		if !mine && (usedPorts(root)[strconv.Itoa(p)] || !portFree(p)) {
+			return 0, fmt.Errorf("%s tunnel port %d is busy: choose another port in the Tunnels tab", name, p)
+		}
+		return p, nil
+	}
+	p = pickTunnelPort(root, skip...)
+	if p == 0 {
+		return 0, fmt.Errorf("no free port for the %s tunnel", name)
+	}
+	_ = a.store.EditTunnels(func() error { save(p); return nil })
+	return p, nil
+}
+
+// armInbound finds or adds a tunnel inbound and sets its port.
+func armInbound(root *OMap, tag string, port int) *OMap {
+	ib, _ := findInbound(root, tag)
+	if ib == nil {
+		ib = om("tag", tag, "listen", "0.0.0.0", "port", port, "protocol", "vless")
+		root.Set("inbounds", append(asArr(root.Get("inbounds")), ib))
+	}
+	ib.Set("port", port)
+	ib.Set("protocol", "vless")
+	ib.Delete("sniffing")
+	return ib
 }
 
 // pickTunnelPort: a free Cloudflare-style HTTPS port, else any free port.
-func pickTunnelPort(root *OMap, skip int) int {
+func pickTunnelPort(root *OMap, skip ...int) int {
 	used := usedPorts(root)
+	bad := func(p int) bool {
+		for _, x := range skip {
+			if x == p {
+				return true
+			}
+		}
+		return used[strconv.Itoa(p)]
+	}
 	for _, p := range cfPorts {
-		if p != skip && !used[strconv.Itoa(p)] && portFree(p) {
+		if !bad(p) && portFree(p) {
 			return p
 		}
 	}
 	for i := 0; i < 20; i++ {
-		if p := suggestPort(); p != skip {
+		if p := suggestPort(); !bad(p) {
 			return p
 		}
 	}
@@ -241,6 +293,27 @@ func (a *App) ensureTunnelSettings(root *OMap) error {
 		if c.XPath == "" {
 			c.XPath = "/" + randHex(6)
 		}
+		if c.RTarget == "" {
+			c.RTarget = defaultRTarget
+		}
+		if c.RKey == "" || pubFromPriv(c.RKey) == "" {
+			pr, pb, err := genX25519()
+			if err != nil {
+				return err
+			}
+			c.RKey, c.RPub = pr, pb
+		}
+		if c.RPub == "" {
+			c.RPub = pubFromPriv(c.RKey)
+		}
+		if c.RSID == "" {
+			c.RSID = randHex(4)
+		}
+		if c.RPort == 0 {
+			if ib, _ := findInbound(root, tunnelTagRT); ib != nil {
+				c.RPort, _ = strconv.Atoi(asStr(ib.Get("port")))
+			}
+		}
 		if c.XPort == 0 {
 			if ib, _ := findInbound(root, tunnelTagXH); ib != nil {
 				c.XPort, _ = strconv.Atoi(asStr(ib.Get("port")))
@@ -252,7 +325,7 @@ func (a *App) ensureTunnelSettings(root *OMap) error {
 			}
 		}
 		if c.Port == 0 {
-			c.Port = pickTunnelPort(root, 0)
+			c.Port = pickTunnelPort(root)
 		}
 		if c.Port == 0 {
 			return errors.New("no free port for the tunnel")
@@ -322,39 +395,32 @@ func (a *App) applyTunnelConfig(root *OMap) error {
 		"wsSettings", om("path", set.Path)))
 	ib.Delete("sniffing")
 
-	// XHTTP inbound, only while a middle server uses (or is trying) it
-	xh, _ := findInbound(root, tunnelTagXH)
-	if usesMethod(servers, tunnelMethodXHTTP) {
-		if set.XPort != 0 && xh == nil && (usedPorts(root)[strconv.Itoa(set.XPort)] || !portFree(set.XPort)) {
-			return fmt.Errorf("XHTTP tunnel port %d is busy: choose another port in the Tunnels tab", set.XPort)
-		}
-		if set.XPort == 0 {
-			p := pickTunnelPort(root, set.Port)
-			if p == 0 {
-				return errors.New("no free port for the XHTTP tunnel")
-			}
-			set.XPort = p
-			_ = a.store.EditTunnels(func() error { a.store.TunnelCfg.XPort = p; return nil })
-		}
-		if xh == nil {
-			xh = om("tag", tunnelTagXH, "listen", "0.0.0.0", "port", set.XPort, "protocol", "vless")
-			root.Set("inbounds", append(asArr(root.Get("inbounds")), xh))
-		}
-		xh.Set("port", set.XPort)
-		xh.Set("protocol", "vless")
-		xh.Set("settings", om("clients", clients, "decryption", "none"))
-		xh.Set("streamSettings", om("network", "xhttp", "security", "tls",
-			"tlsSettings", om("serverName", dom, "alpn", []any{"h2", "http/1.1"}, "certificates", []any{om("certificateFile", rcf, "keyFile", rkf)}),
-			"xhttpSettings", om("path", set.XPath, "mode", "auto")))
-	} else if xh != nil {
-		var keep []any
-		for _, v := range asArr(root.Get("inbounds")) {
-			if asStr(asMap(v).Get("tag")) != tunnelTagXH {
-				keep = append(keep, v)
-			}
-		}
-		root.Set("inbounds", keep)
+	// every ready method listens all the time (pre-armed), so a middle
+	// server can switch at once without touching this server
+	xport, err := a.armPort(root, "XHTTP", set.XPort, func(p int) { a.store.TunnelCfg.XPort = p }, tunnelTagXH, set.Port)
+	if err != nil {
+		return err
 	}
+	xh := armInbound(root, tunnelTagXH, xport)
+	xh.Set("settings", om("clients", clients, "decryption", "none"))
+	xh.Set("streamSettings", om("network", "xhttp", "security", "tls",
+		"tlsSettings", om("serverName", dom, "alpn", []any{"h2", "http/1.1"}, "certificates", []any{om("certificateFile", rcf, "keyFile", rkf)}),
+		"xhttpSettings", om("path", set.XPath, "mode", "auto")))
+
+	rport, err := a.armPort(root, "REALITY", set.RPort, func(p int) { a.store.TunnelCfg.RPort = p }, tunnelTagRT, set.Port, xport)
+	if err != nil {
+		return err
+	}
+	var rclients []any
+	for _, s := range servers {
+		rclients = append(rclients, om("id", s.UUID, "email", "tunnel-"+s.ID, "level", 0, "flow", "xtls-rprx-vision"))
+	}
+	rt := armInbound(root, tunnelTagRT, rport)
+	host, _, _ := strings.Cut(set.RTarget, ":")
+	rt.Set("settings", om("clients", rclients, "decryption", "none"))
+	rt.Set("streamSettings", om("network", "raw", "security", "reality",
+		"realitySettings", om("show", false, "target", set.RTarget, "xver", 0, "serverNames", []any{host},
+			"privateKey", set.RKey, "shortIds", []any{set.RSID})))
 
 	// allowed destinations
 	ips := map[string]bool{"127.0.0.1": true}
@@ -421,9 +487,9 @@ func setTunnelRules(root *OMap, r *tunnelRule) {
 			ips = append(ips, ip)
 		}
 		rules = append(rules,
-			om("type", "field", "ruleTag", "xo-tunnel-allow", "inboundTag", []any{tunnelTag, tunnelTagXH}, "ip", ips,
+			om("type", "field", "ruleTag", "xo-tunnel-allow", "inboundTag", []any{tunnelTag, tunnelTagXH, tunnelTagRT}, "ip", ips,
 				"port", strings.Join(r.ports, ","), "outboundTag", tunnelDirect),
-			om("type", "field", "ruleTag", "xo-tunnel-block", "inboundTag", []any{tunnelTag, tunnelTagXH}, "outboundTag", tunnelBlock))
+			om("type", "field", "ruleTag", "xo-tunnel-block", "inboundTag", []any{tunnelTag, tunnelTagXH, tunnelTagRT}, "outboundTag", tunnelBlock))
 	}
 	for _, v := range asArr(rt.Get("rules")) {
 		if m := asMap(v); m != nil && strings.HasPrefix(asStr(m.Get("ruleTag")), "xo-tunnel") {
@@ -481,6 +547,10 @@ type joinInfo struct {
 	Method string `json:"method,omitempty"` // wss (default) or xhttp
 	XPort  int    `json:"xport,omitempty"`
 	XPath  string `json:"xpath,omitempty"`
+	RPort  int    `json:"rport,omitempty"`
+	RSNI   string `json:"rsni,omitempty"`
+	RPub   string `json:"rpub,omitempty"`
+	RSID   string `json:"rsid,omitempty"`
 	Panel  string `json:"panel"` // URL of the panel as seen from this server, e.g. https://127.0.0.1:24995/base/
 }
 
@@ -513,11 +583,18 @@ func relayXrayConfig(j joinInfo, fwd []fwdPort, ctl int) []byte {
 			"tlsSettings", om("serverName", j.Domain, "fingerprint", "chrome", "alpn", []any{"h2"}),
 			"xhttpSettings", om("path", j.XPath, "host", j.Domain, "mode", "auto"))
 	}
+	user := om("id", j.UUID, "encryption", "none")
+	if j.Method == tunnelMethodRT && j.RPort > 0 {
+		port = j.RPort
+		user.Set("flow", "xtls-rprx-vision")
+		stream = om("network", "raw", "security", "reality",
+			"realitySettings", om("serverName", j.RSNI, "fingerprint", "chrome", "publicKey", j.RPub, "shortId", j.RSID))
+	}
 	root := om("log", om("loglevel", "warning"),
 		"inbounds", inbounds,
 		"outbounds", []any{om("tag", "main", "protocol", "vless",
 			"settings", om("vnext", []any{om("address", j.Domain, "port", port,
-				"users", []any{om("id", j.UUID, "encryption", "none")})}),
+				"users", []any{user})}),
 			"streamSettings", stream)})
 	return EncodeIndent(root)
 }
@@ -532,8 +609,12 @@ func (a *App) joinFor(s TunnelServer) joinInfo {
 	_, set, _ := a.store.TunnelsCopy()
 	j := joinInfo{V: 1, ID: s.ID, Join: s.Join, Domain: a.store.Cfg.Domain, Port: set.Port, Path: set.Path,
 		UUID: s.UUID, Panel: a.panelLocalURL()}
-	if s.Method == tunnelMethodXHTTP {
+	switch s.Method {
+	case tunnelMethodXHTTP:
 		j.Method, j.XPort, j.XPath = s.Method, set.XPort, set.XPath
+	case tunnelMethodRT:
+		host, _, _ := strings.Cut(set.RTarget, ":")
+		j.Method, j.RPort, j.RSNI, j.RPub, j.RSID = s.Method, set.RPort, host, set.RPub, set.RSID
 	}
 	return j
 }
@@ -619,7 +700,7 @@ func (a *App) handleTunnels(w http.ResponseWriter, r *http.Request) {
 		out = append(out, v)
 	}
 	writeJSONResp(w, 200, map[string]any{"servers": out, "port": set.Port, "domain": a.store.Cfg.Domain,
-		"ready": a.store.Cfg.Domain != "" && a.store.Cfg.CertFile != "", "methods": tunnelMethods, "xport": set.XPort, "methodVer": agentMethodVer})
+		"ready": a.store.Cfg.Domain != "" && a.store.Cfg.CertFile != "", "methods": tunnelMethods, "xport": set.XPort, "rport": set.RPort, "rtarget": set.RTarget, "methodVer": agentMethodVer})
 }
 
 func (a *App) handleAddTunnel(w http.ResponseWriter, r *http.Request) {
@@ -1067,7 +1148,7 @@ func (a *App) handleBeat(w http.ResponseWriter, r *http.Request) {
 		select {
 		case <-pc:
 			resp.Probe = true
-		case <-time.After(25 * time.Second):
+		case <-time.After(holdFor(srv.AgentVer)):
 		case <-r.Context().Done():
 			return
 		}
@@ -1231,20 +1312,8 @@ func (a *App) tunnelStatus(id string, ib *OMap) []TunnelLink {
 	return out
 }
 
-// refreshTunnelInbounds re-writes the tunnel inbounds (adds or drops the
-// XHTTP one) after a method switch settled.
-func (a *App) refreshTunnelInbounds() {
-	root, _, err := a.cfg.Load()
-	if err != nil {
-		return
-	}
-	servers, _, _ := a.store.TunnelsCopy()
-	_, has := findInbound(root, tunnelTagXH)
-	if (has >= 0) == usesMethod(servers, tunnelMethodXHTTP) {
-		return
-	}
-	_ = a.cfg.Mutate(func(root *OMap) error { return a.applyTunnelConfig(root) })
-}
+// refreshTunnelInbounds: nothing to do now that every method is pre-armed.
+func (a *App) refreshTunnelInbounds() {}
 
 // POST /api/tunnels/{id}/method {method}: switch one middle server. The agent
 // tries it for a while and goes back by itself when it cannot reach us.
@@ -1311,8 +1380,10 @@ func (a *App) handleTunnelMethod(w http.ResponseWriter, r *http.Request) {
 // server. Every new port is checked against the config and the system (TCP+UDP).
 func (a *App) handleTunnelSettings(w http.ResponseWriter, r *http.Request) {
 	var b struct {
-		Port  int `json:"port"`
-		XPort int `json:"xport"`
+		Port    int    `json:"port"`
+		XPort   int    `json:"xport"`
+		RPort   int    `json:"rport"`
+		RTarget string `json:"rtarget"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&b); err != nil {
 		fail(w, 400, err)
@@ -1331,6 +1402,14 @@ func (a *App) handleTunnelSettings(w http.ResponseWriter, r *http.Request) {
 			others[asStr(x.Get("port"))] = true
 		}
 	}
+	ours := map[int]bool{cur.Port: true, cur.XPort: true, cur.RPort: true}
+	pick := func(p, old int) int {
+		if p == 0 {
+			return old
+		}
+		return p
+	}
+	np, nx, nr := pick(b.Port, cur.Port), pick(b.XPort, cur.XPort), pick(b.RPort, cur.RPort)
 	check := func(name string, p, old int) error {
 		if p == 0 || p == old {
 			return nil
@@ -1344,39 +1423,48 @@ func (a *App) handleTunnelSettings(w http.ResponseWriter, r *http.Request) {
 		if others[strconv.Itoa(p)] {
 			return fmt.Errorf("%s port %d is used by another inbound", name, p)
 		}
-		if p != cur.Port && p != cur.XPort && !portFree(p) {
+		if !ours[p] && !portFree(p) {
 			return fmt.Errorf("%s port %d is busy on this server (another program uses it)", name, p)
 		}
 		return nil
 	}
-	if b.Port != 0 && b.Port == b.XPort {
-		fail(w, 400, errors.New("WS and XHTTP need different ports"))
+	if (np != 0 && (np == nx || np == nr)) || (nx != 0 && nx == nr) {
+		fail(w, 400, errors.New("each tunnel method needs its own port"))
 		return
 	}
-	if err := check("WS", b.Port, cur.Port); err != nil {
-		fail(w, 400, err)
-		return
+	for _, c := range []struct {
+		n      string
+		p, old int
+	}{{"WS", np, cur.Port}, {"XHTTP", nx, cur.XPort}, {"REALITY", nr, cur.RPort}} {
+		if err := check(c.n, c.p, c.old); err != nil {
+			fail(w, 400, err)
+			return
+		}
 	}
-	if err := check("XHTTP", b.XPort, cur.XPort); err != nil {
-		fail(w, 400, err)
-		return
+	nt := cur.RTarget
+	if t := strings.TrimSpace(b.RTarget); t != "" {
+		if !strings.Contains(t, ":") {
+			t += ":443"
+		}
+		h, p, err := net.SplitHostPort(t)
+		if err != nil || h == "" || p == "" || strings.ContainsAny(h, "/ ") {
+			fail(w, 400, errors.New("REALITY target must look like www.example.com:443"))
+			return
+		}
+		nt = t
 	}
-	np, nx := cur.Port, cur.XPort
-	if b.Port != 0 {
-		np = b.Port
-	}
-	if b.XPort != 0 {
-		nx = b.XPort
-	}
-	if np == nx && np != 0 {
-		fail(w, 400, errors.New("WS and XHTTP need different ports"))
-		return
-	}
-	if np == cur.Port && nx == cur.XPort {
+	if np == cur.Port && nx == cur.XPort && nr == cur.RPort && nt == cur.RTarget {
 		writeJSONResp(w, 200, map[string]bool{"ok": true})
 		return
 	}
-	_ = a.store.EditTunnels(func() error { a.store.TunnelCfg.Port, a.store.TunnelCfg.XPort = np, nx; return nil })
+	set := func(c TunnelSettings) {
+		_ = a.store.EditTunnels(func() error {
+			t := &a.store.TunnelCfg
+			t.Port, t.XPort, t.RPort, t.RTarget = c.Port, c.XPort, c.RPort, c.RTarget
+			return nil
+		})
+	}
+	set(TunnelSettings{Port: np, XPort: nx, RPort: nr, RTarget: nt})
 	servers, _, _ := a.store.TunnelsCopy()
 	if len(servers) > 0 {
 		if err := a.cfg.Mutate(func(root *OMap) error {
@@ -1385,7 +1473,7 @@ func (a *App) handleTunnelSettings(w http.ResponseWriter, r *http.Request) {
 			}
 			return a.applyTunnelConfig(root)
 		}); err != nil {
-			_ = a.store.EditTunnels(func() error { a.store.TunnelCfg.Port, a.store.TunnelCfg.XPort = cur.Port, cur.XPort; return nil })
+			set(cur)
 			fail(w, 400, err)
 			return
 		}
@@ -1396,4 +1484,13 @@ func (a *App) handleTunnelSettings(w http.ResponseWriter, r *http.Request) {
 		hub.PokeAll(ids)
 	}
 	writeJSONResp(w, 200, map[string]bool{"ok": true})
+}
+
+// holdFor: how long a quiet heartbeat is held open. Agents from 0.6.3 wait up
+// to 75 s, older ones only 45 s.
+func holdFor(agentVer string) time.Duration {
+	if versionLess(agentVer, "0.6.3") {
+		return 25 * time.Second
+	}
+	return 55 * time.Second
 }

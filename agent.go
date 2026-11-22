@@ -222,7 +222,7 @@ func agentRun() {
 		st.Ctl = agentCtlPort
 	}
 	proxy, _ := url.Parse(fmt.Sprintf("socks5://127.0.0.1:%d", st.Ctl))
-	cl := &http.Client{Timeout: 45 * time.Second, Transport: &http.Transport{Proxy: http.ProxyURL(proxy),
+	cl := &http.Client{Timeout: 75 * time.Second, Transport: &http.Transport{Proxy: http.ProxyURL(proxy),
 		// the hop runs inside the authenticated VLESS+TLS tunnel to 127.0.0.1
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}}
 	every := beatEvery
@@ -267,7 +267,14 @@ func agentRun() {
 			fmt.Println("heartbeat failed:", err)
 			fails++
 			lastFail = time.Now().UTC().Format("15:04:05Z ") + err.Error()
-			next = 5 * time.Second
+			// back off while the main server can't be reached: 5, 10, 20, 40, 60, 60 … s
+			next = 5 * time.Second << min(fails-1, 4)
+			if next > time.Minute {
+				next = time.Minute
+			}
+			if st.PendingAt > 0 && next > 10*time.Second { // trying a new method: decide quickly
+				next = 10 * time.Second
+			}
 			// self-heal: restart the relay after 3 failures in a row
 			if fails%3 == 0 {
 				_, _ = run(30*time.Second, "systemctl", "restart", agentRelay)
