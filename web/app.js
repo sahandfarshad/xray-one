@@ -338,7 +338,6 @@ async function openInboundForm(ed) {
   openModal(`<h3>${ed ? t("editInbound") + ` · <span class="mono">${esc(ed.id)}</span>` : t("addInbound")}</h3>
   <form id="ibForm" class="form">
     <label>${t("protocol")}<select name="protocol"><option>vless</option><option>vmess</option><option>trojan</option><option value="shadowsocks">shadowsocks 2022</option><option value="hysteria">hysteria2</option><option>socks</option><option>http</option><option>wireguard</option></select></label>
-    <label data-show="venc">VLESS Encryption<select name="vlessEnc"><option value="none">none</option><option value="mlkem768x25519plus">ML-KEM-768 (post-quantum)</option></select></label>
     <label>${t("port")}<input name="port" type="number" min="1" max="65535" value="${fp.port || ""}" required></label>
     <label>${t("network")}<select name="network"><option>tcp</option><option>ws</option><option>grpc</option><option>xhttp</option><option>httpupgrade</option><option>kcp</option></select></label>
     <label>${t("security")}<select name="security"><option>reality</option><option>tls</option><option>none</option></select></label>
@@ -361,6 +360,15 @@ async function openInboundForm(ed) {
       <label class="wide">Private Key<input name="r_priv" dir="ltr" class="mono"></label>
       <div class="actions wide"><button type="button" class="btn small primary" id="rKeys">${t("rNewKeys")}</button><button type="button" class="btn small danger" id="rClear">${t("rClear")}</button></div>
     </div>
+    <div data-show="proto" class="rgrid">
+      <label class="wide" data-show="venc">Decryption <small class="muted">(server)</small><input name="pv_dec" dir="ltr" class="mono" value="none"></label>
+      <label class="wide" data-show="venc">Encryption <small class="muted">(client links)</small><input name="pv_enc" readonly dir="ltr" class="mono" value="none"></label>
+      <label data-show="venc">Auth key<select name="pv_auth"><option value="x25519">X25519</option><option value="mlkem768">ML-KEM-768</option></select></label>
+      <label data-show="venc">Mode<select name="pv_mode"><option>native</option><option>xorpub</option><option>random</option></select></label>
+      <div class="actions wide" data-show="venc"><button type="button" class="btn small primary" id="pvGen">Generate</button><button type="button" class="btn small danger" id="pvClear">${t("rClear")}</button></div>
+      <label class="wide" data-show="vision">Vision testseed<span class="inrow">${[0, 1, 2, 3].map((i) => `<input name="pv_ts${i}" type="number" min="0" max="65535" value="${[900, 500, 900, 256][i]}">`).join("")}</span><small class="muted">xtls-rprx-vision</small></label>
+      <div class="wide" data-show="fb"><div class="row-between"><b>Fallbacks</b><button type="button" class="btn small" id="fbAdd">+ Fallback</button></div><div id="fbList" class="stack"></div></div>
+    </div>
     ${certs.length ? `<label data-show="tls">${t("pickCert")}<select name="certPick"><option value="">—</option>${certOpts}</select></label>` : ""}
     <label data-show="tls">${t("certFile")}<input name="certFile" placeholder="/etc/letsencrypt/live/…/fullchain.pem"></label>
     <label data-show="tls">${t("keyFile")}<input name="keyFile" placeholder="/etc/letsencrypt/live/…/privkey.pem"></label>
@@ -374,11 +382,30 @@ async function openInboundForm(ed) {
   const newSids = () => { f.r_sids.value = [8, 2, 1, 3, 4, 7, 5, 6].map(rhex).join(","); };
   const newSpx = () => { const a = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"; f.r_spx.value = "/" + [...crypto.getRandomValues(new Uint8Array(15))].map((b) => a[b % a.length]).join(""); };
   const newKeys = async () => { try { const k = await api("GET", "api/reality/keys"); f.r_priv.value = k.privateKey; f.r_pub.value = k.publicKey; } catch (e) { $("#ibErr").textContent = e.message; } };
+  const fbRow = (x = {}) => {
+    const row = document.createElement("div"); row.className = "fbrow";
+    row.innerHTML = `<input data-k="name" placeholder="SNI (name)" dir="ltr"><input data-k="alpn" placeholder="alpn" dir="ltr"><input data-k="path" placeholder="/path" dir="ltr"><input data-k="dest" placeholder="80 / 127.0.0.1:8080" dir="ltr"><input data-k="xver" type="number" min="0" max="2" placeholder="xver"><button type="button" class="btn small danger">✕</button>`;
+    row.querySelectorAll("input").forEach((i) => { i.value = x[i.dataset.k] ?? ""; });
+    row.querySelector("button").onclick = () => row.remove();
+    $("#fbList").appendChild(row);
+  };
+  $("#fbAdd").onclick = () => fbRow();
+  const encOf = async (dec) => { f.pv_enc.value = "none"; if (dec && dec !== "none") try { f.pv_enc.value = (await api("GET", "api/vless/enc?dec=" + encodeURIComponent(dec))).encryption; } catch (e) { $("#ibErr").textContent = e.message; } };
+  $("#pvGen").onclick = async () => { try { const k = await api("GET", `api/vless/enc?auth=${f.pv_auth.value}&mode=${f.pv_mode.value}`); f.pv_dec.value = k.decryption; f.pv_enc.value = k.encryption; sync(); } catch (e) { $("#ibErr").textContent = e.message; } };
+  $("#pvClear").onclick = () => { f.pv_dec.value = "none"; f.pv_enc.value = "none"; sync(); };
+  f.pv_dec.onchange = () => encOf(f.pv_dec.value.trim());
   if (ed) {
-    const v = ed.form, r = v.reality;
+    const v = ed.form, r = v.reality, pv = v.proto;
+    if (pv) {
+      f.pv_dec.value = pv.decryption || "none"; f.pv_enc.value = pv.encryption || "none";
+      (pv.testseed || []).forEach((n, i) => { if (f["pv_ts" + i]) f["pv_ts" + i].value = n; });
+      (pv.fallbacks || []).forEach(fbRow);
+      const parts = (pv.decryption || "").split(".");
+      if (parts.length > 3) { f.pv_mode.value = parts[1]; f.pv_auth.value = parts[parts.length - 1].length > 60 ? "mlkem768" : "x25519"; }
+    }
     f.protocol.value = v.protocol; f.protocol.disabled = true;
     f.tag.value = v.tag || ""; f.tag.readOnly = true;
-    f.network.value = v.network; f.security.value = v.security; if (v.vlessEnc) f.vlessEnc.value = v.vlessEnc;
+    f.network.value = v.network; f.security.value = v.security;
     f.path.value = v.path || ""; f.serviceName.value = v.serviceName || ""; f.serverName.value = v.serverName || "";
     f.certFile.value = v.certFile || ""; f.keyFile.value = v.keyFile || "";
     if (r) {
@@ -408,7 +435,9 @@ async function openInboundForm(ed) {
     const net = f.network.value, sec = f.security.value, proto = f.protocol.value;
     const wg = proto === "wireguard", fixed = wg || proto === "socks" || proto === "http";
     f.network.disabled = fixed; f.security.disabled = fixed;
-    const show = { path: !fixed && ["ws", "xhttp", "httpupgrade"].includes(net), grpc: !fixed && net === "grpc", sni: !fixed && sec !== "none", reality: !fixed && sec === "reality", tls: !fixed && sec === "tls", venc: proto === "vless" };
+    const show = { path: !fixed && ["ws", "xhttp", "httpupgrade"].includes(net), grpc: !fixed && net === "grpc", sni: !fixed && sec !== "none", reality: !fixed && sec === "reality", tls: !fixed && sec === "tls", venc: proto === "vless", proto: ["vless", "trojan"].includes(proto),
+      vision: proto === "vless" && net === "tcp" && (sec !== "none" || (f.pv_dec.value.trim() || "none") !== "none"),
+      fb: ["vless", "trojan"].includes(proto) && net === "tcp" && (proto === "trojan" || (f.pv_dec.value.trim() || "none") === "none") };
     f.querySelectorAll("[data-show]").forEach((l) => l.classList.toggle("hidden", !show[l.dataset.show]));
     [...f.security.options].forEach((o) => (o.disabled = o.value === "reality" && !["vless", "trojan"].includes(proto)));
     if (f.security.selectedOptions[0].disabled) f.security.value = "tls";
@@ -428,7 +457,12 @@ async function openInboundForm(ed) {
     if (d.security === "reality") d.reality = { show: !!f.r_show.checked, xver: +d.r_xver || 0, fingerprint: d.r_fp, target: (d.r_target || "").trim(),
       serverNames: list(d.r_sni), maxTimeDiff: +d.r_mtd || 0, minClientVer: (d.r_minv || "").trim(), maxClientVer: (d.r_maxv || "").trim(),
       shortIds: sidList(d.r_sids), spiderX: (d.r_spx || "").trim(), privateKey: (d.r_priv || "").trim() };
-    Object.keys(d).filter((k) => k.startsWith("r_")).forEach((k) => delete d[k]);
+    if (["vless", "trojan"].includes(f.protocol.value)) {
+      d.proto = { decryption: (d.pv_dec || "none").trim() || "none", testseed: [0, 1, 2, 3].map((i) => +d["pv_ts" + i] || 0),
+        fallbacks: !$("#fbList").parentElement.classList.contains("hidden") ? [...$("#fbList").children].map((row) => { const o = {}; row.querySelectorAll("input").forEach((i) => { o[i.dataset.k] = i.value.trim(); }); o.xver = +o.xver || 0; return o; }).filter((o) => o.dest) : [] };
+      if (f.protocol.value === "trojan") { delete d.proto.decryption; delete d.proto.testseed; }
+    }
+    Object.keys(d).filter((k) => k.startsWith("r_") || k.startsWith("pv_")).forEach((k) => delete d[k]);
     try {
       if (ed && d.network === ed.form.network) d.headerType = ed.form.headerType;
       if (ed) await api("POST", "api/inbounds/edit", { ...d, id: ed.id }); else await api("POST", "api/inbounds", d);

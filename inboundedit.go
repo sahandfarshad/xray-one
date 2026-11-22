@@ -36,6 +36,7 @@ func inboundForm(ib *OMap) NewInbound {
 			n.VlessEnc = vlessEncName
 		}
 	}
+	n.Proto = protoForm(ib)
 	n.Port = int(numOf(ib.Get("port")))
 	n.Network, n.Security = streamInfo(ib)
 	if n.Network == "raw" {
@@ -179,11 +180,6 @@ func (a *App) handleEditInbound(w http.ResponseWriter, r *http.Request) {
 			return err
 		}
 		ib.Set("port", n.Port)
-		if n.Protocol == "vless" && n.VlessEnc != "" && n.VlessEnc != old.VlessEnc {
-			if s := asMap(ib.Get("settings")); s != nil {
-				s.Set("decryption", pathStr(nb, "settings", "decryption"))
-			}
-		}
 		if ns := asMap(nb.Get("streamSettings")); ns != nil {
 			if os := asMap(ib.Get("streamSettings")); os != nil {
 				for _, k := range []string{"sockopt", "finalmask"} {
@@ -194,7 +190,16 @@ func (a *App) handleEditInbound(w http.ResponseWriter, r *http.Request) {
 			}
 			ib.Set("streamSettings", ns)
 		}
-		// VLESS Vision flow only fits TCP + TLS/REALITY
+		if n.Proto != nil {
+			if err := applyProto(ib, n.Proto); err != nil {
+				return err
+			}
+		} else if n.Protocol == "vless" && n.VlessEnc != "" && n.VlessEnc != old.VlessEnc {
+			if s := asMap(ib.Get("settings")); s != nil {
+				s.Set("decryption", pathStr(nb, "settings", "decryption"))
+			}
+		}
+		// VLESS Vision flow only fits TCP + TLS/REALITY/Encryption
 		if n.Protocol == "vless" {
 			vision := visionOK(ib)
 			for _, c := range asArr(asMap(ib.Get("settings")).Get("clients")) {

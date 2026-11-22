@@ -536,34 +536,9 @@ type NewInbound struct {
 	Flow        string       `json:"-"`
 	Reality     *RealityOpts `json:"reality,omitempty"`
 	VlessEnc    string       `json:"vlessEnc,omitempty"` // "" / none / mlkem768x25519plus
+	Proto       *ProtoOpts   `json:"proto,omitempty"`    // VLESS decryption, Vision testseed, fallbacks
 }
 
-const vlessEncName = "mlkem768x25519plus"
-
-// newVlessDecryption: VLESS Encryption (ML-KEM-768 + X25519 key exchange, X25519 auth).
-func newVlessDecryption() (string, error) {
-	priv, _, err := genX25519()
-	if err != nil {
-		return "", err
-	}
-	return vlessEncName + ".native.600s." + priv, nil
-}
-
-// vlessClientEncryption turns the server's decryption string into the client's.
-func vlessClientEncryption(dec string) string {
-	if dec == "" || dec == "none" {
-		return "none"
-	}
-	p := strings.Split(dec, ".")
-	if len(p) < 4 {
-		return "none"
-	}
-	pub := pubFromPriv(p[len(p)-1])
-	if pub == "" {
-		return "none" // ML-KEM auth key: public part can't be derived here
-	}
-	return p[0] + "." + p[1] + ".0rtt." + pub
-}
 
 // visionOK: VLESS Vision flow fits raw TCP with TLS, REALITY or VLESS Encryption.
 func visionOK(ib *OMap) bool {
@@ -727,7 +702,7 @@ func buildReality(n NewInbound) (*OMap, error) {
 	return rs, nil
 }
 
-func BuildInbound(root *OMap, n NewInbound) (*OMap, error) {
+func buildInboundBase(root *OMap, n NewInbound) (*OMap, error) {
 	if n.Port < 1 || n.Port > 65535 {
 		return nil, errors.New("invalid port")
 	}
@@ -746,7 +721,7 @@ func BuildInbound(root *OMap, n NewInbound) (*OMap, error) {
 		dec := "none"
 		if n.VlessEnc == vlessEncName {
 			var err error
-			if dec, err = newVlessDecryption(); err != nil {
+			if dec, _, err = newVlessEnc("x25519", "native"); err != nil {
 				return nil, err
 			}
 		}

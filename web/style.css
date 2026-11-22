@@ -146,6 +146,9 @@ mark{background:#ffe58a;color:inherit;border-radius:3px;padding:0 2px}
 .rgrid{grid-column:1/-1;display:grid;grid-template-columns:repeat(3,1fr);gap:.6rem;border:1px solid var(--line);border-radius:12px;padding:.75rem}
 .rgrid .wide{grid-column:1/-1}
 .rgrid .rck{flex-direction:row;align-items:center;gap:.4rem}
+.fbrow{display:grid;grid-template-columns:1.2fr .8fr 1fr 1.4fr .6fr auto;gap:.4rem;margin-top:.4rem}
+.fbrow input{min-width:0}
+@media (max-width:640px){.fbrow{grid-template-columns:1fr 1fr}}
 .rgrid.hidden{display:none}
 @media (max-width:640px){.rgrid{grid-template-columns:1fr}}
 .rgrid .rck input{width:16px;height:16px;padding:0}
