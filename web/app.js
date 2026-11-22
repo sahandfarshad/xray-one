@@ -56,6 +56,12 @@ const T = {
     tnRemove: "حذف relay از سرور میانی (روی همان سرور بزنید):", tnCmdTitle: "دستور نصب سرور میانی",
     tnInbounds: "اینباندها", tnDeploying: "در حال نصب روی سرور میانی… (تا چند دقیقه)", tnConfirmDel: "این سرور میانی حذف شود؟ اینباندها دیگر از آن استفاده نمی‌کنند.", tnXrayErr: "خطای relay",
     selectAll: "انتخاب همه", wgTitle: "فایل WireGuard", wgHint: "در اپ WireGuard دکمه‌ی + را بزنید، بعد فایل را وارد کنید یا QR را اسکن کنید.", wgFile: "دانلود فایل", ports: "پورت‌ها", portsTitle: "پورت‌های استفاده‌شده", portsHint: "همه‌ی پورت‌های این‌باندها، جدا با کاما؛ برای ساخت relay و تانل.", gSS: "Shadowsocks", gProxy: "پراکسی ساده (SOCKS / HTTP، با یوزر و پسورد جدا)", relayLinks: "لینک‌های relay", singleUser: "تک‌کاربره", confirmDelRelay: "این relay حذف شود؟",
+    dtTitle: "تانل‌های اختصاصی", dtHint: "مسیر ثابت و جدا از تانل چرخشی: هرگز عوض نمی‌شود و جایگزین ندارد. اینباندهایی که به آن وصل شوند فقط از همین مسیر می‌روند و اگر قطع شود، قطع می‌مانند.",
+    dtWg: "WireGuard اختصاصی", dtWgD: "Xray WireGuard روی UDP؛ سرور میانی مستقیم به IP این سرور وصل می‌شود. اگر UDP بین دو سرور بسته باشد کار نمی‌کند.", dtBackhaul: "Backhaul", dtBackhaulD: "تانل اختصاصی Backhaul.",
+    dtOn: "روشن کن", dtOff: "خاموش کن", dtUp: "وصل", dtDown: "قطع", dtPending: "در حال بررسی…", dtOffline: "سرور میانی آفلاین", dtOffState: "خاموش", dtLastOk: "آخرین اتصال موفق {t}", dtPins: "{n} اینباند", dtNeedAgent: "تانل اختصاصی به ایجنت نسخه‌ی {v} یا جدیدتر نیاز دارد: دستور نصب را یک بار دیگر روی سرور میانی اجرا کنید.",
+    dtAskOn: "WireGuard اختصاصی برای این سرور میانی روشن شود؟ پورت UDP {p} این سرور باید از سرور میانی باز باشد.", dtAskOff: "WireGuard اختصاصی خاموش شود؟ {n} اینباند وصل به آن به تانل چرخشی برمی‌گردند.",
+    dtPort: "پورت WireGuard (UDP)", dtHost: "آدرس این سرور برای WireGuard", dtSave: "ذخیره", dtSetHint: "سرور میانی با UDP به این آدرس و پورت وصل می‌شود. IP مستقیم بدهید، نه دامنه‌ی پشت CDN. پورت باید آزاد باشد (TCP و UDP).",
+    dtPath: "مسیر", dtRot: "چرخشی (پیش‌فرض)", dtPickHint: "مسیر «اختصاصی» ثابت است و جایگزین ندارد: اگر قطع شود این اینباند روی آن سرور قطع می‌ماند.",
   },
   en: {
     loginHint: "Sign in to manage the Xray core.", user: "Username", pass: "Password", signIn: "Sign in",
@@ -113,6 +119,12 @@ const T = {
     tnRemove: "Remove the relay from the middle server (run there):", tnCmdTitle: "Middle server install command",
     tnInbounds: "Inbounds", tnDeploying: "Installing on the middle server… (a few minutes)", tnConfirmDel: "Remove this middle server? Inbounds stop using it.", tnXrayErr: "Relay error",
     selectAll: "Select all", wgTitle: "WireGuard file", wgHint: "For the official WireGuard app: download the file and tap + then Import from file, or scan the QR with Create from QR code.", wgFile: "Download .conf", ports: "Ports", portsTitle: "Used ports", portsHint: "Every inbound port, comma separated, for building relays and tunnels.", gSS: "Shadowsocks", gProxy: "Plain proxies (SOCKS / HTTP, own user and password)", relayLinks: "Relay links", singleUser: "single user", confirmDelRelay: "Remove this relay?",
+    dtTitle: "Dedicated tunnels", dtHint: "A fixed path, separate from the rotating tunnel: it never switches and has no fallback. Inbounds pinned to it go only this way, and stay down if it drops.",
+    dtWg: "Dedicated WireGuard", dtWgD: "Xray WireGuard over UDP; the middle server dials this server's IP directly. Won't work if UDP is blocked between the servers.", dtBackhaul: "Backhaul", dtBackhaulD: "Dedicated Backhaul tunnel.",
+    dtOn: "Turn on", dtOff: "Turn off", dtUp: "Up", dtDown: "Down", dtPending: "Checking…", dtOffline: "Middle server offline", dtOffState: "Off", dtLastOk: "last good check {t}", dtPins: "{n} inbounds", dtNeedAgent: "Dedicated tunnels need agent {v} or newer: run the install command on the middle server once more.",
+    dtAskOn: "Turn on dedicated WireGuard for this middle server? UDP port {p} on this server must be reachable from it.", dtAskOff: "Turn off dedicated WireGuard? {n} inbounds pinned to it go back to the rotating tunnel.",
+    dtPort: "WireGuard port (UDP)", dtHost: "This server's address for WireGuard", dtSave: "Save", dtSetHint: "Middle servers dial this address and port over UDP. Use the direct IP, not a domain behind a CDN. The port must be free (TCP and UDP).",
+    dtPath: "Path", dtRot: "Rotating (default)", dtPickHint: "A dedicated path is fixed with no fallback: if it drops, this inbound stays down on that server.",
   },
 };
 let lang = localStorage.getItem("xo_lang") || "fa";
@@ -370,7 +382,7 @@ function renderInbounds() {
       ${ib.tunnels && ib.tunnels.length ? `<div class="relays"><span class="muted">${t("tunnels")}:</span>${ib.tunnels.map((x) => {
         const cls = x.state === "ok" ? "ok" : ["busy", "down", "offline"].includes(x.state) ? "bad" : "tun";
         const label = { ok: t("stOk"), busy: t("stBusy"), down: t("stDown"), offline: t("stOffline"), unknown: t("stUnknown"), pending: t("stPending") }[x.state] || x.state;
-        return `<span class="chip ${cls}" title="${esc(label)}">⇄ ${esc(x.name + " · " + (x.address || "?") + ":" + x.port)} <small>${esc(label)}</small></span>`;
+        return `<span class="chip ${cls}" title="${esc(label)}">${x.via ? "⇶" : "⇄"} ${esc(x.name + " · " + (x.address || "?") + ":" + x.port)}${x.via ? ` <small class="dvia">${esc(t("dt" + cap(x.via)))}</small>` : ""} <small>${esc(label)}</small></span>`;
       }).join("")}</div>` : ""}
       ${ib.singleLink ? `<div class="clients"><p class="muted">${t("singleUser")}</p>${copyRow(ib.singleLink)}</div>` : ""}
       ${clients}</div>`;
@@ -945,6 +957,12 @@ $("#tunnelPorts").addEventListener("submit", guard(async (e) => {
   await api("POST", "api/tunnels/settings", { port: +f.port.value || 0, xport: +f.xport.value || 0, rport: +f.rport.value || 0, rtarget: f.rtarget.value.trim() });
   toast(t("done")); document.activeElement?.blur(); loadTunnels();
 }));
+$("#dtPorts").addEventListener("submit", guard(async (e) => {
+  e.preventDefault();
+  const f = e.target;
+  await api("POST", "api/tunnels/dtsettings", { wgport: +f.wgport.value || 0, wghost: f.wghost.value.trim() });
+  toast(t("done")); document.activeElement?.blur(); loadTunnels();
+}));
 function renderTunnels() {
   const d = tunnelData; if (!d) return;
   $("#tunnelInfo").textContent = d.ready ? t("tnInfo").replace("{x}", (d.xport ? ", XHTTP " + d.xport : "") + (d.rport ? ", REALITY " + d.rport : "")).replace("{port}", d.port || "—").replace("{domain}", d.domain) : t("tnNeedSSL");
@@ -957,9 +975,16 @@ function renderTunnels() {
     <label>${t("tpRtT")}<input name="rtarget" dir="ltr" value="${esc(d.rtarget || "")}" placeholder="www.microsoft.com:443"></label>
     <button class="btn" type="submit">${t("tpSave")}</button><small class="muted">${t("tpHint")}</small>`;
   else if (!d.ready) tp.innerHTML = "";
+  const dp = $("#dtPorts");
+  if (d.ready && d.servers.length && document.activeElement?.form !== dp) dp.innerHTML = `
+    <b class="dthead">${t("dtTitle")} · WireGuard</b>
+    <label>${t("dtPort")}<input name="wgport" type="number" min="1" max="65535" value="${d.wgport || ""}" placeholder="${t("tpAuto")}"></label>
+    <label>${t("dtHost")}<input name="wghost" dir="ltr" value="${esc(d.wghost || "")}" placeholder="${t("tpAuto")}"></label>
+    <button class="btn" type="submit">${t("dtSave")}</button><small class="muted">${t("dtSetHint")}</small>`;
+  else if (!d.ready || !d.servers.length) dp.innerHTML = "";
   if (!d.servers.length) { $("#tunnelList").innerHTML = `<div class="card empty">${t("tnNoSrv")}</div>`; return; }
   const now = Date.now() / 1000;
-  clearTimeout(tnPoll); if (d.servers.some((s) => s.prevMethod || (s.domain && !s.certOk && !s.certErr))) tnPoll = setTimeout(() => { if (state.view === "tunnels" && !tnTyping()) loadTunnels(); }, 3000);
+  clearTimeout(tnPoll); if (d.servers.some((s) => s.prevMethod || (s.domain && !s.certOk && !s.certErr) || (s.dedView || []).some((x) => x.state === "pending"))) tnPoll = setTimeout(() => { if (state.view === "tunnels" && !tnTyping()) loadTunnels(); }, 3000);
   $("#tunnelList").innerHTML = d.servers.map((s, i) => {
     const seen = s.lastSeen ? ago(Math.max(0, Math.round(now - s.lastSeen))) + " " + t("tnAgo") : t("tnNever");
     return `<div class="card">
@@ -979,6 +1004,7 @@ function renderTunnels() {
       </div>
       ${methodCards(s, i)}
       ${revBlock(s, i)}
+      ${dedBlock(s, i)}
       ${s.methodErr ? `<p class="err">${esc(t("mBack").replace("{x}", s.methodErr))}</p>` : ""}
       ${tnTestRes[s.id] ? `<p class="${tnTestRes[s.id].ok ? "okmsg" : "err"}">${esc(tnTestRes[s.id].text)}</p>` : ""}
       ${s.lastFail ? `<p class="muted small">${t("tnLastFail")}: ${esc(s.failAt ? ago(Math.max(0, Math.round(now - s.failAt))) + " " + t("tnAgo") : "")} · ${t("tnFails").replace("{n}", s.fails || 0)} · <span class="mono">${esc(s.lastFail)}</span></p>` : ""}
@@ -987,6 +1013,31 @@ function renderTunnels() {
       <details class="muted small-details"><summary>${t("tnRemove").replace(/[:：]$/, "")}</summary>${copyRow(s.remove)}</details>
     </div>`;
   }).join("");
+}
+// dedicated tunnels: a block of their own, apart from the rotating method cards
+function dedBlock(s, i) {
+  const d = tunnelData, types = d.dedTypes || [];
+  if (!types.length) return "";
+  const old = !s.agentVer || versionLess(s.agentVer, d.dedVer);
+  const now = Date.now() / 1000;
+  const cards = types.map((m) => {
+    const v = (s.dedView || []).find((x) => x.type === m.id) || { state: "off", on: false, pins: 0 };
+    const name = t("dt" + cap(m.id)), desc = t("dt" + cap(m.id) + "D");
+    if (!m.ready) return `<div class="mcard soon dcard"><b>${esc(name)}</b><small>${esc(desc)}</small><em>${t("mSoon")}</em></div>`;
+    const st = { up: ["ok", t("dtUp")], down: ["bad", t("dtDown")], pending: ["tun", t("dtPending")], offline: ["bad", t("dtOffline")], off: ["gray", t("dtOffState")] }[v.state] || ["gray", v.state];
+    const extra = [];
+    if (v.on && v.state === "up" && v.ms) extra.push(v.ms + " ms");
+    if (v.on && v.okAt) extra.push(t("dtLastOk").replace("{t}", ago(Math.max(0, Math.round(now - v.okAt))) + " " + t("tnAgo")));
+    if (v.on) extra.push(t("dtPins").replace("{n}", v.pins || 0));
+    return `<div class="mcard dcard${v.on ? " on" : ""}${v.on && v.state !== "up" && v.state !== "pending" ? " down" : ""}">
+      <b>${esc(name)}</b><small>${esc(desc)}</small>
+      <span class="dstate"><span dir="auto" class="pill ${st[0]}">${esc(st[1])}</span>${extra.length ? `<small dir="auto">${esc(extra.join(" · "))}</small>` : ""}</span>
+      ${v.on && v.err && v.state === "down" ? `<small class="err mono">${esc(v.err)}</small>` : ""}
+      <button class="btn small${v.on ? "" : " primary"}" data-tn="ded" data-i="${i}" data-m="${m.id}" data-on="${v.on ? 0 : 1}">${v.on ? t("dtOff") : t("dtOn")}</button></div>`;
+  }).join("");
+  return `<div class="dtbox"><b>${t("dtTitle")}</b><p class="muted small">${t("dtHint")}</p>
+    ${old && s.lastSeen ? `<p class="muted small">${esc(t("dtNeedAgent").replace("{v}", d.dedVer))}</p>` : ""}
+    <div class="mcards">${cards}</div></div>`;
 }
 function revBlock(s, i) {
   const d = tunnelData;
@@ -1041,6 +1092,12 @@ $("#tunnelList").addEventListener("click", guard(async (e) => {
   }
   const b = e.target.closest("button[data-tn]"); if (!b) return;
   const s = tunnelData.servers[+b.dataset.i];
+  if (b.dataset.tn === "ded") {
+    const on = b.dataset.on === "1", v = (s.dedView || []).find((x) => x.type === b.dataset.m) || {};
+    if (on && (!s.agentVer || versionLess(s.agentVer, tunnelData.dedVer))) { alert(t("dtNeedAgent").replace("{v}", tunnelData.dedVer)); return; }
+    if (!confirm(on ? t("dtAskOn").replace("{p}", tunnelData.wgport || t("tpAuto")) : t("dtAskOff").replace("{n}", v.pins || 0))) return;
+    await api("POST", "api/tunnels/" + s.id + "/dedicated", { type: b.dataset.m, on }); toast(t("done")); loadTunnels(); refreshInbounds(); return;
+  }
   if (b.dataset.tn === "del") {
     if (!confirm(t("tnConfirmDel"))) return;
     await api("DELETE", "api/tunnels/" + s.id); toast(t("done")); loadTunnels(); refreshInbounds();
@@ -1111,14 +1168,21 @@ async function openTunnelPick(ib) {
   const row = (s) => {
     const on = s.inbounds.includes(ib.id);
     const port = on && s.ports[ib.id] ? s.ports[ib.id] : "";
+    const via = on ? (s.vias || {})[ib.id] || "" : "";
+    const ded = (s.dedView || []).filter((x) => x.on || x.type === via);
+    const path = ded.length ? `<label class="tnvia">${t("dtPath")}<select>
+        <option value="">${t("dtRot")}</option>
+        ${ded.map((x) => `<option value="${esc(x.type)}" ${x.type === via ? "selected" : ""}>${esc(t("dt" + cap(x.type)))}</option>`).join("")}
+      </select></label>` : "";
     return `<div class="tnrow" data-id="${esc(s.id)}">
       <label class="pitem"><input type="checkbox" ${on ? "checked" : ""}><span class="dot${s.online ? "" : " bad"}"></span><b>${esc(s.name)}</b><small class="mono">${esc(s.publicIP || s.host || "")}</small></label>
       <label class="tnport">${t("tnPortHere")}<input type="number" min="1" max="65535" placeholder="${esc(ib.port)}" value="${port}"></label>
-      <small class="err tnbusy"></small></div>`;
+      ${path}<small class="err tnbusy"></small></div>`;
   };
   openModal(`<h3>${t("tnUse")} · <span class="mono">${esc(ib.tag || ib.id)}</span></h3>
   <p class="muted">${t("tnPick")}</p>
   <div class="stack">${d.servers.map(row).join("")}</div>
+  ${d.servers.some((s) => (s.dedView || []).some((x) => x.on)) ? `<p class="muted small">${t("dtPickHint")}</p>` : ""}
   <p id="tpErr" class="err"></p>
   <div class="actions"><button class="btn primary" id="tpSave">${t("save")}</button><button class="btn" data-close>${t("cancel")}</button></div>`, true);
   const check = (el) => {
@@ -1131,7 +1195,7 @@ async function openTunnelPick(ib) {
   $("#modalBody").querySelectorAll(".tnrow").forEach((el) => { check(el); el.querySelector(".tnport input").oninput = () => check(el); });
   $("#tpSave").onclick = async () => {
     const uses = [...$("#modalBody").querySelectorAll(".tnrow")].filter((el) => el.querySelector("input[type=checkbox]").checked)
-      .map((el) => ({ server: el.dataset.id, port: +el.querySelector(".tnport input").value || 0 }));
+      .map((el) => ({ server: el.dataset.id, port: +el.querySelector(".tnport input").value || 0, via: el.querySelector(".tnvia select")?.value || "" }));
     try { await api("POST", "api/tunnels/assign", { id: ib.id, uses }); closeModal(); toast(t("done")); refreshInbounds(); }
     catch (e) { $("#tpErr").textContent = e.message; }
   };

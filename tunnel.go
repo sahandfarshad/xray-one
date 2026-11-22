@@ -48,7 +48,9 @@ const (
 	methodTrial = 90 * time.Second
 )
 
-func isTunnelTag(t string) bool { return t == tunnelTag || t == tunnelTagXH || t == tunnelTagRT }
+func isTunnelTag(t string) bool {
+	return t == tunnelTag || t == tunnelTagXH || t == tunnelTagRT || t == dedTagWG
+}
 
 func validMethod(m string) bool {
 	return m == tunnelMethodWS || m == tunnelMethodXHTTP || m == tunnelMethodRT
@@ -120,6 +122,8 @@ type TunnelServer struct {
 	CertExp  int64  `json:"certExp,omitempty"`
 	CertErr  string `json:"certErr,omitempty"`
 	CertBusy bool   `json:"certBusy,omitempty"`
+	// dedicated tunnels (dedicated.go): fixed paths, separate from the above
+	Ded []DedTunnel `json:"dedicated,omitempty"`
 }
 
 // agentHub wakes held heartbeats (long-poll) and lets a manual test wait for
@@ -180,6 +184,7 @@ func (h *agentHub) Beat(id string) {
 type TunnelUse struct {
 	Server string `json:"server"`
 	Port   int    `json:"port,omitempty"`
+	Via    string `json:"via,omitempty"` // "" the rotating tunnel, or a dedicated tunnel type ("wg")
 }
 
 func (u TunnelUse) ListenPort(inboundPort int) int {
@@ -200,6 +205,11 @@ type TunnelSettings struct {
 	RKey    string `json:"rkey,omitempty"`    // x25519 private key
 	RPub    string `json:"rpub,omitempty"`
 	RSID    string `json:"rsid,omitempty"`
+	// dedicated WireGuard tunnel (dedicated.go)
+	WGPort int    `json:"wgport,omitempty"`
+	WGKey  string `json:"wgkey,omitempty"`
+	WGPub  string `json:"wgpub,omitempty"`
+	WGHost string `json:"wghost,omitempty"` // address middle servers dial (public IP)
 }
 
 // armPort returns the port a pre-armed method listens on: the chosen one
@@ -274,7 +284,9 @@ func (s *Store) TunnelsCopy() ([]TunnelServer, TunnelSettings, map[string][]Tunn
 	defer s.mu.Unlock()
 	out := []TunnelServer{}
 	for _, t := range s.Tunnels {
-		out = append(out, *t)
+		c := *t
+		c.Ded = append([]DedTunnel(nil), t.Ded...)
+		out = append(out, c)
 	}
 	m := map[string][]TunnelUse{}
 	for k, v := range s.TunnelUse {
@@ -389,6 +401,7 @@ func (a *App) applyTunnelConfig(root *OMap) error {
 		root.Set("inbounds", keep)
 		setTunnelRules(root, nil)
 		dropBridges(root)
+		dropDedOutbounds(root)
 		return nil
 	}
 	cf, kf := a.store.Cfg.CertFile, a.store.Cfg.KeyFile
@@ -467,6 +480,10 @@ func (a *App) applyTunnelConfig(root *OMap) error {
 	ensureTaggedOutbounds(root, tr)
 	// after ensureTaggedOutbounds, so a bridge is never the default outbound
 	tr.extra = a.addBridges(root, servers)
+	// dedicated tunnels: their own inbound, outbounds and rules
+	if tr.dt, tr.dtTags, err = a.applyDedicated(root, servers, tmap); err != nil {
+		return err
+	}
 	setTunnelRules(root, tr)
 	return nil
 }
@@ -475,6 +492,10 @@ type tunnelRule struct {
 	ips   []string
 	ports []string
 	extra []any // more inbound tags (reverse traffic)
+	// dedicated tunnels: their allow rules, and their inbound tags (blocked
+	// for anything else)
+	dt     []any
+	dtTags []any
 }
 
 func keys(m map[string]bool) []string {
@@ -515,10 +536,11 @@ func setTunnelRules(root *OMap, r *tunnelRule) {
 			ips = append(ips, ip)
 		}
 		in := append([]any{tunnelTag, tunnelTagXH, tunnelTagRT}, r.extra...)
+		rules = append(rules, r.dt...)
 		rules = append(rules,
 			om("type", "field", "ruleTag", "xo-tunnel-allow", "inboundTag", in, "ip", ips,
 				"port", strings.Join(r.ports, ","), "outboundTag", tunnelDirect),
-			om("type", "field", "ruleTag", "xo-tunnel-block", "inboundTag", in, "outboundTag", tunnelBlock))
+			om("type", "field", "ruleTag", "xo-tunnel-block", "inboundTag", append(append([]any{}, in...), r.dtTags...), "outboundTag", tunnelBlock))
 	}
 	for _, v := range asArr(rt.Get("rules")) {
 		if m := asMap(v); m != nil && strings.HasPrefix(asStr(m.Get("ruleTag")), "xo-tunnel") {
@@ -592,13 +614,19 @@ func (a *App) panelLocalURL() string {
 	return scheme + "://127.0.0.1" + portOf(c.Listen) + c.BasePath
 }
 
-func relayXrayConfig(j joinInfo, fwd []fwdPort, ctl int, rev *revInfo) []byte {
+func relayXrayConfig(j joinInfo, fwd []fwdPort, ctl int, rev *revInfo, ded *dedRelay) []byte {
 	if ctl == 0 {
 		ctl = agentCtlPort
 	}
 	inbounds := []any{om("tag", "ctl", "listen", "127.0.0.1", "port", ctl, "protocol", "socks",
 		"settings", om("auth", "noauth", "udp", false))}
 	for _, f := range fwd {
+		if f.Via != "" { // pinned to a dedicated tunnel: only through it
+			if ib := relayDedFwd(f, ded); ib != nil {
+				inbounds = append(inbounds, ib)
+			}
+			continue
+		}
 		inbounds = append(inbounds, om("tag", fmt.Sprintf("fwd-%d", f.Listen), "listen", "0.0.0.0", "port", f.Listen,
 			"protocol", "dokodemo-door", "settings", om("address", f.Host, "port", f.Port, "network", "tcp,udp")))
 	}
@@ -606,6 +634,7 @@ func relayXrayConfig(j joinInfo, fwd []fwdPort, ctl int, rev *revInfo) []byte {
 		"inbounds", inbounds,
 		"outbounds", []any{mainOutbound(j)})
 	addRelayReverse(root, rev, ctl)
+	addRelayDedicated(root, ded, ctl)
 	return EncodeIndent(root)
 }
 
@@ -638,6 +667,7 @@ type fwdPort struct {
 	Listen int    `json:"listen"`
 	Host   string `json:"host"`
 	Port   int    `json:"port"`
+	Via    string `json:"via,omitempty"` // dedicated tunnel type, "" rotating
 }
 
 func (a *App) joinFor(s TunnelServer) joinInfo {
@@ -672,7 +702,7 @@ func (a *App) fwdFor(root *OMap, id string) []fwdPort {
 				continue
 			}
 			if h, p := targetOf(ib); p > 0 {
-				out = append(out, fwdPort{Listen: u.ListenPort(p), Host: h, Port: p})
+				out = append(out, fwdPort{Listen: u.ListenPort(p), Host: h, Port: p, Via: u.Via})
 			}
 		}
 	}
@@ -705,11 +735,24 @@ func (a *App) relaysFor(id string) []Relay {
 
 type tunnelView struct {
 	TunnelServer
-	Online  bool           `json:"online"`
-	Command string         `json:"command,omitempty"`
-	Inbound []string       `json:"inbounds"`
-	Remove  string         `json:"remove"`
-	Ports   map[string]int `json:"ports"` // inbound id -> chosen port on the middle server (0 = same)
+	Online  bool              `json:"online"`
+	Command string            `json:"command,omitempty"`
+	Inbound []string          `json:"inbounds"`
+	Remove  string            `json:"remove"`
+	Ports   map[string]int    `json:"ports"` // inbound id -> chosen port on the middle server (0 = same)
+	Vias    map[string]string `json:"vias"`  // inbound id -> dedicated tunnel it is pinned to ("" rotating)
+	DedView []dedView         `json:"dedView"`
+}
+
+type dedView struct {
+	Type  string `json:"type"`
+	On    bool   `json:"on"`
+	State string `json:"state"` // off, offline, pending, up, down
+	OkAt  int64  `json:"okAt,omitempty"`
+	ChkAt int64  `json:"chkAt,omitempty"`
+	Ms    int    `json:"ms,omitempty"`
+	Err   string `json:"err,omitempty"`
+	Pins  int    `json:"pins"`
 }
 
 func (a *App) handleTunnels(w http.ResponseWriter, r *http.Request) {
@@ -717,7 +760,7 @@ func (a *App) handleTunnels(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
 	out := []tunnelView{}
 	for _, s := range servers {
-		v := tunnelView{TunnelServer: s, Online: s.LastSeen > 0 && now.Sub(time.Unix(s.LastSeen, 0)) < onlineWindow, Inbound: []string{}, Ports: map[string]int{}}
+		v := tunnelView{TunnelServer: s, Online: s.LastSeen > 0 && now.Sub(time.Unix(s.LastSeen, 0)) < onlineWindow, Inbound: []string{}, Ports: map[string]int{}, Vias: map[string]string{}, DedView: []dedView{}}
 		if s.Join != "" && s.JoinExp > now.Unix() {
 			v.Command = "bash <(curl -fsSL " + tunnelInstall + ") " + encodeJoin(a.joinFor(s))
 		}
@@ -726,16 +769,30 @@ func (a *App) handleTunnels(w http.ResponseWriter, r *http.Request) {
 				if u.Server == s.ID {
 					v.Inbound = append(v.Inbound, ibid)
 					v.Ports[ibid] = u.Port
+					if u.Via != "" {
+						v.Vias[ibid] = u.Via
+					}
 				}
 			}
 		}
 		v.Remove = "xray-one agent remove"
 		sort.Strings(v.Inbound)
 		v.Token, v.Join, v.UUID, v.RevKey, v.RevUUID = "", "", "", "", ""
+		for _, d := range s.Ded {
+			dv := dedView{Type: d.Type, On: d.On, State: dedState(d, v.Online), OkAt: d.OkAt, ChkAt: d.ChkAt, Ms: d.Ms, Err: d.Err}
+			for _, x := range v.Vias {
+				if x == d.Type {
+					dv.Pins++
+				}
+			}
+			v.DedView = append(v.DedView, dv)
+		}
+		v.Ded = nil
 		out = append(out, v)
 	}
 	writeJSONResp(w, 200, map[string]any{"servers": out, "port": set.Port, "domain": a.store.Cfg.Domain,
-		"ready": a.store.Cfg.Domain != "" && a.store.Cfg.CertFile != "", "methods": tunnelMethods, "xport": set.XPort, "rport": set.RPort, "rtarget": set.RTarget, "methodVer": agentMethodVer, "revVer": agentRevVer})
+		"ready": a.store.Cfg.Domain != "" && a.store.Cfg.CertFile != "", "methods": tunnelMethods, "xport": set.XPort, "rport": set.RPort, "rtarget": set.RTarget, "methodVer": agentMethodVer, "revVer": agentRevVer,
+		"dedTypes": dedTypes, "dedVer": agentDedVer, "wgport": set.WGPort, "wghost": set.WGHost})
 }
 
 func (a *App) handleAddTunnel(w http.ResponseWriter, r *http.Request) {
@@ -927,6 +984,16 @@ func (s *Store) checkUsesLocked(id string, uses []TunnelUse, ibPort int, ibPorts
 		if lp == srv.CtlPort || (srv.CtlPort == 0 && lp == agentCtlPort) {
 			return nil, fmt.Errorf("port %d is the agent's own port on %s", lp, srv.Name)
 		}
+		if u.Via != "" && !dedOn(*srv, u.Via) {
+			return nil, fmt.Errorf("the dedicated tunnel %q is not on for %s; turn it on in the Tunnels tab", u.Via, srv.Name)
+		}
+		if len(srv.Ded) > 0 && lp == probePort(*srv) {
+			for _, d := range srv.Ded {
+				if d.On {
+					return nil, fmt.Errorf("port %d on %s is used by the dedicated tunnel's status check", lp, srv.Name)
+				}
+			}
+		}
 		mine := false
 		for k, us := range s.TunnelUse {
 			for _, x := range us {
@@ -1062,25 +1129,26 @@ func (a *App) handleTunnelBulk(w http.ResponseWriter, r *http.Request) {
 // ---------- agent heartbeat (no login; agent token) ----------
 
 type beatReq struct {
-	Version   string            `json:"version"`
-	PublicIP  string            `json:"publicIP"`
-	XrayOK    bool              `json:"xrayOk"`
-	XrayErr   string            `json:"xrayErr"`
-	Applied   string            `json:"applied"`
-	CtlPort   int               `json:"ctlPort"`
-	Busy      []int             `json:"busy"`
-	Wait      bool              `json:"wait"`                // agent accepts a held (long-poll) reply
-	Fails     int               `json:"fails"`               // failed heartbeats since the last good one
-	LastFail  string            `json:"lastFail"`            // why the last one failed
-	PortState map[string]string `json:"portState,omitempty"` // forwarded port -> ok / busy / down (0.5.1+)
-	Rejected  string            `json:"rejected,omitempty"`  // config hash the agent tried and went back from (0.6.1+)
-	Pending   bool              `json:"pending,omitempty"`   // still trying the newest config
-	Mode      string            `json:"mode,omitempty"`      // "rev" when it reached us over the reverse path (0.6.4+)
-	Via       string            `json:"via,omitempty"`       // forward method it found by searching (0.6.5+)
-	CertDom   string            `json:"certDomain,omitempty"`
-	CertExp   int64             `json:"certExp,omitempty"`
-	CertErr   string            `json:"certErr,omitempty"`
-	CertBusy  bool              `json:"certBusy,omitempty"`
+	Version   string               `json:"version"`
+	PublicIP  string               `json:"publicIP"`
+	XrayOK    bool                 `json:"xrayOk"`
+	XrayErr   string               `json:"xrayErr"`
+	Applied   string               `json:"applied"`
+	CtlPort   int                  `json:"ctlPort"`
+	Busy      []int                `json:"busy"`
+	Wait      bool                 `json:"wait"`                // agent accepts a held (long-poll) reply
+	Fails     int                  `json:"fails"`               // failed heartbeats since the last good one
+	LastFail  string               `json:"lastFail"`            // why the last one failed
+	PortState map[string]string    `json:"portState,omitempty"` // forwarded port -> ok / busy / down (0.5.1+)
+	Rejected  string               `json:"rejected,omitempty"`  // config hash the agent tried and went back from (0.6.1+)
+	Pending   bool                 `json:"pending,omitempty"`   // still trying the newest config
+	Mode      string               `json:"mode,omitempty"`      // "rev" when it reached us over the reverse path (0.6.4+)
+	Via       string               `json:"via,omitempty"`       // forward method it found by searching (0.6.5+)
+	CertDom   string               `json:"certDomain,omitempty"`
+	CertExp   int64                `json:"certExp,omitempty"`
+	CertErr   string               `json:"certErr,omitempty"`
+	CertBusy  bool                 `json:"certBusy,omitempty"`
+	Ded       map[string]dedReport `json:"dedicated,omitempty"` // check through each dedicated tunnel (0.6.8+)
 }
 
 type beatResp struct {
@@ -1141,6 +1209,7 @@ func (a *App) handleBeat(w http.ResponseWriter, r *http.Request) {
 				s.CertExp, s.CertErr = req.CertExp, ""
 			}
 		}
+		saveDedReports(s, req.Ded)
 		srv = *s
 		return nil
 	})
@@ -1183,7 +1252,7 @@ func (a *App) handleBeat(w http.ResponseWriter, r *http.Request) {
 		})
 		go a.refreshTunnelInbounds()
 	}
-	cfg := relayXrayConfig(a.joinFor(srv), fwd, srv.CtlPort, a.revFor(srv))
+	cfg := relayXrayConfig(a.joinFor(srv), fwd, srv.CtlPort, a.revFor(srv), a.dedFor(root, srv))
 	if revCapable(srv) {
 		resp.Domain = srv.Domain
 	}
@@ -1348,6 +1417,7 @@ type TunnelLink struct {
 	Port    int    `json:"port"`
 	State   string `json:"state"` // ok, busy, down, offline, unknown (old agent), pending
 	Online  bool   `json:"online"`
+	Via     string `json:"via,omitempty"` // pinned dedicated tunnel
 }
 
 func (a *App) tunnelStatus(id string, ib *OMap) []TunnelLink {
@@ -1362,7 +1432,7 @@ func (a *App) tunnelStatus(id string, ib *OMap) []TunnelLink {
 			}
 			lp := u.ListenPort(ibPort)
 			l := TunnelLink{Server: s.ID, Name: orDefault(s.Name, "tunnel"), Address: orDefault(s.PublicIP, s.Host), Port: lp,
-				Online: s.LastSeen > 0 && now.Sub(time.Unix(s.LastSeen, 0)) < onlineWindow}
+				Online: s.LastSeen > 0 && now.Sub(time.Unix(s.LastSeen, 0)) < onlineWindow, Via: u.Via}
 			switch {
 			case !l.Online:
 				l.State = "offline"

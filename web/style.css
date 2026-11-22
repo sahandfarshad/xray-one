@@ -166,8 +166,18 @@ mark{background:#ffe58a;color:inherit;border-radius:3px;padding:0 2px}
 .mcard.on{border-color:#27ae60;box-shadow:0 0 0 1px #27ae60 inset;cursor:default}
 .mcard.on em{color:#27ae60;opacity:1}
 .mcard.soon{opacity:.5;cursor:not-allowed}
+.dtbox{margin:.7rem 0 .2rem;padding-top:.6rem;border-top:1px dashed var(--line,#ddd)}
+.dtbox>p{margin:.2rem 0 0}
+.dcard{cursor:default}
+.dcard.down{border-color:#c0392b;box-shadow:0 0 0 1px #c0392b inset}
+.dcard .dstate{display:flex;flex-wrap:wrap;align-items:center;gap:.35rem;margin:.15rem 0}
+.dcard .btn{margin-top:.25rem}
+.dthead{flex:1 1 100%}
+.tnvia{font-size:12px}
+.tnvia select{width:100%}
+.dvia{opacity:.85}
 .mcard:not(:disabled):hover{border-color:#2f80ed}
-.tports{display:flex;flex-wrap:wrap;align-items:flex-end;gap:.5rem;margin:.4rem 0 .8rem}.tports label{display:flex;flex-direction:column;font-size:.8rem;gap:.2rem}.tports input{width:8rem}.tports small{flex-basis:100%}
+.tports{display:flex;flex-wrap:wrap;align-items:flex-end;gap:.5rem;margin:.4rem 0 .8rem}.tports label{display:flex;flex-direction:column;font-size:.8rem;gap:.2rem}.tports input{width:8rem}.tports input[name=wghost]{width:12rem}.tports small{flex-basis:100%}
 
 .dmrow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0 2px; font-size: 13px; }
 .dmrow label { display: flex; align-items: center; gap: 6px; }
