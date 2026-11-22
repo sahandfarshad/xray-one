@@ -43,7 +43,7 @@ const T = {
     usersTab: "کلاینت‌ها", addUser: "کلاینت جدید", usersHint: "هر کلاینت یک اسم است که روی چند اینباند می‌نشیند، با یک محدودیت حجم و زمان و یک لینک سابسکریپشن برای همه.",
     noUsers: "هنوز کلاینتی نیست.", pickInbounds: "اینباندهای این کلاینت", editUser: "ویرایش", noInboundsYet: "بدون اینباند", confirmDelUser: "این کلاینت از همه‌ی اینباندها حذف شود؟",
     tunnels: "تانل", addTunnel: "سرور میانی جدید", tnName: "نام", tnHost: "IP یا دامنه‌ی سرور میانی (برای SSH)", tnSshPort: "پورت SSH", tnSshUser: "کاربر SSH",
-    tnMethod: "روش", mWss: "Xray WS", mWssD: "WebSocket + TLS. ساده و پایدار.", mXhttp: "Xray XHTTP", mXhttpD: "HTTP/2 + TLS، شبیه HTTPS معمولی؛ جایگزین WS.",
+    tnMethod: "روش", tpWs: "پورت WS", tpXh: "پورت XHTTP", tpAuto: "خودکار", tpSave: "ذخیره‌ی پورت‌ها", tpHint: "قبل از ذخیره، آزاد بودن پورت (TCP و UDP) چک می‌شود. اگر سروری روی همین روش وصل است، اول روشش را عوض کنید بعد پورت را.", mWss: "Xray WS", mWssD: "WebSocket + TLS. ساده و پایدار.", mXhttp: "Xray XHTTP", mXhttpD: "HTTP/2 + TLS، شبیه HTTPS معمولی؛ جایگزین WS.",
     mGrefrp: "GRE + FRP", mGrefrpD: "FRP روی لینک GRE.", mBackhaul: "Backhaul", mBackhaulD: "با یا بدون GRE؛ tcpmux، ws و …", mFrpssh: "FRP روی SSH", mFrpsshD: "وقتی فقط SSH رد می‌شود.",
     mSoon: "به‌زودی", mActive: "فعال", mTrying: "در حال امتحان…", mAsk: "روش این سرور میانی به «{m}» عوض شود؟ اگر تا ۹۰ ثانیه وصل نشد، خودش به روش قبلی برمی‌گردد.",
     mBack: "روش جدید وصل نشد و به روش قبلی برگشت: {x}", mNeedAgent: "برای عوض کردن روش، دستور نصب را یک بار دیگر روی سرور میانی بزنید (نسخه‌ی {v} به بالا).", tnDeploy: "Deploy با SSH", tnPass: "پسورد SSH (فقط یک بار؛ ذخیره نمی‌شود)", tnPassKey: "کلید پنل نصب شده؛ پسورد لازم نیست",
@@ -100,7 +100,7 @@ const T = {
     usersTab: "Clients", addUser: "New client", usersHint: "A client is one name that sits on several inbounds, with one traffic/time limit and one subscription link for all of them.",
     noUsers: "No clients yet.", pickInbounds: "Inbounds of this client", editUser: "Edit", noInboundsYet: "no inbound", confirmDelUser: "Remove this client from every inbound?",
     tunnels: "Tunnel", addTunnel: "New middle server", tnName: "Name", tnHost: "Middle server IP or domain (for SSH)", tnSshPort: "SSH port", tnSshUser: "SSH user",
-    tnMethod: "Method", mWss: "Xray WS", mWssD: "WebSocket + TLS. Simple and stable.", mXhttp: "Xray XHTTP", mXhttpD: "HTTP/2 + TLS, looks like normal HTTPS; WS successor.",
+    tnMethod: "Method", tpWs: "WS port", tpXh: "XHTTP port", tpAuto: "auto", tpSave: "Save ports", tpHint: "Each port is checked as free (TCP and UDP) before saving. If a server is connected with that method, switch its method first, then change the port.", mWss: "Xray WS", mWssD: "WebSocket + TLS. Simple and stable.", mXhttp: "Xray XHTTP", mXhttpD: "HTTP/2 + TLS, looks like normal HTTPS; WS successor.",
     mGrefrp: "GRE + FRP", mGrefrpD: "FRP over a GRE link.", mBackhaul: "Backhaul", mBackhaulD: "With or without GRE; tcpmux, ws, …", mFrpssh: "FRP over SSH", mFrpsshD: "When only SSH gets through.",
     mSoon: "Soon", mActive: "Active", mTrying: "Trying…", mAsk: "Switch this middle server to \"{m}\"? If it can't connect within 90 s it goes back by itself.",
     mBack: "The new method did not connect and went back: {x}", mNeedAgent: "To switch methods, run the install command on the middle server once more (version {v} or newer).", tnDeploy: "Deploy over SSH", tnPass: "SSH password (used once, never stored)", tnPassKey: "Panel key installed; no password needed",
@@ -909,10 +909,22 @@ async function loadTunnels() {
   renderTunnels();
 }
 const tnTestRes = {}; let tnPoll;
+$("#tunnelPorts").addEventListener("submit", guard(async (e) => {
+  e.preventDefault();
+  const f = e.target;
+  await api("POST", "api/tunnels/settings", { port: +f.port.value || 0, xport: +f.xport.value || 0 });
+  toast(t("done")); document.activeElement?.blur(); loadTunnels();
+}));
 function renderTunnels() {
   const d = tunnelData; if (!d) return;
   $("#tunnelInfo").textContent = d.ready ? t("tnInfo").replace("{x}", d.xport ? ", XHTTP " + d.xport : "").replace("{port}", d.port || "—").replace("{domain}", d.domain) : t("tnNeedSSL");
   $("#addTunnelBtn").disabled = !d.ready;
+  const tp = $("#tunnelPorts");
+  if (d.ready && document.activeElement?.form !== tp) tp.innerHTML = `
+    <label>${t("tpWs")}<input name="port" type="number" min="1" max="65535" value="${d.port || ""}" placeholder="${t("tpAuto")}"></label>
+    <label>${t("tpXh")}<input name="xport" type="number" min="1" max="65535" value="${d.xport || ""}" placeholder="${t("tpAuto")}"></label>
+    <button class="btn" type="submit">${t("tpSave")}</button><small class="muted">${t("tpHint")}</small>`;
+  else if (!d.ready) tp.innerHTML = "";
   if (!d.servers.length) { $("#tunnelList").innerHTML = `<div class="card empty">${t("tnNoSrv")}</div>`; return; }
   const now = Date.now() / 1000;
   clearTimeout(tnPoll); if (d.servers.some((s) => s.prevMethod)) tnPoll = setTimeout(() => { if (state.view === "tunnels") loadTunnels(); }, 3000);

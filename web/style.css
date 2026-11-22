@@ -167,3 +167,4 @@ mark{background:#ffe58a;color:inherit;border-radius:3px;padding:0 2px}
 .mcard.on em{color:#27ae60;opacity:1}
 .mcard.soon{opacity:.5;cursor:not-allowed}
 .mcard:not(:disabled):hover{border-color:#2f80ed}
+.tports{display:flex;flex-wrap:wrap;align-items:flex-end;gap:.5rem;margin:.4rem 0 .8rem}.tports label{display:flex;flex-direction:column;font-size:.8rem;gap:.2rem}.tports input{width:8rem}.tports small{flex-basis:100%}

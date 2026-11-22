@@ -325,7 +325,10 @@ func (a *App) applyTunnelConfig(root *OMap) error {
 	// XHTTP inbound, only while a middle server uses (or is trying) it
 	xh, _ := findInbound(root, tunnelTagXH)
 	if usesMethod(servers, tunnelMethodXHTTP) {
-		if set.XPort == 0 || (xh == nil && (usedPorts(root)[strconv.Itoa(set.XPort)] || !portFree(set.XPort))) {
+		if set.XPort != 0 && xh == nil && (usedPorts(root)[strconv.Itoa(set.XPort)] || !portFree(set.XPort)) {
+			return fmt.Errorf("XHTTP tunnel port %d is busy: choose another port in the Tunnels tab", set.XPort)
+		}
+		if set.XPort == 0 {
 			p := pickTunnelPort(root, set.Port)
 			if p == 0 {
 				return errors.New("no free port for the XHTTP tunnel")
@@ -1300,6 +1303,97 @@ func (a *App) handleTunnelMethod(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		hub.Poke(id)
+	}
+	writeJSONResp(w, 200, map[string]bool{"ok": true})
+}
+
+// POST /api/tunnels/settings {port, xport}: choose each method's port on this
+// server. Every new port is checked against the config and the system (TCP+UDP).
+func (a *App) handleTunnelSettings(w http.ResponseWriter, r *http.Request) {
+	var b struct {
+		Port  int `json:"port"`
+		XPort int `json:"xport"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&b); err != nil {
+		fail(w, 400, err)
+		return
+	}
+	root, _, err := a.cfg.Load()
+	if err != nil {
+		fail(w, 500, err)
+		return
+	}
+	_, cur, _ := a.store.TunnelsCopy()
+	panel, _ := strconv.Atoi(strings.TrimPrefix(portOf(a.store.Cfg.Listen), ":"))
+	others := map[string]bool{}
+	for _, v := range asArr(root.Get("inbounds")) {
+		if x := asMap(v); x != nil && !isTunnelTag(asStr(x.Get("tag"))) {
+			others[asStr(x.Get("port"))] = true
+		}
+	}
+	check := func(name string, p, old int) error {
+		if p == 0 || p == old {
+			return nil
+		}
+		if p < 1 || p > 65535 {
+			return fmt.Errorf("%s port %d is not valid", name, p)
+		}
+		if p == panel {
+			return fmt.Errorf("%s port %d is the panel's port", name, p)
+		}
+		if others[strconv.Itoa(p)] {
+			return fmt.Errorf("%s port %d is used by another inbound", name, p)
+		}
+		if p != cur.Port && p != cur.XPort && !portFree(p) {
+			return fmt.Errorf("%s port %d is busy on this server (another program uses it)", name, p)
+		}
+		return nil
+	}
+	if b.Port != 0 && b.Port == b.XPort {
+		fail(w, 400, errors.New("WS and XHTTP need different ports"))
+		return
+	}
+	if err := check("WS", b.Port, cur.Port); err != nil {
+		fail(w, 400, err)
+		return
+	}
+	if err := check("XHTTP", b.XPort, cur.XPort); err != nil {
+		fail(w, 400, err)
+		return
+	}
+	np, nx := cur.Port, cur.XPort
+	if b.Port != 0 {
+		np = b.Port
+	}
+	if b.XPort != 0 {
+		nx = b.XPort
+	}
+	if np == nx && np != 0 {
+		fail(w, 400, errors.New("WS and XHTTP need different ports"))
+		return
+	}
+	if np == cur.Port && nx == cur.XPort {
+		writeJSONResp(w, 200, map[string]bool{"ok": true})
+		return
+	}
+	_ = a.store.EditTunnels(func() error { a.store.TunnelCfg.Port, a.store.TunnelCfg.XPort = np, nx; return nil })
+	servers, _, _ := a.store.TunnelsCopy()
+	if len(servers) > 0 {
+		if err := a.cfg.Mutate(func(root *OMap) error {
+			if err := a.ensureTunnelSettings(root); err != nil {
+				return err
+			}
+			return a.applyTunnelConfig(root)
+		}); err != nil {
+			_ = a.store.EditTunnels(func() error { a.store.TunnelCfg.Port, a.store.TunnelCfg.XPort = cur.Port, cur.XPort; return nil })
+			fail(w, 400, err)
+			return
+		}
+		ids := []string{}
+		for _, s := range servers {
+			ids = append(ids, s.ID)
+		}
+		hub.PokeAll(ids)
 	}
 	writeJSONResp(w, 200, map[string]bool{"ok": true})
 }

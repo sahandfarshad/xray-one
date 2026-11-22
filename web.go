@@ -196,6 +196,7 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("POST /api/tunnels/{id}/join", a.api(a.handleNewJoin))
 	mux.HandleFunc("POST /api/tunnels/{id}/test", a.api(a.handleTestTunnel))
 	mux.HandleFunc("POST /api/tunnels/{id}/method", a.api(a.handleTunnelMethod))
+	mux.HandleFunc("POST /api/tunnels/settings", a.api(a.handleTunnelSettings))
 	mux.HandleFunc("POST /api/tunnels/assign", a.api(a.handleTunnelAssign))
 	mux.HandleFunc("POST /api/tunnels/bulk", a.api(a.handleTunnelBulk))
 	mux.HandleFunc("POST /api/reality/scan", a.api(a.handleRealityScan))
