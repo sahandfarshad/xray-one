@@ -3,7 +3,7 @@ const T = {
   fa: {
     loginHint: "برای مدیریت هسته‌ی XRay وارد شوید.", user: "نام کاربری", pass: "رمز عبور", signIn: "ورود",
     overview: "نمای کلی", inbounds: "اینباندها", settings: "تنظیمات", logout: "خروج",
-    liveTitle: "مصرف لحظه‌ای سرور", dailyTitle: "مصرف روزانه", dlLbl: "دانلود", ulLbl: "آپلود", dSince: "شمارش از", ibCount: "اینباند",
+    liveTitle: "مصرف لحظه‌ای سرور", dailyTitle: "مصرف روزانه", d7: "۷ روز", dMonthLbl: "ماه", dlLbl: "دانلود", ulLbl: "آپلود", dSince: "شمارش از", ibCount: "اینباند",
     coreStatus: "وضعیت هسته", coreVersion: "نسخه‌ی هسته", clients: "کلاینت‌ها", traffic: "ترافیک کل",
     coreTitle: "هسته‌ی XRay", restart: "ری‌استارت", enableApi: "فعال‌سازی آمار ترافیک",
     install: "نصب XRay", update: "آپدیت به آخرین نسخه", updateTo: "نصب این نسخه",
@@ -57,7 +57,7 @@ const T = {
   en: {
     loginHint: "Sign in to manage the Xray core.", user: "Username", pass: "Password", signIn: "Sign in",
     overview: "Overview", inbounds: "Inbounds", settings: "Settings", logout: "Log out",
-    liveTitle: "Live server traffic", dailyTitle: "Daily traffic", dlLbl: "Download", ulLbl: "Upload", dSince: "Counting since", ibCount: "inbounds",
+    liveTitle: "Live server traffic", dailyTitle: "Daily traffic", d7: "7 days", dMonthLbl: "Month", dlLbl: "Download", ulLbl: "Upload", dSince: "Counting since", ibCount: "inbounds",
     coreStatus: "Core status", coreVersion: "Core version", clients: "Clients", traffic: "Total traffic",
     coreTitle: "Xray core", restart: "Restart", enableApi: "Enable traffic stats",
     install: "Install Xray", update: "Update to latest", updateTo: "Install this version",
@@ -203,29 +203,61 @@ function liveSync() {
   } else if (!liveWanted() && live.es) { live.es.close(); live.es = null; }
 }
 document.addEventListener("visibilitychange", liveSync);
-function drawLive() {
-  const c = $("#liveChart"), w = (c.width = c.clientWidth * devicePixelRatio), h = (c.height = 80 * devicePixelRatio), x = c.getContext("2d");
-  const max = Math.max(1024, ...live.pts.map((p) => Math.max(p.rx, p.tx))), step = w / 89;
-  const line = (k, col) => {
-    x.beginPath(); live.pts.forEach((p, i) => { const X = w - (live.pts.length - 1 - i) * step, Y = h - (p[k] / max) * (h - 6) - 3; i ? x.lineTo(X, Y) : x.moveTo(X, Y); });
-    x.strokeStyle = col; x.lineWidth = 2 * devicePixelRatio; x.stroke();
-  };
-  x.clearRect(0, 0, w, h); line("rx", "#2f80ed"); line("tx", "#27ae60");
-  x.fillStyle = "#999"; x.font = `${11 * devicePixelRatio}px sans-serif`; x.fillText(fmtRate(max), 4, 13 * devicePixelRatio);
+// y-axis scale in KB/MB/GB with round steps (1, 2, 2.5, 5 × 10^n), 4 lines
+function niceScale(max) {
+  const units = [["B", 1], ["KB", 1024], ["MB", 1024 ** 2], ["GB", 1024 ** 3], ["TB", 1024 ** 4]];
+  max = Math.max(max, 1024);
+  let u = units[0]; for (const x of units) if (max >= x[1]) u = x;
+  const v = max / u[1] / 4, p = 10 ** Math.floor(Math.log10(v));
+  const step = [1, 2, 2.5, 5, 10].map((m) => m * p).find((m) => m >= v);
+  const fmt = (i) => { if (!i) return "0"; const n = step * i; return (Number.isInteger(n) ? n : +n.toFixed(2)) + " " + u[0]; };
+  return { top: step * 4 * u[1], ticks: [0, 1, 2, 3, 4].map((i) => ({ v: step * i * u[1], label: fmt(i) })) };
 }
-const daily = { month: "" };
+const C_DL = "#27ae60", C_UL = "#e5484d";
+function drawLive() {
+  const c = $("#liveChart"), r = devicePixelRatio, W = c.clientWidth, H = 130;
+  c.width = W * r; c.height = H * r; const x = c.getContext("2d"); x.scale(r, r); x.clearRect(0, 0, W, H);
+  const padL = 58, padR = 58, padT = 8, padB = 8, w = W - padL - padR, h = H - padT - padB;
+  const sc = niceScale(Math.max(0, ...live.pts.map((p) => Math.max(p.rx, p.tx))));
+  x.font = "11px sans-serif"; x.textBaseline = "middle";
+  for (const tk of sc.ticks) {
+    const Y = padT + h - (tk.v / sc.top) * h;
+    x.strokeStyle = "rgba(128,128,128,.18)"; x.lineWidth = 1; x.beginPath(); x.moveTo(padL, Y); x.lineTo(padL + w, Y); x.stroke();
+    x.fillStyle = "#888"; x.textAlign = "right"; x.fillText(tk.label + "/s", padL - 6, Y); x.textAlign = "left"; x.fillText(tk.label + "/s", padL + w + 6, Y);
+  }
+  const step = w / 89;
+  const line = (k, col) => {
+    x.beginPath(); live.pts.forEach((p, i) => { const X = padL + w - (live.pts.length - 1 - i) * step, Y = padT + h - (p[k] / sc.top) * h; i ? x.lineTo(X, Y) : x.moveTo(X, Y); });
+    x.strokeStyle = col; x.lineWidth = 2; x.lineJoin = "round"; x.stroke();
+  };
+  line("rx", C_DL); line("tx", C_UL);
+}
+const daily = { month: "", mode: localStorage.getItem("xoDailyMode") || "month" };
 async function loadDaily(shift) {
-  if (shift) { const [y, m] = daily.month.split("-").map(Number); const d = new Date(y, m - 1 + shift, 1); daily.month = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0"); }
-  const r = await api("GET", "api/traffic/daily" + (daily.month ? "?month=" + daily.month : ""));
-  daily.month = r.month; $("#dMonth").textContent = r.month;
-  $("#dSum").textContent = `↓ ${t("dlLbl")} ${fmtBytes(r.rx)} · ↑ ${t("ulLbl")} ${fmtBytes(r.tx)} · ${t("traffic")} ${fmtBytes(r.rx + r.tx)}` + (r.since ? ` · ${t("dSince")} ${r.since}` : "");
-  const max = Math.max(1, ...r.days.map((d) => d.rx + d.tx)), n = r.days.length, W = 100 / n, today = +r.today.slice(8), cur = r.today.startsWith(r.month);
-  $("#dailyChart").innerHTML = `<svg viewBox="0 0 100 50" preserveAspectRatio="none">${r.days.map((d, i) => {
-    const hr = (d.rx / max) * 46, ht = (d.tx / max) * 46, x = i * W + W * 0.15, bw = W * 0.7;
-    return `<g><title>${d.day}: ↓ ${fmtBytes(d.rx)} · ↑ ${fmtBytes(d.tx)}</title><rect x="${x}" y="${50 - hr}" width="${bw}" height="${hr}" fill="#2f80ed"${cur && d.day === today ? ' opacity=".6"' : ""}/><rect x="${x}" y="${50 - hr - ht}" width="${bw}" height="${ht}" fill="#27ae60"/></g>`;
-  }).join("")}</svg><div class="dlabels">${r.days.map((d) => `<span>${d.day % 5 === 0 || d.day === 1 ? d.day : ""}</span>`).join("")}</div>`;
+  if (shift && daily.month) { const [y, m] = daily.month.split("-").map(Number); const d = new Date(y, m - 1 + shift, 1); daily.month = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0"); }
+  const wk = daily.mode === "week";
+  document.querySelectorAll("#dMode button").forEach((b) => b.classList.toggle("primary", b.dataset.m === daily.mode));
+  $("#dNav").classList.toggle("hidden", wk);
+  const r = await api("GET", "api/traffic/daily" + (wk ? "?days=7" : daily.month ? "?month=" + daily.month : ""));
+  if (!wk) { daily.month = r.month; $("#dMonth").textContent = r.month; }
+  $("#dSum").innerHTML = `<span style="color:${C_DL}">↓ ${t("dlLbl")} ${fmtBytes(r.rx)}</span> · <span style="color:${C_UL}">↑ ${t("ulLbl")} ${fmtBytes(r.tx)}</span> · ${t("traffic")} ${fmtBytes(r.rx + r.tx)}` + (r.since ? ` · ${t("dSince")} ${r.since}` : "");
+  const W = 760, H = 230, padL = 62, padR = 8, padT = 10, padB = 24, w = W - padL - padR, h = H - padT - padB;
+  const sc = niceScale(Math.max(0, ...r.days.map((d) => Math.max(d.rx, d.tx)))), n = r.days.length, slot = w / n;
+  const bw = Math.min(slot * 0.36, 26);
+  let g = sc.ticks.map((tk) => { const Y = padT + h - (tk.v / sc.top) * h;
+    return `<line x1="${padL}" x2="${W - padR}" y1="${Y}" y2="${Y}" stroke="rgba(128,128,128,.2)"/><text x="${padL - 6}" y="${Y + 4}" text-anchor="end" class="ax">${tk.label}</text>`; }).join("");
+  g += r.days.map((d, i) => {
+    const cx = padL + slot * i + slot / 2, hr = (d.rx / sc.top) * h, ht = (d.tx / sc.top) * h, today = d.date === r.today;
+    return `<g><title>${d.date}\n↓ ${t("dlLbl")} ${fmtBytes(d.rx)}\n↑ ${t("ulLbl")} ${fmtBytes(d.tx)}</title>
+      <rect x="${cx - slot / 2}" y="${padT}" width="${slot}" height="${h}" fill="${today ? "rgba(128,128,128,.10)" : "transparent"}"/>
+      <rect x="${cx - bw}" y="${padT + h - hr}" width="${bw}" height="${hr}" rx="1.5" fill="${C_DL}"/>
+      <rect x="${cx}" y="${padT + h - ht}" width="${bw}" height="${ht}" rx="1.5" fill="${C_UL}"/>
+      <text x="${cx}" y="${H - 7}" text-anchor="middle" class="ax${today ? " today" : ""}">${d.day}</text></g>`;
+  }).join("");
+  $("#dailyChart").innerHTML = `<svg viewBox="0 0 ${W} ${H}">${g}</svg>`;
 }
 $("#dPrev").onclick = guard(() => loadDaily(-1)); $("#dNext").onclick = guard(() => loadDaily(1));
+document.querySelectorAll("#dMode button").forEach((b) => (b.onclick = guard(() => { daily.mode = b.dataset.m; localStorage.setItem("xoDailyMode", daily.mode); return loadDaily(); })));
 
 function render() {
   liveSync(); if (state.view === "overview" && !daily.loaded && !$("#app").classList.contains("hidden")) { daily.loaded = true; loadDaily().catch(() => (daily.loaded = false)); }
@@ -885,7 +917,8 @@ function renderTunnels() {
           <span class="pill gray">${esc(s.method)}</span>
           <span class="pill ${s.online ? "" : "warn"}">${s.online ? t("tnOnline") : t("tnOffline")} · ${esc(seen)}</span>
           ${s.publicIP || s.host ? `<span class="pill gray mono">${esc(s.publicIP || s.host)}</span>` : ""}
-          ${s.agentVer ? `<span class="pill gray">v${esc(s.agentVer)}</span>` : ""}</div>
+          ${s.agentVer ? `<span class="pill gray">v${esc(s.agentVer)}</span>` : ""}
+          <span class="pill gray">${s.inbounds.length} ${t("ibCount")}</span></div>
         <div class="actions">
           ${s.host ? `<button class="btn small primary" data-tn="deploy" data-i="${i}">${t("tnDeploy")}</button>` : ""}
           <button class="btn small" data-tn="test" data-i="${i}">${t("tnTest")}</button>
@@ -893,7 +926,6 @@ function renderTunnels() {
           <button class="btn small danger" data-tn="del" data-i="${i}">${t("del")}</button>
         </div>
       </div>
-      <p class="muted">${t("tnInbounds")}: ${s.inbounds.length ? s.inbounds.map((x) => `<span class="chip">${esc(x)}</span>`).join("") : "—"}</p>
       ${tnTestRes[s.id] ? `<p class="${tnTestRes[s.id].ok ? "okmsg" : "err"}">${esc(tnTestRes[s.id].text)}</p>` : ""}
       ${s.lastFail ? `<p class="muted small">${t("tnLastFail")}: ${esc(s.failAt ? ago(Math.max(0, Math.round(now - s.failAt))) + " " + t("tnAgo") : "")} · ${t("tnFails").replace("{n}", s.fails || 0)} · <span class="mono">${esc(s.lastFail)}</span></p>` : ""}
       ${s.xrayErr ? `<p class="err">${t("tnXrayErr")}: ${esc(s.xrayErr)}</p>` : ""}

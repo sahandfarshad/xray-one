@@ -143,20 +143,23 @@ func (t *trafficLog) save() {
 	}
 }
 
-// loop: count every minute, write the file every 5 minutes.
+// loop: count once an hour (and at start), saving each time. A day's total
+// lands in the day the hour ended in, which is close enough.
 func (t *trafficLog) loop() {
 	t.sample()
-	n := 0
-	for range time.Tick(time.Minute) {
+	t.save()
+	for range time.Tick(time.Hour) {
 		t.sample()
-		if n++; n%5 == 0 {
-			t.save()
-		}
+		t.save()
 	}
 }
 
-// GET /api/traffic/daily?month=YYYY-MM
+// GET /api/traffic/daily?month=YYYY-MM | ?days=7
 func (a *App) handleTrafficDaily(w http.ResponseWriter, r *http.Request) {
+	if n, _ := strconv.Atoi(r.URL.Query().Get("days")); n > 0 && n <= 60 {
+		a.trafficLastDays(w, n)
+		return
+	}
 	month := r.URL.Query().Get("month")
 	m, err := time.ParseInLocation("2006-01", month, time.Local)
 	if err != nil {
@@ -176,7 +179,7 @@ func (a *App) handleTrafficDaily(w http.ResponseWriter, r *http.Request) {
 		}
 		sumRx += v.Rx
 		sumTx += v.Tx
-		days = append(days, map[string]any{"day": d.Day(), "rx": v.Rx, "tx": v.Tx})
+		days = append(days, map[string]any{"day": d.Day(), "date": k, "rx": v.Rx, "tx": v.Tx})
 	}
 	first := ""
 	for k := range t.Days {
@@ -228,4 +231,31 @@ func (a *App) handleLive(w http.ResponseWriter, r *http.Request) {
 			fl.Flush()
 		}
 	}
+}
+
+func (a *App) trafficLastDays(w http.ResponseWriter, n int) {
+	t := a.traffic
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	now := time.Now()
+	var days []map[string]any
+	var sumRx, sumTx uint64
+	for i := n - 1; i >= 0; i-- {
+		d := now.AddDate(0, 0, -i)
+		k := d.Format("2006-01-02")
+		v := t.Days[k]
+		if v == nil {
+			v = &DayTraffic{}
+		}
+		sumRx += v.Rx
+		sumTx += v.Tx
+		days = append(days, map[string]any{"day": d.Day(), "date": k, "rx": v.Rx, "tx": v.Tx})
+	}
+	first := ""
+	for k := range t.Days {
+		if first == "" || k < first {
+			first = k
+		}
+	}
+	writeJSONResp(w, 200, map[string]any{"days": days, "rx": sumRx, "tx": sumTx, "since": first, "iface": t.Iface, "today": now.Format("2006-01-02")})
 }
