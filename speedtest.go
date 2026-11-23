@@ -287,7 +287,7 @@ func (a *App) handleSpeedTest(w http.ResponseWriter, r *http.Request) {
 	t.Method = b.Kind
 	j := a.joinWith(t, true)
 	if (b.Kind == tunnelMethodXHTTP && j.XPort == 0) || (b.Kind == tunnelMethodRT && (j.RPort == 0 || set.RPub == "")) || (b.Kind == tunnelMethodWS && set.Port == 0) ||
-		(isUDPMethod(b.Kind) && j.Method != b.Kind) {
+		((isUDPMethod(b.Kind) || isCarrier(b.Kind)) && j.Method != b.Kind) {
 		fail(w, 400, errors.New("this method is not ready on this server yet"))
 		return
 	}

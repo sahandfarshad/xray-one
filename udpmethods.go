@@ -125,6 +125,8 @@ func methodCapable(s TunnelServer, m string) bool {
 		return s.AgentVer != "" && !versionLess(s.AgentVer, agentWGVer)
 	case tunnelMethodKCP:
 		return s.AgentVer != "" && !versionLess(s.AgentVer, agentKCPVer) && s.XrayVer != "" && !versionLess(s.XrayVer, minKCPXray)
+	case tunnelMethodGRE, tunnelMethodFRP, tunnelMethodBH, tunnelMethodSSH:
+		return s.AgentVer != "" && !versionLess(s.AgentVer, agentCarrierVer)
 	}
 	return true
 }
@@ -545,6 +547,7 @@ func (a *App) handleTunnelPool(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	hub.Poke(id) // its next config has the new set of ways
+	pokeCarriers()
 	writeJSONResp(w, 200, map[string]bool{"ok": true})
 }
 

@@ -259,3 +259,7 @@ img,canvas,svg,input,select,textarea,pre{max-width:100%}
 .qm:hover::after,.qm:focus::after{opacity:1}
 .tports label>span,.dmrow label>span{display:inline-flex;align-items:center;gap:.3rem}
 .rcout{display:flex;flex-wrap:wrap;align-items:center;gap:.4rem 1rem;margin:-.4rem 0 .9rem;font-size:.82rem}
+.copt{display:flex;flex-wrap:wrap;align-items:center;gap:.3rem .7rem;font-size:.78rem;cursor:default}
+.copt label{display:inline-flex;align-items:center;gap:.3rem}
+.copt select{font-size:.78rem;padding:.1rem .3rem}
+.mcard small.err{opacity:1}

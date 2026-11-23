@@ -85,7 +85,7 @@ func (a *App) revFor(s TunnelServer) *revInfo {
 		r.PortW, r.PortX = s.RevPortW, s.RevPortX
 	}
 	// the other ways the middle server can dial us, for its own search
-	for _, m := range []string{tunnelMethodWS, tunnelMethodXHTTP, tunnelMethodRT, tunnelMethodWG, tunnelMethodKCP} {
+	for _, m := range allMethods {
 		if m == orDefault(s.Method, tunnelMethodWS) || !inPool(s, m) || !methodCapable(s, m) {
 			continue
 		}

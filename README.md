@@ -30,6 +30,13 @@ A light, minimal panel that sits **beside** a headless Xray core. It never repla
 
 ۰.۸.۲: دکمه‌های اسکن و بررسی کنار سایت REALITY تانل (بررسی از این سرور و همه‌ی سرورهای میانی)، علامت «?» با توضیح کوتاه، و حذف اروِر SSL دامنه‌ی قبلی سرور میانی.
 
+## v0.9
+- Four more methods in the same rotating tunnel: **GRE** (a kernel GRE link between the two servers' IPs, VLESS inside), **FRP** (frps on the middle server, frpc here dials it; protocol tcp, kcp, quic or websocket), **Backhaul** (server there, client here; tcpmux, tcp, wsmux or ws) and **SSH** (an SSH server built into the agent; this server logs in with its key and opens a remote forward; looks like plain SSH). FRP and Backhaul can run over the GRE link. Each has its card, port (opened on the middle servers), protocol and "In rotation" tick.
+- They carry VLESS like WireGuard and land on the same local inbound. FRP, Backhaul and SSH are dialed by this server (like the reverse path), so they still work when the middle server cannot reach out. The middle server gets the FRP and Backhaul programs from this server through its tunnel.
+- Middle servers need agent 0.9.0 (run the install command once more). GRE needs public IPs on both servers (no NAT) and protocol 47 allowed.
+
+چهار روش تازه در همان تانل چرخشی: GRE، FRP (با انتخاب پروتکل)، Backhaul (با انتخاب پروتکل) و SSH. FRP و Backhaul می‌توانند روی GRE هم بروند.
+
 ## Install / نصب
 
 ```bash

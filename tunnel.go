@@ -50,11 +50,11 @@ const (
 
 func isTunnelTag(t string) bool {
 	return t == tunnelTag || t == tunnelTagXH || t == tunnelTagRT || t == tunnelTagWG || t == tunnelTagWGV || t == tunnelTagKCP ||
-		t == oldTagWG || t == oldTagKCP || isGraceTag(t)
+		t == oldTagWG || t == oldTagKCP || t == tunnelTagGRE || isGraceTag(t)
 }
 
 func validMethod(m string) bool {
-	return m == tunnelMethodWS || m == tunnelMethodXHTTP || m == tunnelMethodRT || m == tunnelMethodWG || m == tunnelMethodKCP
+	return inList(allMethods, m)
 }
 
 // tunnelMethods: the method cards. Ready ones can be switched on per server.
@@ -64,9 +64,10 @@ var tunnelMethods = []map[string]any{
 	{"id": tunnelMethodRT, "ready": true},
 	{"id": tunnelMethodWG, "ready": true, "udp": true, "ver": agentWGVer},
 	{"id": tunnelMethodKCP, "ready": true, "udp": true, "ver": agentKCPVer},
-	{"id": "grefrp", "ready": false},
-	{"id": "backhaul", "ready": false},
-	{"id": "frpssh", "ready": false},
+	{"id": tunnelMethodGRE, "ready": true, "carrier": true, "ver": agentCarrierVer},
+	{"id": tunnelMethodFRP, "ready": true, "carrier": true, "ver": agentCarrierVer, "protos": frpProtos},
+	{"id": tunnelMethodBH, "ready": true, "carrier": true, "ver": agentCarrierVer, "protos": bhProtos},
+	{"id": tunnelMethodSSH, "ready": true, "carrier": true, "ver": agentCarrierVer},
 }
 
 // minimum agent able to try a method and fall back by itself
@@ -126,6 +127,9 @@ type TunnelServer struct {
 	CertExp  int64  `json:"certExp,omitempty"`
 	CertErr  string `json:"certErr,omitempty"`
 	CertBusy bool   `json:"certBusy,omitempty"`
+	// carrier methods (carriers.go): the agent's report, and its SSH host key
+	CState  map[string]string `json:"cstate,omitempty"`
+	SSHHost string            `json:"sshHost,omitempty"`
 	// WireGuard method (udpmethods.go): its keys and address in the tunnel,
 	// and a second key for tests
 	WGKey  string `json:"wgKey,omitempty"`
@@ -236,6 +240,16 @@ type TunnelSettings struct {
 	// public IP without TLS)
 	KDec string `json:"kdec,omitempty"`
 	KEnc string `json:"kenc,omitempty"`
+	// carrier methods (carriers.go): their ports on the middle servers
+	FRPPort  int    `json:"frpport,omitempty"`
+	FRPProto string `json:"frpproto,omitempty"`
+	FRPGre   bool   `json:"frpgre,omitempty"`
+	FRPTok   string `json:"frptok,omitempty"`
+	BHPort   int    `json:"bhport,omitempty"`
+	BHProto  string `json:"bhproto,omitempty"`
+	BHGre    bool   `json:"bhgre,omitempty"`
+	BHTok    string `json:"bhtok,omitempty"`
+	SSHPort  int    `json:"sshport,omitempty"`
 	// old ports of moved methods, still listening until Until (tunnelgrace.go)
 	Grace []tunnelGrace `json:"grace,omitempty"`
 }
@@ -520,6 +534,8 @@ func (a *App) applyTunnelConfig(root *OMap) error {
 		return err
 	}
 	tr.extra = append(tr.extra, udpIn...)
+	tr.extra = append(tr.extra, a.applyCarriers(root, servers)...)
+	defer pokeCarriers()
 	setTunnelRules(root, tr)
 	return nil
 }
@@ -649,6 +665,9 @@ type joinInfo struct {
 	WPub   string `json:"wpub,omitempty"`
 	WKey   string `json:"wkey,omitempty"`
 	WAddr  string `json:"waddr,omitempty"`
+	// GRE, FRP, Backhaul, SSH: where the carrier delivers VLESS
+	CAddr string `json:"caddr,omitempty"`
+	CPort int    `json:"cport,omitempty"`
 }
 
 func (a *App) panelLocalURL() string {
@@ -682,6 +701,9 @@ func relayXrayConfig(j joinInfo, fwd []fwdPort, ctl int, rev *revInfo) []byte {
 func methodOutbounds(j joinInfo, tag string) []any {
 	if isUDPMethod(j.Method) {
 		return udpOutbounds(j, tag)
+	}
+	if isCarrier(j.Method) {
+		return carrierOutbound(j, tag)
 	}
 	o := mainOutbound(j)
 	o.Set("tag", tag)
@@ -735,6 +757,11 @@ func (a *App) joinWith(s TunnelServer, test bool) joinInfo {
 	case tunnelMethodWG, tunnelMethodKCP:
 		j.Method = s.Method
 		if !a.udpJoin(&j, s, set, test) {
+			j = joinInfo{V: j.V, ID: j.ID, Join: j.Join, Domain: j.Domain, Port: j.Port, Path: j.Path, UUID: j.UUID, Panel: j.Panel}
+		}
+	case tunnelMethodGRE, tunnelMethodFRP, tunnelMethodBH, tunnelMethodSSH:
+		j.Method = s.Method
+		if !a.carrierJoin(&j, s, set) {
 			j = joinInfo{V: j.V, ID: j.ID, Join: j.Join, Domain: j.Domain, Port: j.Port, Path: j.Path, UUID: j.UUID, Panel: j.Panel}
 		}
 	}
@@ -799,7 +826,8 @@ type tunnelView struct {
 	Ports   map[string]int       `json:"ports"` // inbound id -> chosen port on the middle server (0 = same)
 	Speed   map[string]speedView `json:"speed"` // last speed test per card (wss, xhttp, reality, wg, kcp)
 	// methods it can run (agent and Xray new enough)
-	Capable map[string]bool `json:"capable"`
+	Capable map[string]bool   `json:"capable"`
+	CMain   map[string]string `json:"cmain"` // this server's end of each carrier: error, "" ok
 }
 
 func (a *App) handleTunnels(w http.ResponseWriter, r *http.Request) {
@@ -825,9 +853,10 @@ func (a *App) handleTunnels(w http.ResponseWriter, r *http.Request) {
 		v.Remove = "xray-one agent remove"
 		sort.Strings(v.Inbound)
 		v.Token, v.Join, v.UUID, v.RevKey, v.RevUUID = "", "", "", "", ""
-		for _, m := range []string{tunnelMethodWS, tunnelMethodXHTTP, tunnelMethodRT, tunnelMethodWG, tunnelMethodKCP} {
+		for _, m := range allMethods {
 			v.Capable[m] = methodCapable(s, m)
 		}
+		v.CMain = carrierStatusOf(s.ID)
 		v.WGKey, v.WGPub, v.WGTKey, v.WGTPub, v.Ded = "", "", "", "", nil
 		v.Speed = speeds.view(s.ID)
 		out = append(out, v)
@@ -835,7 +864,9 @@ func (a *App) handleTunnels(w http.ResponseWriter, r *http.Request) {
 	writeJSONResp(w, 200, map[string]any{"servers": out, "port": set.Port, "domain": a.store.Cfg.Domain,
 		"ready": a.store.Cfg.Domain != "" && a.store.Cfg.CertFile != "", "methods": tunnelMethods, "xport": set.XPort, "rport": set.RPort, "rtarget": set.RTarget, "methodVer": agentMethodVer, "revVer": agentRevVer,
 		"wgport": set.WGPort, "wghost": set.WGHost, "kport": set.KPort, "wgOn": set.WGOn, "kOn": set.KOn,
-		"testVer": agentTestVer, "wgTestVer": agentWGTestVer, "kcpXray": minKCPXray, "wgVer": agentWGVer, "kcpVer": agentKCPVer})
+		"testVer": agentTestVer, "wgTestVer": agentWGTestVer, "kcpXray": minKCPXray, "wgVer": agentWGVer, "kcpVer": agentKCPVer,
+		"frpport": set.FRPPort, "frpproto": set.FRPProto, "frpgre": set.FRPGre, "bhport": set.BHPort, "bhproto": set.BHProto, "bhgre": set.BHGre,
+		"sshport": set.SSHPort, "carrierVer": agentCarrierVer, "greIP": mainGREIP(set)})
 }
 
 func (a *App) handleAddTunnel(w http.ResponseWriter, r *http.Request) {
@@ -927,6 +958,7 @@ func (a *App) handleDelTunnel(w http.ResponseWriter, r *http.Request) {
 		fail(w, 400, err)
 		return
 	}
+	pokeCarriers()
 	writeJSONResp(w, 200, map[string]bool{"ok": true})
 }
 
@@ -1190,20 +1222,23 @@ type beatReq struct {
 	CertErr   string               `json:"certErr,omitempty"`
 	CertBusy  bool                 `json:"certBusy,omitempty"`
 	CertFor   string               `json:"certFor,omitempty"`   // domain the last certificate try was for (0.8.2+)
+	CState    map[string]string    `json:"cstate,omitempty"`    // carrier method -> error, "" ok (0.9.0+)
+	SSHHost   string               `json:"sshHost,omitempty"`   // the agent's SSH host key (0.9.0+)
 	Ded       map[string]dedReport `json:"dedicated,omitempty"` // check through each dedicated tunnel (0.6.8+)
 	XrayVer   string               `json:"xrayVer,omitempty"`   // Xray core on the middle server (0.7.0+)
 }
 
 type beatResp struct {
-	Token  string          `json:"token,omitempty"`
-	Hash   string          `json:"hash"`
-	Config json.RawMessage `json:"config,omitempty"`
-	Every  int             `json:"every"`
-	Held   bool            `json:"held,omitempty"`   // reply was held; beat again at once
-	Probe  bool            `json:"probe,omitempty"`  // beat again at once (test or new config)
-	Domain string          `json:"domain,omitempty"` // get a certificate for this domain (0.6.4+)
-	Test   *speedSpec      `json:"test,omitempty"`   // run this speed test (0.7.0+)
-	RCheck *rcheckSpec     `json:"rcheck,omitempty"` // check a REALITY target from there (0.8.2+)
+	Token    string          `json:"token,omitempty"`
+	Hash     string          `json:"hash"`
+	Config   json.RawMessage `json:"config,omitempty"`
+	Every    int             `json:"every"`
+	Held     bool            `json:"held,omitempty"`     // reply was held; beat again at once
+	Probe    bool            `json:"probe,omitempty"`    // beat again at once (test or new config)
+	Domain   string          `json:"domain,omitempty"`   // get a certificate for this domain (0.6.4+)
+	Test     *speedSpec      `json:"test,omitempty"`     // run this speed test (0.7.0+)
+	RCheck   *rcheckSpec     `json:"rcheck,omitempty"`   // check a REALITY target from there (0.8.2+)
+	Carriers *carrierSpec    `json:"carriers,omitempty"` // GRE, FRP, Backhaul, SSH to arm there (0.9.0+)
 }
 
 func (a *App) handleBeat(w http.ResponseWriter, r *http.Request) {
@@ -1250,6 +1285,16 @@ func (a *App) handleBeat(w http.ResponseWriter, r *http.Request) {
 			s.Fails, s.LastFail, s.FailAt = req.Fails, trimTo(req.LastFail, 300), time.Now().Unix()
 		}
 		s.Mode, s.Via = req.Mode, req.Via
+		if req.CState != nil {
+			for k, v := range req.CState {
+				req.CState[k] = trimTo(v, 300)
+			}
+			s.CState = req.CState
+		}
+		if req.SSHHost != "" && s.SSHHost != req.SSHHost {
+			s.SSHHost = req.SSHHost
+			defer pokeCarriers()
+		}
 		if revCapable(*s) && s.Domain != "" {
 			s.CertBusy, s.CertErr = req.CertBusy, trimTo(req.CertErr, 300)
 			// an error from a try for another (older) domain, or while a new try runs, is not this domain's
@@ -1329,6 +1374,7 @@ func (a *App) handleBeat(w http.ResponseWriter, r *http.Request) {
 		})
 		go a.refreshTunnelInbounds()
 	}
+	resp.Carriers = a.carrierSpecFor(srv)
 	resp.Every = int(beatEvery / time.Second)
 	hub.Beat(srv.ID)
 	resp.Test = speeds.take(srv)
@@ -1542,7 +1588,22 @@ func (a *App) handleTunnelMethod(w http.ResponseWriter, r *http.Request) {
 			if b.Method == tunnelMethodKCP {
 				return fmt.Errorf("mKCP needs agent %s and Xray %s or newer on %s (it has Xray %s): run the install command there again", agentKCPVer, minKCPXray, s.Name, orDefault(s.XrayVer, "unknown"))
 			}
-			return fmt.Errorf("update the middle server first (agent %s or newer): run the install command again there", agentWGVer)
+			v := agentWGVer
+			if isCarrier(b.Method) {
+				v = agentCarrierVer
+			}
+			return fmt.Errorf("update the middle server first (agent %s or newer): run the install command again there", v)
+		}
+		if set := a.store.TunnelCfg; isCarrier(b.Method) {
+			if !set.WGOn || set.WGVPort == 0 {
+				return errors.New("this method lands on the WireGuard method's local inbound: set the UDP address in the Tunnels tab first")
+			}
+			if b.Method == tunnelMethodGRE && (s.PublicIP == "" || greNum(*s) == 0 || mainGREIP(set) == "") {
+				return errors.New("GRE needs both servers' public IPs (this server's UDP address must be an IP)")
+			}
+			if b.Method == tunnelMethodSSH && s.SSHHost == "" {
+				return errors.New("the middle server has not sent its SSH key yet: wait a few seconds")
+			}
 		}
 		if set := a.store.TunnelCfg; (b.Method == tunnelMethodWG && !set.WGOn) || (b.Method == tunnelMethodKCP && !set.KOn) {
 			if b.Method == tunnelMethodKCP {

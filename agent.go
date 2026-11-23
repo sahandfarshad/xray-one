@@ -93,6 +93,7 @@ func agentMain(args []string) {
 	case "status":
 		agentStatus()
 	case "remove":
+		agentCarriersRemove()
 		_, _ = run(20*time.Second, "systemctl", "disable", "--now", agentUnit, agentRelay)
 		_ = os.Remove("/etc/systemd/system/" + agentUnit + ".service")
 		_ = os.Remove("/etc/systemd/system/" + agentRelay + ".service")
@@ -316,7 +317,7 @@ func agentRun() {
 		mkReq := func(mode string, wait bool) []byte {
 			req := beatReq{Version: version, PublicIP: ip, XrayOK: active == "active", XrayErr: lastErr, Applied: st.Hash, CtlPort: st.Ctl, Busy: busy,
 				Wait: wait, Fails: fails, LastFail: lastFail, PortState: pstate, Rejected: st.Rejected, Pending: st.PendingAt > 0,
-				Mode: mode, Via: st.Via, CertDom: st.CertDomain, CertExp: st.CertExp, CertErr: st.CertErr, CertBusy: certBusy, CertFor: st.CertTried,
+				Mode: mode, Via: st.Via, CertDom: st.CertDomain, CertExp: st.CertExp, CertErr: st.CertErr, CertBusy: certBusy, CertFor: st.CertTried, CState: agentCarrierState(), SSHHost: agentHostPub(),
 				XrayVer: xrayVer}
 			if mode == "rev" {
 				req.Via = ""
@@ -429,6 +430,7 @@ func agentRun() {
 			}
 			agentStartTest(br.Test, st) // a manual tunnel test, in the background
 			agentStartRCheck(br.RCheck, st)
+			agentCarriers(br.Carriers, st)
 			newCfg := false
 			if wasPending && st.PendingAt > 0 { // reached the panel with the new config
 				st.PendingAt = 0

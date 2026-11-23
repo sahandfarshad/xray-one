@@ -44,11 +44,12 @@ const T = {
     noUsers: "هنوز کلاینتی نیست.", pickInbounds: "اینباندهای این کلاینت", editUser: "ویرایش", noInboundsYet: "بدون اینباند", confirmDelUser: "این کلاینت از همه‌ی اینباندها حذف شود؟",
     tunnels: "تانل", addTunnel: "سرور میانی جدید", tnName: "نام", tnHost: "IP یا دامنه‌ی سرور میانی (برای SSH)", tnSshPort: "پورت SSH", tnSshUser: "کاربر SSH",
     tnMethod: "روش", tpWs: "پورت WS", tpXh: "پورت XHTTP", tpRt: "پورت REALITY", tpRtT: "سایت REALITY", mReality: "Xray REALITY", mRealityD: "بدون دامنه و گواهی؛ شبیه اتصال به یک سایت واقعی.", tpAuto: "خودکار", tpSave: "ذخیره‌ی پورت‌ها", tpHint: "قبل از ذخیره، آزاد بودن پورت (TCP و UDP) چک می‌شود. اگر سروری روی همین روش وصل است، اول روشش را عوض کنید بعد پورت را.", mWss: "Xray WS", mWssD: "WebSocket + TLS. ساده و پایدار.", mXhttp: "Xray XHTTP", mXhttpD: "HTTP/2 + TLS، شبیه HTTPS معمولی؛ جایگزین WS.",
-    mGrefrp: "GRE + FRP", mGrefrpD: "FRP روی لینک GRE.", mBackhaul: "Backhaul", mBackhaulD: "با یا بدون GRE؛ tcpmux، ws و …", mFrpssh: "FRP روی SSH", mFrpsshD: "وقتی فقط SSH رد می‌شود.",
+    mGrefrp: "GRE + FRP", mGrefrpD: "FRP روی لینک GRE.", mBackhaul: "Backhaul", mBackhaulD: "این سرور با Backhaul به سرور میانی وصل می‌شود؛ VLESS داخلش.", mFrpssh: "FRP روی SSH", mFrpsshD: "وقتی فقط SSH رد می‌شود.",
     mSoon: "به‌زودی", mActive: "فعال", mTrying: "در حال امتحان…", mAsk: "روش این سرور میانی به «{m}» عوض شود؟ اگر تا ۹۰ ثانیه وصل نشد، خودش به روش قبلی برمی‌گردد.",
     mBack: "روش جدید وصل نشد و به روش قبلی برگشت: {x}", mNeedAgent: "برای عوض کردن روش، دستور نصب را یک بار دیگر روی سرور میانی بزنید (نسخه‌ی {v} به بالا).", tnDeploy: "Deploy با SSH", tnPass: "پسورد SSH (فقط یک بار؛ ذخیره نمی‌شود)", tnPassKey: "کلید پنل نصب شده؛ پسورد لازم نیست",
     tnOnline: "متصل", tnOffline: "قطع", tnNever: "هنوز وصل نشده", tnAgo: "پیش", tnQuick: "نصب سریع بدون پسورد: این دستور را روی سرور میانی (با root) بزنید. تا ۲۴ ساعت معتبر است و بعد از اتصال باطل می‌شود.",
     qSingle: "این اینباند (SOCKS یا HTTP) لیست کلاینت ندارد و فقط یک نام کاربری و رمز دارد؛ همه با همین یک لینک وصل می‌شوند. شکل لینک: http://کاربر:رمز@سرور:پورت (در SOCKS کاربر:رمز به base64 است). در هر برنامه‌ای که تنظیم پروکسی دارد یا در v2rayN/NekoBox وارد می‌شود. رمزنگاری ندارد.", qDomain: "اختیاری. اگر سرور میانی نتواند به این سرور وصل شود، این سرور خودش به سرور میانی وصل می‌شود (مسیر برگشت). بدون دامنه فقط REALITY امتحان می‌شود؛ با دامنه و SSL، WS و XHTTP هم. در لینک کاربرها استفاده نمی‌شود.", qRtT: "سایتی که تانل REALITY شبیه بازدید از آن دیده می‌شود؛ هم روی این سرور، هم در مسیر برگشت روی سرور میانی. می‌تواند با سایت اینباندها فرق داشته باشد. باید TLS 1.3، h2 و X25519 داشته باشد: «بررسی» آن را از این سرور و سرورهای میانی تست می‌کند.", rcCheck: "بررسی", rcHere: "این سرور", rcWait: "در حال بررسی…", rcOld: "سرور میانی باید به‌روز شود", rcOff: "وصل نیست", rcNoAns: "جوابی نیامد",
+    mGre: "GRE", mGreD: "لینک GRE بین IP دو سرور (پروتکل ۴۷)، VLESS داخلش. سبک و سریع؛ رمزنگاری خودش را ندارد و پشت NAT کار نمی‌کند.", mFrp: "FRP", mFrpD: "این سرور با FRP به سرور میانی وصل می‌شود (مثل مسیر برگشت)؛ VLESS داخلش.", mSsh: "SSH", mSshD: "تونل SSH داخلی؛ روی سیم دقیقاً یک اتصال SSH است. برنامه‌ی جداگانه نمی‌خواهد.", cProto: "پروتکل", cOverGre: "روی GRE", cOverGreHint: "این سرور از داخل لینک GRE به سرور میانی وصل شود (GRE باید بین دو سرور کار کند).", cMid: "سرور میانی", cMain: "این سرور", mNoGre: "آماده نیست: GRE به IP عمومی هر دو سرور نیاز دارد", mNoSshKey: "در انتظار کلید SSH سرور میانی…", qCPort: "این پورت روی سرورهای میانی باز می‌شود و این سرور به آن وصل می‌شود؛ اگر فایروال دارند، بازش کنید (برای kcp و quic روی UDP).", qGre: "GRE پروتکل ۴۷ است، نه TCP یا UDP؛ اگر فایروال یا دیتاسنتر آن را ببندد، چرخش سراغ روش بعدی می‌رود.",
     tnNewCmd: "دستور نصب جدید", mWg: "WireGuard", mWgD: "روی UDP، مستقیم به IP این سرور. اگر UDP بین دو سرور بسته باشد، چرخش سراغ روش بعدی می‌رود.", mKcp: "mKCP", mKcpD: "VLESS روی mKCP (UDP)، رمزشده؛ روی لینک پرافت پایدارتر، ولی ترافیک بیشتری مصرف می‌کند.", poolIn: "در چرخش", poolHint: "تیک را بردار تا سرور میانی در جستجو و چرخش سراغ این روش نرود. روشِ فعال همیشه در چرخش است.", mNoUdp: "آماده نیست: آدرس UDP را تنظیم کنید", mNoKcp: "آماده نیست: Xray این سرور باید {v} به بالا باشد", mOldMid: "سرور میانی باید به‌روز شود (دستور نصب را دوباره بزنید)", udpTitle: "WireGuard و mKCP", udpHost: "آدرس این سرور برای UDP", udpHint: "سرورهای میانی با UDP مستقیم به این آدرس وصل می‌شوند: IP مستقیم، نه دامنه‌ی پشت CDN.", tnCreating: "در حال ساختن… (چند ثانیه)", tnNoSrv: "هنوز سرور میانی اضافه نشده.", tnInfo: "سرور میانی به {domain} وصل می‌شود؛ روش هر سرور را از کارت‌هایش انتخاب کنید (WS روی پورت {port}{x}). کاربر ← سرور میانی ← این سرور ← اینترنت.",
     tnNeedSSL: "برای تانل WSS اول باید دامنه و SSL را از منوی SSH تنظیم کنید.", tnUse: "تانل", tnPick: "این اینباند از کدام سرورهای میانی استفاده کند؟ برای هر کدام یک لینک جدا ساخته می‌شود.",
     tnTest: "تست اتصال", tnTesting: "در حال تست…", tnTestOk: "وصل است · {ms} میلی‌ثانیه", tnTestBad: "پاسخی از سرور میانی نیامد",
@@ -113,11 +114,12 @@ const T = {
     noUsers: "No clients yet.", pickInbounds: "Inbounds of this client", editUser: "Edit", noInboundsYet: "no inbound", confirmDelUser: "Remove this client from every inbound?",
     tunnels: "Tunnel", addTunnel: "New middle server", tnName: "Name", tnHost: "Middle server IP or domain (for SSH)", tnSshPort: "SSH port", tnSshUser: "SSH user",
     tnMethod: "Method", tpWs: "WS port", tpXh: "XHTTP port", tpRt: "REALITY port", tpRtT: "REALITY site", mReality: "Xray REALITY", mRealityD: "No domain or cert needed; looks like a visit to a real site.", tpAuto: "auto", tpSave: "Save ports", tpHint: "Each port is checked as free (TCP and UDP) before saving. If a server is connected with that method, switch its method first, then change the port.", mWss: "Xray WS", mWssD: "WebSocket + TLS. Simple and stable.", mXhttp: "Xray XHTTP", mXhttpD: "HTTP/2 + TLS, looks like normal HTTPS; WS successor.",
-    mGrefrp: "GRE + FRP", mGrefrpD: "FRP over a GRE link.", mBackhaul: "Backhaul", mBackhaulD: "With or without GRE; tcpmux, ws, …", mFrpssh: "FRP over SSH", mFrpsshD: "When only SSH gets through.",
+    mGrefrp: "GRE + FRP", mGrefrpD: "FRP over a GRE link.", mBackhaul: "Backhaul", mBackhaulD: "This server dials the middle server with Backhaul; VLESS inside.", mFrpssh: "FRP over SSH", mFrpsshD: "When only SSH gets through.",
     mSoon: "Soon", mActive: "Active", mTrying: "Trying…", mAsk: "Switch this middle server to \"{m}\"? If it can't connect within 90 s it goes back by itself.",
     mBack: "The new method did not connect and went back: {x}", mNeedAgent: "To switch methods, run the install command on the middle server once more (version {v} or newer).", tnDeploy: "Deploy over SSH", tnPass: "SSH password (used once, never stored)", tnPassKey: "Panel key installed; no password needed",
     tnOnline: "Connected", tnOffline: "Down", tnNever: "not connected yet", tnAgo: "ago", tnQuick: "Quick install without a password: run this on the middle server as root. Valid 24 h, void after it connects.",
     qSingle: "This inbound (SOCKS or HTTP) has no client list, just one username and password, so everyone uses this one link. Link form: http://user:pass@server:port (for SOCKS, user:pass is base64). Works in any app with a proxy setting, or v2rayN/NekoBox. Not encrypted.", qDomain: "Optional. If the middle server cannot reach this server, this server dials the middle server itself (reverse path). Without a domain only REALITY is tried; with a domain and SSL, WS and XHTTP too. Not used in user links.", qRtT: "The site the REALITY tunnel looks like a visit to, on this server and, on the reverse path, on the middle server. It can differ from your inbounds' sites. Needs TLS 1.3, h2 and X25519: Check tests it from this server and the middle servers.", rcCheck: "Check", rcHere: "This server", rcWait: "Checking…", rcOld: "update the middle server", rcOff: "offline", rcNoAns: "no answer",
+    mGre: "GRE", mGreD: "A GRE link between the two servers' IPs (protocol 47) with VLESS inside. Light and fast; no encryption of its own, and no NAT.", mFrp: "FRP", mFrpD: "This server dials the middle server with FRP (like the reverse path); VLESS inside.", mSsh: "SSH", mSshD: "Built-in SSH tunnel; on the wire it is just an SSH connection. No extra program.", cProto: "Protocol", cOverGre: "Over GRE", cOverGreHint: "This server dials the middle server inside the GRE link (GRE must work between the servers).", cMid: "Middle server", cMain: "This server", mNoGre: "Not ready: GRE needs both servers' public IPs", mNoSshKey: "Waiting for the middle server's SSH key…", qCPort: "This port opens on the middle servers and this server dials it; open it in their firewall if they have one (UDP for kcp and quic).", qGre: "GRE is protocol 47, not TCP or UDP; if a firewall or the datacenter blocks it, rotation moves on to the next method.",
     tnNewCmd: "New install command", mWg: "WireGuard", mWgD: "Over UDP, straight to this server's IP. If UDP is blocked between the servers, rotation moves on to the next method.", mKcp: "mKCP", mKcpD: "VLESS over mKCP (UDP), encrypted; steadier on lossy links, but uses more traffic.", poolIn: "In rotation", poolHint: "Untick to keep the middle server from searching or rotating to this method. The active method is always in.", mNoUdp: "Not ready: set the UDP address", mNoKcp: "Not ready: this server needs Xray {v} or newer", mOldMid: "Update the middle server (run the install command again)", udpTitle: "WireGuard and mKCP", udpHost: "This server's address for UDP", udpHint: "Middle servers connect to this address over UDP: a direct IP, not a domain behind a CDN.", tnCreating: "Creating… (a few seconds)", tnNoSrv: "No middle server yet.", tnInfo: "The middle server connects to {domain}; pick each server's method on its cards (WS on port {port}{x}). User → middle server → this server → internet.",
     tnNeedSSL: "The WSS tunnel needs this server's domain and SSL: set them in the SSH menu first.", tnUse: "Tunnel", tnPick: "Which middle servers should this inbound use? Each one gets its own link.",
     tnTest: "Test connection", tnTesting: "Testing…", tnTestOk: "Connected · {ms} ms", tnTestBad: "No answer from the middle server",
@@ -1120,20 +1122,24 @@ $("#tunnelList").addEventListener("keydown", guard(async (e) => {
   if (inp && e.key === "Escape") { portEdit = ""; renderTunnels(); return; }
   if ((e.key === "Enter" || e.key === " ") && e.target.matches("[role=button]")) { e.preventDefault(); e.target.click(); }
 }));
-const tnTyping = () => !!document.activeElement?.closest?.("#tunnelList input:not([type=checkbox])");
+const tnTyping = () => !!document.activeElement?.closest?.("#tunnelList input:not([type=checkbox]), #tunnelList select");
 function versionLess(a, b) {
   const pa = String(a).split(".").map(Number), pb = String(b).split(".").map(Number);
   for (let i = 0; i < 3; i++) { const x = pa[i] || 0, y = pb[i] || 0; if (x !== y) return x < y; }
   return false;
 }
 const cap = (m) => (m === "wss" ? "Wss" : m.charAt(0).toUpperCase() + m.slice(1));
-const methodPort = { wss: "port", xhttp: "xport", reality: "rport", wg: "wgport", kcp: "kport" };
+const methodPort = { wss: "port", xhttp: "xport", reality: "rport", wg: "wgport", kcp: "kport", frp: "frpport", backhaul: "bhport", ssh: "sshport" };
+const carrierKeys = { frp: ["frpproto", "frpgre"], backhaul: ["bhproto", "bhgre"] };
 // why a method cannot run between this server and middle server s ("" = it can)
 function methodBlock(s, m) {
   const d = tunnelData;
   if (m === "wg" && !d.wgOn) return t("mNoUdp");
   if (m === "kcp" && !d.kOn) return d.wghost ? t("mNoKcp").replace("{v}", d.kcpXray) : t("mNoUdp");
+  if (["gre", "frp", "backhaul", "ssh"].includes(m) && !d.wgOn) return t("mNoUdp");
+  if (m === "gre" && (!d.greIP || (s.lastSeen && !s.publicIP))) return t("mNoGre");
   if (s.capable && s.capable[m] === false && s.lastSeen) return t("mOldMid");
+  if (m === "ssh" && s.lastSeen && !s.sshHost) return t("mNoSshKey");
   return "";
 }
 // "Port: N ✎" on a card, or its inline editor
@@ -1142,6 +1148,17 @@ function portLine(i, k) {
   if (portEdit === i + ":" + k) return `<span class="pedit"><input id="pe-${i}-${k}" inputmode="numeric" dir="ltr" value="${esc(v || "")}" aria-label="${t("pePort")}">
     <button type="button" class="btn small primary" data-pe-save="${k}" data-i="${i}" title="${t("peSave")}">✓</button><button type="button" class="btn small" data-pe-cancel="1" title="${t("peCancel")}">✕</button></span>`;
   return `<span class="pport" role="button" tabindex="0" data-pe="${k}" data-i="${i}" title="${t("peEdit")}">${t("pePort")}: <b class="mono">${esc(v || t("tpAuto"))}</b> ✎</span>`;
+}
+// protocol and "over GRE" of FRP / Backhaul (the same for every middle server)
+function carrierOpts(m, i) {
+  const [pk, gk] = carrierKeys[m.id], d = tunnelData;
+  return `<span class="copt"><label>${t("cProto")} <select data-copt="${pk}" data-i="${i}" dir="ltr">${m.protos.map((p) => `<option ${d[pk] === p ? "selected" : ""}>${p}</option>`).join("")}</select></label>
+    <label title="${esc(t("cOverGreHint"))}"><input type="checkbox" data-copt="${gk}" data-i="${i}" ${d[gk] ? "checked" : ""}> ${t("cOverGre")}</label></span>`;
+}
+// what each end of a carrier reports (only problems)
+function carrierState(s, m) {
+  const mid = (s.cstate || {})[m], main = (s.cmain || {})[m];
+  return (mid ? `<small class="err" dir="auto">${t("cMid")}: ${esc(mid)}</small>` : "") + (main ? `<small class="err" dir="auto">${t("cMain")}: ${esc(main)}</small>` : "");
 }
 function methodCards(s, i) {
   const ms = tunnelData.methods || [];
@@ -1153,7 +1170,9 @@ function methodCards(s, i) {
     const cls = "mcard" + (on ? " on" : "") + (m.ready ? "" : " soon") + (m.ready && !on && !inPool ? " out" : "");
     return `<div class="${cls}" data-tn="method" data-i="${i}" data-m="${m.id}" ${can ? `role="button" tabindex="0"` : ""}>
       <b>${esc(t("m" + cap(m.id)))}</b><small>${esc(t("m" + cap(m.id) + "D"))}</small>
-      ${m.ready && methodPort[m.id] && tunnelData.ready && !(m.udp && why === t("mNoUdp")) ? portLine(i, methodPort[m.id]) : ""}
+      ${m.ready && methodPort[m.id] && tunnelData.ready && !(m.udp && why === t("mNoUdp")) ? portLine(i, methodPort[m.id]) : ""}${m.carrier && methodPort[m.id] && tunnelData.ready ? " " + qm("qCPort") : ""}${m.id === "gre" ? qm("qGre") : ""}
+      ${m.protos ? carrierOpts(m, i) : ""}
+      ${m.carrier ? carrierState(s, m.id) : ""}
       ${m.ready ? `<label class="pool" title="${esc(t("poolHint"))}"><input type="checkbox" data-pool="${m.id}" data-i="${i}" ${inPool || on ? "checked" : ""} ${on || trying ? "disabled" : ""}> ${t("poolIn")}</label>` : ""}
       ${why ? `<small class="muted" dir="auto">${esc(why)}</small>` : ""}
       <em>${on ? (trying ? t("mTrying") : "✓ " + t("mActive")) : m.ready ? "" : t("mSoon")}</em>
@@ -1193,7 +1212,10 @@ async function startSpeed(s, k) {
 async function savePort(i, k) {
   const n = portNum($(`#pe-${i}-${k}`).value), d = tunnelData;
   if (!n || n === d[k]) { portEdit = ""; renderTunnels(); return; }
-  if (k === "wgport" || k === "kport") {
+  if (k === "frpport" || k === "bhport" || k === "sshport") {
+    await api("POST", "api/tunnels/csettings", { [k]: n });
+    toast(t("done"));
+  } else if (k === "wgport" || k === "kport") {
     const m = k === "wgport" ? "wg" : "kcp";
     if (d.servers.some((x) => x.method === m || x.prevMethod === m) && !confirm(t(m === "wg" ? "peAskWg" : "peAskKcp").replace("{p}", n))) return;
     await api("POST", "api/tunnels/dtsettings", { [k]: n });
@@ -1215,7 +1237,7 @@ $("#tunnelList").addEventListener("click", guard(async (e) => {
   if (e.target.closest(".pedit")) return;
   const sb = e.target.closest("button[data-sp]");
   if (sb) { await startSpeed(tunnelData.servers[+sb.dataset.i], sb.dataset.sp); return; }
-  if (e.target.closest(".spres") || e.target.closest(".pool")) return;
+  if (e.target.closest(".spres") || e.target.closest(".pool") || e.target.closest(".copt") || e.target.closest(".qm")) return;
   const mb = e.target.closest("[data-tn=method][role=button]");
   if (mb) {
     const s = tunnelData.servers[+mb.dataset.i], m = mb.dataset.m;
@@ -1248,6 +1270,12 @@ $("#tunnelList").addEventListener("click", guard(async (e) => {
 }));
 // a method in or out of a middle server's rotation
 $("#tunnelList").addEventListener("change", guard(async (e) => {
+  const co = e.target.closest("[data-copt]");
+  if (co) {
+    const v = co.type === "checkbox" ? co.checked : co.value;
+    try { await api("POST", "api/tunnels/csettings", { [co.dataset.copt]: v }); toast(t("done")); } finally { co.blur(); loadTunnels(); }
+    return;
+  }
   const cb = e.target.closest("input[data-pool]"); if (!cb) return;
   const s = tunnelData.servers[+cb.dataset.i];
   try { await api("POST", "api/tunnels/" + s.id + "/pool", { method: cb.dataset.pool, on: cb.checked }); toast(t("done")); }

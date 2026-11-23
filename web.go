@@ -206,6 +206,7 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("POST /api/tunnels/{id}/domain", a.api(a.handleTunnelDomain))
 	mux.HandleFunc("POST /api/tunnels/settings", a.api(a.handleTunnelSettings))
 	mux.HandleFunc("POST /api/tunnels/rcheck", a.api(a.handleRCheck))
+	mux.HandleFunc("POST /api/tunnels/csettings", a.api(a.handleCarrierSettings))
 	mux.HandleFunc("GET /api/tunnels/rcheck", a.api(a.handleRCheckView))
 	mux.HandleFunc("POST /api/tunnels/assign", a.api(a.handleTunnelAssign))
 	mux.HandleFunc("POST /api/tunnels/bulk", a.api(a.handleTunnelBulk))
@@ -223,6 +224,7 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("POST /api/agent/t/ul", a.handleTestUp)
 	mux.HandleFunc("POST /api/agent/t/res", a.handleTestResult)
 	mux.HandleFunc("POST /api/agent/rc/res", a.handleRCheckResult)
+	mux.HandleFunc("GET /api/agent/bin/{name}", a.handleAgentBin)
 	mux.HandleFunc("GET /sub/{token}", a.handleSub)
 	mux.HandleFunc("GET /dl/{token}/{file}", a.handleMirror)
 
