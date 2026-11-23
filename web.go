@@ -152,7 +152,13 @@ func (a *App) api(h http.HandlerFunc) http.HandlerFunc {
 func (a *App) Routes() http.Handler {
 	mux := http.NewServeMux()
 	static, _ := fs.Sub(webFS, "web")
-	mux.Handle("/", http.FileServer(http.FS(static)))
+	files := http.FileServer(http.FS(static))
+	mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// the files are built into the binary with no date: never let a
+		// browser keep an old app.js after an update
+		w.Header().Set("Cache-Control", "no-cache")
+		files.ServeHTTP(w, r)
+	}))
 	mux.HandleFunc("POST /api/login", a.handleLogin)
 	mux.HandleFunc("POST /api/logout", a.handleLogout)
 	mux.HandleFunc("GET /api/status", a.api(a.handleStatus))
@@ -199,6 +205,8 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("POST /api/tunnels/{id}/method", a.api(a.handleTunnelMethod))
 	mux.HandleFunc("POST /api/tunnels/{id}/domain", a.api(a.handleTunnelDomain))
 	mux.HandleFunc("POST /api/tunnels/settings", a.api(a.handleTunnelSettings))
+	mux.HandleFunc("POST /api/tunnels/rcheck", a.api(a.handleRCheck))
+	mux.HandleFunc("GET /api/tunnels/rcheck", a.api(a.handleRCheckView))
 	mux.HandleFunc("POST /api/tunnels/assign", a.api(a.handleTunnelAssign))
 	mux.HandleFunc("POST /api/tunnels/bulk", a.api(a.handleTunnelBulk))
 	mux.HandleFunc("POST /api/tunnels/{id}/pool", a.api(a.handleTunnelPool))
@@ -214,6 +222,7 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("GET /api/agent/t/dl", a.handleTestDown)
 	mux.HandleFunc("POST /api/agent/t/ul", a.handleTestUp)
 	mux.HandleFunc("POST /api/agent/t/res", a.handleTestResult)
+	mux.HandleFunc("POST /api/agent/rc/res", a.handleRCheckResult)
 	mux.HandleFunc("GET /sub/{token}", a.handleSub)
 	mux.HandleFunc("GET /dl/{token}/{file}", a.handleMirror)
 

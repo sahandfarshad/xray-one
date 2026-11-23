@@ -48,6 +48,7 @@ const T = {
     mSoon: "به‌زودی", mActive: "فعال", mTrying: "در حال امتحان…", mAsk: "روش این سرور میانی به «{m}» عوض شود؟ اگر تا ۹۰ ثانیه وصل نشد، خودش به روش قبلی برمی‌گردد.",
     mBack: "روش جدید وصل نشد و به روش قبلی برگشت: {x}", mNeedAgent: "برای عوض کردن روش، دستور نصب را یک بار دیگر روی سرور میانی بزنید (نسخه‌ی {v} به بالا).", tnDeploy: "Deploy با SSH", tnPass: "پسورد SSH (فقط یک بار؛ ذخیره نمی‌شود)", tnPassKey: "کلید پنل نصب شده؛ پسورد لازم نیست",
     tnOnline: "متصل", tnOffline: "قطع", tnNever: "هنوز وصل نشده", tnAgo: "پیش", tnQuick: "نصب سریع بدون پسورد: این دستور را روی سرور میانی (با root) بزنید. تا ۲۴ ساعت معتبر است و بعد از اتصال باطل می‌شود.",
+    qSingle: "این اینباند (SOCKS یا HTTP) لیست کلاینت ندارد و فقط یک نام کاربری و رمز دارد؛ همه با همین یک لینک وصل می‌شوند. شکل لینک: http://کاربر:رمز@سرور:پورت (در SOCKS کاربر:رمز به base64 است). در هر برنامه‌ای که تنظیم پروکسی دارد یا در v2rayN/NekoBox وارد می‌شود. رمزنگاری ندارد.", qDomain: "اختیاری. اگر سرور میانی نتواند به این سرور وصل شود، این سرور خودش به سرور میانی وصل می‌شود (مسیر برگشت). بدون دامنه فقط REALITY امتحان می‌شود؛ با دامنه و SSL، WS و XHTTP هم. در لینک کاربرها استفاده نمی‌شود.", qRtT: "سایتی که تانل REALITY شبیه بازدید از آن دیده می‌شود؛ هم روی این سرور، هم در مسیر برگشت روی سرور میانی. می‌تواند با سایت اینباندها فرق داشته باشد. باید TLS 1.3، h2 و X25519 داشته باشد: «بررسی» آن را از این سرور و سرورهای میانی تست می‌کند.", rcCheck: "بررسی", rcHere: "این سرور", rcWait: "در حال بررسی…", rcOld: "سرور میانی باید به‌روز شود", rcOff: "وصل نیست", rcNoAns: "جوابی نیامد",
     tnNewCmd: "دستور نصب جدید", mWg: "WireGuard", mWgD: "روی UDP، مستقیم به IP این سرور. اگر UDP بین دو سرور بسته باشد، چرخش سراغ روش بعدی می‌رود.", mKcp: "mKCP", mKcpD: "VLESS روی mKCP (UDP)، رمزشده؛ روی لینک پرافت پایدارتر، ولی ترافیک بیشتری مصرف می‌کند.", poolIn: "در چرخش", poolHint: "تیک را بردار تا سرور میانی در جستجو و چرخش سراغ این روش نرود. روشِ فعال همیشه در چرخش است.", mNoUdp: "آماده نیست: آدرس UDP را تنظیم کنید", mNoKcp: "آماده نیست: Xray این سرور باید {v} به بالا باشد", mOldMid: "سرور میانی باید به‌روز شود (دستور نصب را دوباره بزنید)", udpTitle: "WireGuard و mKCP", udpHost: "آدرس این سرور برای UDP", udpHint: "سرورهای میانی با UDP مستقیم به این آدرس وصل می‌شوند: IP مستقیم، نه دامنه‌ی پشت CDN.", tnCreating: "در حال ساختن… (چند ثانیه)", tnNoSrv: "هنوز سرور میانی اضافه نشده.", tnInfo: "سرور میانی به {domain} وصل می‌شود؛ روش هر سرور را از کارت‌هایش انتخاب کنید (WS روی پورت {port}{x}). کاربر ← سرور میانی ← این سرور ← اینترنت.",
     tnNeedSSL: "برای تانل WSS اول باید دامنه و SSL را از منوی SSH تنظیم کنید.", tnUse: "تانل", tnPick: "این اینباند از کدام سرورهای میانی استفاده کند؟ برای هر کدام یک لینک جدا ساخته می‌شود.",
     tnTest: "تست اتصال", tnTesting: "در حال تست…", tnTestOk: "وصل است · {ms} میلی‌ثانیه", tnTestBad: "پاسخی از سرور میانی نیامد",
@@ -116,6 +117,7 @@ const T = {
     mSoon: "Soon", mActive: "Active", mTrying: "Trying…", mAsk: "Switch this middle server to \"{m}\"? If it can't connect within 90 s it goes back by itself.",
     mBack: "The new method did not connect and went back: {x}", mNeedAgent: "To switch methods, run the install command on the middle server once more (version {v} or newer).", tnDeploy: "Deploy over SSH", tnPass: "SSH password (used once, never stored)", tnPassKey: "Panel key installed; no password needed",
     tnOnline: "Connected", tnOffline: "Down", tnNever: "not connected yet", tnAgo: "ago", tnQuick: "Quick install without a password: run this on the middle server as root. Valid 24 h, void after it connects.",
+    qSingle: "This inbound (SOCKS or HTTP) has no client list, just one username and password, so everyone uses this one link. Link form: http://user:pass@server:port (for SOCKS, user:pass is base64). Works in any app with a proxy setting, or v2rayN/NekoBox. Not encrypted.", qDomain: "Optional. If the middle server cannot reach this server, this server dials the middle server itself (reverse path). Without a domain only REALITY is tried; with a domain and SSL, WS and XHTTP too. Not used in user links.", qRtT: "The site the REALITY tunnel looks like a visit to, on this server and, on the reverse path, on the middle server. It can differ from your inbounds' sites. Needs TLS 1.3, h2 and X25519: Check tests it from this server and the middle servers.", rcCheck: "Check", rcHere: "This server", rcWait: "Checking…", rcOld: "update the middle server", rcOff: "offline", rcNoAns: "no answer",
     tnNewCmd: "New install command", mWg: "WireGuard", mWgD: "Over UDP, straight to this server's IP. If UDP is blocked between the servers, rotation moves on to the next method.", mKcp: "mKCP", mKcpD: "VLESS over mKCP (UDP), encrypted; steadier on lossy links, but uses more traffic.", poolIn: "In rotation", poolHint: "Untick to keep the middle server from searching or rotating to this method. The active method is always in.", mNoUdp: "Not ready: set the UDP address", mNoKcp: "Not ready: this server needs Xray {v} or newer", mOldMid: "Update the middle server (run the install command again)", udpTitle: "WireGuard and mKCP", udpHost: "This server's address for UDP", udpHint: "Middle servers connect to this address over UDP: a direct IP, not a domain behind a CDN.", tnCreating: "Creating… (a few seconds)", tnNoSrv: "No middle server yet.", tnInfo: "The middle server connects to {domain}; pick each server's method on its cards (WS on port {port}{x}). User → middle server → this server → internet.",
     tnNeedSSL: "The WSS tunnel needs this server's domain and SSL: set them in the SSH menu first.", tnUse: "Tunnel", tnPick: "Which middle servers should this inbound use? Each one gets its own link.",
     tnTest: "Test connection", tnTesting: "Testing…", tnTestOk: "Connected · {ms} ms", tnTestBad: "No answer from the middle server",
@@ -176,6 +178,10 @@ function fmtBytes(n) {
   return (i ? n.toFixed(n < 10 ? 2 : 1) : n) + " " + u[i];
 }
 
+// a "?" that shows a short explanation on hover or tap
+document.addEventListener("click", (e) => { const q = e.target.closest(".qm"); if (q) { e.preventDefault(); q.focus(); } });
+function qm(key) { return `<span class="qm" tabindex="0" role="note" aria-label="${esc(t(key))}" data-tip="${esc(t(key))}">?</span>`; }
+
 // ---------- login ----------
 function showLogin() { $("#app").classList.add("hidden"); $("#login").classList.remove("hidden"); }
 $("#loginForm").addEventListener("submit", async (e) => {
@@ -213,9 +219,10 @@ async function boot() {
   try {
     state.status = await api("GET", "api/status");
   } catch { return; }
+  const v = location.hash.slice(1);
+  if (views.includes(v)) state.view = v; // show the tab from the address at once, not the overview first
   $("#login").classList.add("hidden"); $("#app").classList.remove("hidden");
   await refreshInbounds();
-  const v = location.hash.slice(1);
   await (views.includes(v) && v !== "overview" ? goView(v) : Promise.resolve(render()));
   try {
     const sc = JSON.parse(sessionStorage.getItem("xoScroll") || "null");
@@ -417,7 +424,7 @@ function renderInbounds() {
         const label = { ok: t("stOk"), busy: t("stBusy"), down: t("stDown"), offline: t("stOffline"), unknown: t("stUnknown"), pending: t("stPending") }[x.state] || x.state;
         return `<span class="chip ${cls}" title="${esc(label)}">⇄ ${esc(x.name + " · " + (x.address || "?") + ":" + x.port)} <small>${esc(label)}</small></span>`;
       }).join("")}</div>` : ""}
-      ${ib.singleLink ? `<div class="clients"><p class="muted">${t("singleUser")}</p>${copyRow(ib.singleLink)}</div>` : ""}
+      ${ib.singleLink ? `<div class="clients"><p class="muted">${t("singleUser")} ${qm("qSingle")}</p>${copyRow(ib.singleLink)}</div>` : ""}
       ${clients}</div>`;
   }).join("");
 }
@@ -999,6 +1006,33 @@ $("#tunnelPorts").addEventListener("submit", guard(async (e) => {
   await api("POST", "api/tunnels/settings", { port: portNum(f.port.value), xport: portNum(f.xport.value), rport: portNum(f.rport.value), rtarget: f.rtarget.value.trim() });
   toast(t("done")); document.activeElement?.blur(); loadTunnels();
 }));
+// REALITY site of the tunnel: pick one with the scanner, or check it here and on the middle servers
+$("#tunnelPorts").addEventListener("click", guard(async (e) => {
+  const b = e.target.closest("[data-rc]"); if (!b) return;
+  const f = $("#tunnelPorts");
+  if (b.dataset.rc === "scan") { openRealityScan((x) => { f.rtarget.value = x.target; rcheck(); }); return; }
+  await rcheck();
+}));
+let rcSeq = 0;
+async function rcheck() {
+  const f = $("#tunnelPorts"), out = $("#rcOut"), seq = ++rcSeq;
+  const pill = (r) => !r ? `<span class="muted">${t("rcNoAns")}</span>` : r.feasible ? `<span dir="auto" class="pill ok">${t("rsOk")}</span> ${r.latency} ms`
+    : `<span dir="auto" class="pill bad">${esc(r.reason || t("rsNo"))}</span>`;
+  out.classList.remove("hidden"); out.innerHTML = `<span class="muted">${t("rcWait")}</span>`;
+  let r;
+  try { r = await api("POST", "api/tunnels/rcheck", { target: f.rtarget.value.trim() }); } catch (e) { out.innerHTML = `<span class="err">${esc(e.message)}</span>`; return; }
+  const draw = (servers) => {
+    if (seq !== rcSeq) return;
+    out.innerHTML = `<b class="mono" dir="ltr">${esc(r.target)}</b><span>${t("rcHere")}: ${pill(r.here)}</span>` + (servers || []).map((s) =>
+      `<span>${esc(s.name)}: ${s.off ? `<span class="muted">${t("rcOff")}</span>` : s.old ? `<span class="muted">${t("rcOld")}</span>` : s.busy ? `<span class="muted">${t("rcWait")}</span>` : pill(s.res)}</span>`).join("");
+  };
+  for (let i = 0; i < 25 && seq === rcSeq; i++) {
+    let v; try { v = await api("GET", "api/tunnels/rcheck?id=" + r.id); } catch { break; }
+    draw(v.servers);
+    if (!v.servers.some((s) => s.busy)) break;
+    await new Promise((ok) => setTimeout(ok, 1500));
+  }
+}
 $("#dtPorts").addEventListener("submit", guard(async (e) => {
   e.preventDefault();
   const f = e.target;
@@ -1014,7 +1048,8 @@ function renderTunnels() {
     <label>${t("tpWs")}<input name="port" inputmode="numeric" dir="ltr" value="${d.port || ""}" placeholder="${t("tpAuto")}"></label>
     <label>${t("tpXh")}<input name="xport" inputmode="numeric" dir="ltr" value="${d.xport || ""}" placeholder="${t("tpAuto")}"></label>
     <label>${t("tpRt")}<input name="rport" inputmode="numeric" dir="ltr" value="${d.rport || ""}" placeholder="${t("tpAuto")}"></label>
-    <label>${t("tpRtT")}<input name="rtarget" dir="ltr" value="${esc(d.rtarget || "")}" placeholder="www.microsoft.com:443"></label>
+    <label><span>${t("tpRtT")} ${qm("qRtT")}</span><input name="rtarget" dir="ltr" value="${esc(d.rtarget || "")}" placeholder="www.microsoft.com:443"></label>
+    <button class="btn" type="button" data-rc="scan">${t("rsScan")}</button><button class="btn" type="button" data-rc="check">${t("rcCheck")}</button>
     <button class="btn" type="submit">${t("tpSave")}</button><small class="muted">${t("tpHint")}</small>`;
   else if (!d.ready) tp.innerHTML = "";
   const dp = $("#dtPorts");
@@ -1075,7 +1110,7 @@ function revBlock(s, i) {
     else st = `<span class="muted">${s.certBusy ? t("dmBusy") : t("dmWait")}</span>`;
   }
   return `${rv ? `<p class="muted small">↔ ${esc(rv)}</p>` : ""}${s.bridgeErr ? `<p class="err">${esc(s.bridgeErr)}</p>` : ""}
-    <div class="dmrow"><label>${t("dmLabel")} <input id="tnDom-${i}" dir="ltr" value="${esc(s.domain || "")}" placeholder="mid.${esc(base)}"></label>
+    <div class="dmrow"><label><span>${t("dmLabel")} ${qm("qDomain")}</span> <input id="tnDom-${i}" dir="ltr" value="${esc(s.domain || "")}" placeholder="mid.${esc(base)}"></label>
       <button class="btn small" data-tn="domain" data-i="${i}">${t("dmSave")}</button> ${st}</div>
     ${s.domain && s.certOk ? "" : `<p class="muted small">${esc(t("dmHint").replace("{ip}", s.publicIP || s.host || "IP"))}</p>`}`;
 }

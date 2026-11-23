@@ -1189,6 +1189,7 @@ type beatReq struct {
 	CertExp   int64                `json:"certExp,omitempty"`
 	CertErr   string               `json:"certErr,omitempty"`
 	CertBusy  bool                 `json:"certBusy,omitempty"`
+	CertFor   string               `json:"certFor,omitempty"`   // domain the last certificate try was for (0.8.2+)
 	Ded       map[string]dedReport `json:"dedicated,omitempty"` // check through each dedicated tunnel (0.6.8+)
 	XrayVer   string               `json:"xrayVer,omitempty"`   // Xray core on the middle server (0.7.0+)
 }
@@ -1202,6 +1203,7 @@ type beatResp struct {
 	Probe  bool            `json:"probe,omitempty"`  // beat again at once (test or new config)
 	Domain string          `json:"domain,omitempty"` // get a certificate for this domain (0.6.4+)
 	Test   *speedSpec      `json:"test,omitempty"`   // run this speed test (0.7.0+)
+	RCheck *rcheckSpec     `json:"rcheck,omitempty"` // check a REALITY target from there (0.8.2+)
 }
 
 func (a *App) handleBeat(w http.ResponseWriter, r *http.Request) {
@@ -1250,6 +1252,10 @@ func (a *App) handleBeat(w http.ResponseWriter, r *http.Request) {
 		s.Mode, s.Via = req.Mode, req.Via
 		if revCapable(*s) && s.Domain != "" {
 			s.CertBusy, s.CertErr = req.CertBusy, trimTo(req.CertErr, 300)
+			// an error from a try for another (older) domain, or while a new try runs, is not this domain's
+			if req.CertBusy || (req.CertFor != "" && req.CertFor != s.Domain) {
+				s.CertErr = ""
+			}
 			s.CertOK = req.CertDom == s.Domain && req.CertExp > time.Now().Unix()
 			if s.CertOK {
 				s.CertExp, s.CertErr = req.CertExp, ""
@@ -1326,13 +1332,15 @@ func (a *App) handleBeat(w http.ResponseWriter, r *http.Request) {
 	resp.Every = int(beatEvery / time.Second)
 	hub.Beat(srv.ID)
 	resp.Test = speeds.take(srv)
-	if req.Wait && resp.Config == nil && resp.Token == "" && resp.Test == nil {
+	resp.RCheck = rchecks.take(srv)
+	if req.Wait && resp.Config == nil && resp.Token == "" && resp.Test == nil && resp.RCheck == nil {
 		resp.Held = true
 		pc := hub.pokeChan(srv.ID)
 		select {
 		case <-pc:
 			resp.Probe = true
 			resp.Test = speeds.take(srv)
+			resp.RCheck = rchecks.take(srv)
 		case <-time.After(holdFor(srv.AgentVer)):
 		case <-r.Context().Done():
 			return

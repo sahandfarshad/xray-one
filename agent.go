@@ -316,7 +316,7 @@ func agentRun() {
 		mkReq := func(mode string, wait bool) []byte {
 			req := beatReq{Version: version, PublicIP: ip, XrayOK: active == "active", XrayErr: lastErr, Applied: st.Hash, CtlPort: st.Ctl, Busy: busy,
 				Wait: wait, Fails: fails, LastFail: lastFail, PortState: pstate, Rejected: st.Rejected, Pending: st.PendingAt > 0,
-				Mode: mode, Via: st.Via, CertDom: st.CertDomain, CertExp: st.CertExp, CertErr: st.CertErr, CertBusy: certBusy,
+				Mode: mode, Via: st.Via, CertDom: st.CertDomain, CertExp: st.CertExp, CertErr: st.CertErr, CertBusy: certBusy, CertFor: st.CertTried,
 				XrayVer: xrayVer}
 			if mode == "rev" {
 				req.Via = ""
@@ -409,6 +409,9 @@ func agentRun() {
 			fails, sr = 0, agentSearch{}
 			if br.Domain != "" && !certBusy && needCert(st, br.Domain) {
 				certBusy = true
+				if st.CertTried != br.Domain { // the old domain's error is not this one's
+					st.CertErr = ""
+				}
 				go func(d string) {
 					r := certResult{domain: d}
 					cf, err := obtainCertAgent(d)
@@ -425,6 +428,7 @@ func agentRun() {
 				_ = saveAgent(st)
 			}
 			agentStartTest(br.Test, st) // a manual tunnel test, in the background
+			agentStartRCheck(br.RCheck, st)
 			newCfg := false
 			if wasPending && st.PendingAt > 0 { // reached the panel with the new config
 				st.PendingAt = 0

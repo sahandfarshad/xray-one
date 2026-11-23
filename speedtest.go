@@ -658,27 +658,9 @@ func startTestXray(out json.RawMessage, xrayBin, dir string) (int, func(), error
 // the reverse one).
 func reportSpeed(st agentState, testID string, res speedResult) {
 	body, _ := json.Marshal(map[string]any{"id": testID, "res": res})
-	ctl := st.Ctl
-	if ctl == 0 {
-		ctl = agentCtlPort
+	if !agentReport(st, "/api/agent/t/res", body) {
+		fmt.Println("tunnel test: could not report the result")
 	}
-	for _, port := range []int{ctl, ctl + 1} {
-		pu, _ := url.Parse(fmt.Sprintf("socks5://127.0.0.1:%d", port))
-		c := &http.Client{Timeout: 20 * time.Second, Transport: &http.Transport{Proxy: http.ProxyURL(pu),
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}} // inside the tunnel, to 127.0.0.1
-		hr, _ := http.NewRequest("POST", strings.TrimSuffix(st.Join.Panel, "/")+"/api/agent/t/res", bytes.NewReader(body))
-		hr.Header.Set("Content-Type", "application/json")
-		hr.Header.Set("X-Agent-ID", st.Join.ID)
-		hr.Header.Set("X-Agent-Token", st.Token)
-		resp, err := c.Do(hr)
-		if err == nil {
-			resp.Body.Close()
-			if resp.StatusCode == 200 {
-				return
-			}
-		}
-	}
-	fmt.Println("tunnel test: could not report the result")
 }
 
 // agentXrayVersion: "26.11.9" from `xray version`, "" when unknown.

@@ -26,6 +26,10 @@ A light, minimal panel that sits **beside** a headless Xray core. It never repla
 
 یک سیستم تانل: WireGuard و mKCP حالا روش‌های تانل چرخشی‌اند، کنار WS و XHTTP و REALITY. تیک «در چرخش» روی هر کارت روش، آن روش را از چرخش آن سرور میانی بیرون می‌برد.
 
+- 0.8.2: Scan and Check buttons beside the tunnel's REALITY site (Check tests it from this server and from every connected middle server, since the reverse path uses it there too); "?" notes for single-user links, the middle server domain and the REALITY site; a certificate error for a middle server's old domain no longer shows after the domain changes; the panel's files are never served from an old browser cache.
+
+۰.۸.۲: دکمه‌های اسکن و بررسی کنار سایت REALITY تانل (بررسی از این سرور و همه‌ی سرورهای میانی)، علامت «?» با توضیح کوتاه، و حذف اروِر SSL دامنه‌ی قبلی سرور میانی.
+
 ## Install / نصب
 
 ```bash
