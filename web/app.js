@@ -190,7 +190,24 @@ $("#logoutBtn").onclick = guard(async () => { await api("POST", "api/logout"); s
 $("#langBtn").onclick = () => { lang = lang === "fa" ? "en" : "fa"; localStorage.setItem("xo_lang", lang); applyLang(); };
 
 // ---------- navigation ----------
-document.querySelectorAll("#tabs button").forEach((b) => (b.onclick = () => { state.view = b.dataset.view; render(); if (state.view === "settings") loadSettings(); if (state.view === "tunnels") loadTunnels(); if (state.view === "users") loadUsers(); if (state.view === "overview" && daily.loaded) loadDaily().catch(() => {}); }));
+// the open tab lives in the address (#tunnels), so a refresh stays on it
+const views = ["overview", "inbounds", "users", "tunnels", "settings"];
+function goView(v) {
+  state.view = views.includes(v) ? v : "overview";
+  if (location.hash.slice(1) !== state.view) history.replaceState(null, "", state.view === "overview" ? location.pathname + location.search : "#" + state.view);
+  render();
+  let p;
+  if (state.view === "settings") p = loadSettings();
+  if (state.view === "tunnels") p = loadTunnels();
+  if (state.view === "users") p = loadUsers();
+  if (state.view === "overview" && daily.loaded) p = loadDaily();
+  return Promise.resolve(p).catch(() => {});
+}
+document.querySelectorAll("#tabs button").forEach((b) => (b.onclick = () => { sessionStorage.removeItem("xoScroll"); goView(b.dataset.view); scrollTo(0, 0); }));
+window.addEventListener("hashchange", () => { if (location.hash.slice(1) !== state.view) goView(location.hash.slice(1)); });
+// and the scroll position, once the tab's content has loaded
+window.addEventListener("beforeunload", () => sessionStorage.setItem("xoScroll", JSON.stringify({ v: state.view, y: scrollY })));
+if ("scrollRestoration" in history) history.scrollRestoration = "manual";
 
 async function boot() {
   try {
@@ -198,7 +215,13 @@ async function boot() {
   } catch { return; }
   $("#login").classList.add("hidden"); $("#app").classList.remove("hidden");
   await refreshInbounds();
-  render();
+  const v = location.hash.slice(1);
+  await (views.includes(v) && v !== "overview" ? goView(v) : Promise.resolve(render()));
+  try {
+    const sc = JSON.parse(sessionStorage.getItem("xoScroll") || "null");
+    sessionStorage.removeItem("xoScroll");
+    if (sc && sc.v === state.view && sc.y > 0) requestAnimationFrame(() => scrollTo(0, sc.y));
+  } catch {}
   pollJob();
 }
 
