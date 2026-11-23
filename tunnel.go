@@ -49,11 +49,12 @@ const (
 )
 
 func isTunnelTag(t string) bool {
-	return t == tunnelTag || t == tunnelTagXH || t == tunnelTagRT || t == dedTagWG || t == dedTagKCP || isGraceTag(t)
+	return t == tunnelTag || t == tunnelTagXH || t == tunnelTagRT || t == tunnelTagWG || t == tunnelTagWGV || t == tunnelTagKCP ||
+		t == oldTagWG || t == oldTagKCP || isGraceTag(t)
 }
 
 func validMethod(m string) bool {
-	return m == tunnelMethodWS || m == tunnelMethodXHTTP || m == tunnelMethodRT
+	return m == tunnelMethodWS || m == tunnelMethodXHTTP || m == tunnelMethodRT || m == tunnelMethodWG || m == tunnelMethodKCP
 }
 
 // tunnelMethods: the method cards. Ready ones can be switched on per server.
@@ -61,6 +62,8 @@ var tunnelMethods = []map[string]any{
 	{"id": tunnelMethodWS, "ready": true},
 	{"id": tunnelMethodXHTTP, "ready": true},
 	{"id": tunnelMethodRT, "ready": true},
+	{"id": tunnelMethodWG, "ready": true, "udp": true, "ver": agentWGVer},
+	{"id": tunnelMethodKCP, "ready": true, "udp": true, "ver": agentKCPVer},
 	{"id": "grefrp", "ready": false},
 	{"id": "backhaul", "ready": false},
 	{"id": "frpssh", "ready": false},
@@ -123,7 +126,16 @@ type TunnelServer struct {
 	CertExp  int64  `json:"certExp,omitempty"`
 	CertErr  string `json:"certErr,omitempty"`
 	CertBusy bool   `json:"certBusy,omitempty"`
-	// dedicated tunnels (dedicated.go): fixed paths, separate from the above
+	// WireGuard method (udpmethods.go): its keys and address in the tunnel,
+	// and a second key for tests
+	WGKey  string `json:"wgKey,omitempty"`
+	WGPub  string `json:"wgPub,omitempty"`
+	WGAddr string `json:"wgAddr,omitempty"`
+	WGTKey string `json:"wgTKey,omitempty"`
+	WGTPub string `json:"wgTPub,omitempty"`
+	// methods taken out of its rotation (the admin unticked them)
+	Off []string `json:"off,omitempty"`
+	// old dedicated tunnels, read once by migrateDedicated
 	Ded []DedTunnel `json:"dedicated,omitempty"`
 	// being created: hidden from the panel until xray accepted it, so a
 	// failed create never shows a card (and an install command) that vanishes
@@ -188,7 +200,7 @@ func (h *agentHub) Beat(id string) {
 type TunnelUse struct {
 	Server string `json:"server"`
 	Port   int    `json:"port,omitempty"`
-	Via    string `json:"via,omitempty"` // "" the rotating tunnel, or a dedicated tunnel type ("wg")
+	Via    string `json:"via,omitempty"` // old dedicated pin; always "" now
 }
 
 func (u TunnelUse) ListenPort(inboundPort int) int {
@@ -209,14 +221,21 @@ type TunnelSettings struct {
 	RKey    string `json:"rkey,omitempty"`    // x25519 private key
 	RPub    string `json:"rpub,omitempty"`
 	RSID    string `json:"rsid,omitempty"`
-	// dedicated WireGuard tunnel (dedicated.go)
-	WGPort int    `json:"wgport,omitempty"`
-	WGKey  string `json:"wgkey,omitempty"`
-	WGPub  string `json:"wgpub,omitempty"`
-	WGHost string `json:"wghost,omitempty"` // address middle servers dial (public IP), WireGuard and mKCP
-	// dedicated mKCP tunnel (dedicated.go)
+	// WireGuard method (udpmethods.go)
+	WGPort  int    `json:"wgport,omitempty"`
+	WGVPort int    `json:"wgvport,omitempty"` // its local VLESS inbound
+	WGOn    bool   `json:"wgOn,omitempty"`    // armed on this server
+	KOn     bool   `json:"kOn,omitempty"`     // mKCP armed (this Xray has the mask)
+	WGKey   string `json:"wgkey,omitempty"`
+	WGPub   string `json:"wgpub,omitempty"`
+	WGHost  string `json:"wghost,omitempty"` // address middle servers dial (public IP), WireGuard and mKCP
+	// mKCP method (udpmethods.go)
 	KPort int    `json:"kport,omitempty"`
 	KSeed string `json:"kseed,omitempty"`
+	// VLESS Encryption on the mKCP inbound (Xray refuses plain VLESS to a
+	// public IP without TLS)
+	KDec string `json:"kdec,omitempty"`
+	KEnc string `json:"kenc,omitempty"`
 	// old ports of moved methods, still listening until Until (tunnelgrace.go)
 	Grace []tunnelGrace `json:"grace,omitempty"`
 }
@@ -295,7 +314,8 @@ func (s *Store) TunnelsCopy() ([]TunnelServer, TunnelSettings, map[string][]Tunn
 	out := []TunnelServer{}
 	for _, t := range s.Tunnels {
 		c := *t
-		c.Ded = append([]DedTunnel(nil), t.Ded...)
+		c.Off = append([]string(nil), t.Off...)
+		c.Ded = nil
 		out = append(out, c)
 	}
 	m := map[string][]TunnelUse{}
@@ -494,10 +514,12 @@ func (a *App) applyTunnelConfig(root *OMap) error {
 	ensureTaggedOutbounds(root, tr)
 	// after ensureTaggedOutbounds, so a bridge is never the default outbound
 	tr.extra = append(a.addBridges(root, servers), graceTags...)
-	// dedicated tunnels: their own inbound, outbounds and rules
-	if tr.dt, tr.dtTags, err = a.applyDedicated(root, servers, tmap); err != nil {
+	// WireGuard and mKCP: their inbounds, and the WireGuard door
+	var udpIn []any
+	if udpIn, tr.dt, tr.dtTags, err = a.applyUDPMethods(root, servers); err != nil {
 		return err
 	}
+	tr.extra = append(tr.extra, udpIn...)
 	setTunnelRules(root, tr)
 	return nil
 }
@@ -617,6 +639,16 @@ type joinInfo struct {
 	RPub   string `json:"rpub,omitempty"`
 	RSID   string `json:"rsid,omitempty"`
 	Panel  string `json:"panel"` // URL of the panel as seen from this server, e.g. https://127.0.0.1:24995/base/
+	// WireGuard and mKCP (never in an install command)
+	UHost  string `json:"uhost,omitempty"` // this server's address for UDP
+	KPort  int    `json:"kport,omitempty"`
+	KSeed  string `json:"kseed,omitempty"`
+	KEnc   string `json:"kenc,omitempty"`
+	WPort  int    `json:"wport,omitempty"`
+	WVPort int    `json:"wvport,omitempty"`
+	WPub   string `json:"wpub,omitempty"`
+	WKey   string `json:"wkey,omitempty"`
+	WAddr  string `json:"waddr,omitempty"`
 }
 
 func (a *App) panelLocalURL() string {
@@ -628,31 +660,35 @@ func (a *App) panelLocalURL() string {
 	return scheme + "://127.0.0.1" + portOf(c.Listen) + c.BasePath
 }
 
-func relayXrayConfig(j joinInfo, fwd []fwdPort, ctl int, rev *revInfo, ded *dedRelay) []byte {
+func relayXrayConfig(j joinInfo, fwd []fwdPort, ctl int, rev *revInfo) []byte {
 	if ctl == 0 {
 		ctl = agentCtlPort
 	}
 	inbounds := []any{om("tag", "ctl", "listen", "127.0.0.1", "port", ctl, "protocol", "socks",
 		"settings", om("auth", "noauth", "udp", false))}
 	for _, f := range fwd {
-		if f.Via != "" { // pinned to a dedicated tunnel: only through it
-			if ib := relayDedFwd(f, ded); ib != nil {
-				inbounds = append(inbounds, ib)
-			}
-			continue
-		}
 		inbounds = append(inbounds, om("tag", fmt.Sprintf("fwd-%d", f.Listen), "listen", "0.0.0.0", "port", f.Listen,
 			"protocol", "dokodemo-door", "settings", om("address", f.Host, "port", f.Port, "network", "tcp,udp")))
 	}
 	root := om("log", om("loglevel", "warning"),
 		"inbounds", inbounds,
-		"outbounds", []any{mainOutbound(j)})
+		"outbounds", methodOutbounds(j, "main"))
 	addRelayReverse(root, rev, ctl)
-	addRelayDedicated(root, ded, ctl)
 	return EncodeIndent(root)
 }
 
-// mainOutbound: how a middle server dials this server with j's method.
+// methodOutbounds: how a middle server dials this server with j's method, the
+// first outbound tagged tag (WireGuard adds the outbound it dials through).
+func methodOutbounds(j joinInfo, tag string) []any {
+	if isUDPMethod(j.Method) {
+		return udpOutbounds(j, tag)
+	}
+	o := mainOutbound(j)
+	o.Set("tag", tag)
+	return []any{o}
+}
+
+// mainOutbound: how a middle server dials this server with j's TCP method.
 func mainOutbound(j joinInfo) *OMap {
 	port := j.Port
 	stream := om("network", "ws", "security", "tls",
@@ -681,10 +717,12 @@ type fwdPort struct {
 	Listen int    `json:"listen"`
 	Host   string `json:"host"`
 	Port   int    `json:"port"`
-	Via    string `json:"via,omitempty"` // dedicated tunnel type, "" rotating
 }
 
-func (a *App) joinFor(s TunnelServer) joinInfo {
+func (a *App) joinFor(s TunnelServer) joinInfo { return a.joinWith(s, false) }
+
+// joinWith: test uses the server's test key for WireGuard.
+func (a *App) joinWith(s TunnelServer, test bool) joinInfo {
 	_, set, _ := a.store.TunnelsCopy()
 	j := joinInfo{V: 1, ID: s.ID, Join: s.Join, Domain: a.store.Cfg.Domain, Port: set.Port, Path: set.Path,
 		UUID: s.UUID, Panel: a.panelLocalURL()}
@@ -694,6 +732,11 @@ func (a *App) joinFor(s TunnelServer) joinInfo {
 	case tunnelMethodRT:
 		host, _, _ := strings.Cut(set.RTarget, ":")
 		j.Method, j.RPort, j.RSNI, j.RPub, j.RSID = s.Method, set.RPort, host, set.RPub, set.RSID
+	case tunnelMethodWG, tunnelMethodKCP:
+		j.Method = s.Method
+		if !a.udpJoin(&j, s, set, test) {
+			j = joinInfo{V: j.V, ID: j.ID, Join: j.Join, Domain: j.Domain, Port: j.Port, Path: j.Path, UUID: j.UUID, Panel: j.Panel}
+		}
 	}
 	return j
 }
@@ -716,7 +759,7 @@ func (a *App) fwdFor(root *OMap, id string) []fwdPort {
 				continue
 			}
 			if h, p := targetOf(ib); p > 0 {
-				out = append(out, fwdPort{Listen: u.ListenPort(p), Host: h, Port: p, Via: u.Via})
+				out = append(out, fwdPort{Listen: u.ListenPort(p), Host: h, Port: p})
 			}
 		}
 	}
@@ -754,20 +797,9 @@ type tunnelView struct {
 	Inbound []string             `json:"inbounds"`
 	Remove  string               `json:"remove"`
 	Ports   map[string]int       `json:"ports"` // inbound id -> chosen port on the middle server (0 = same)
-	Vias    map[string]string    `json:"vias"`  // inbound id -> dedicated tunnel it is pinned to ("" rotating)
-	DedView []dedView            `json:"dedView"`
 	Speed   map[string]speedView `json:"speed"` // last speed test per card (wss, xhttp, reality, wg, kcp)
-}
-
-type dedView struct {
-	Type  string `json:"type"`
-	On    bool   `json:"on"`
-	State string `json:"state"` // off, offline, pending, up, down
-	OkAt  int64  `json:"okAt,omitempty"`
-	ChkAt int64  `json:"chkAt,omitempty"`
-	Ms    int    `json:"ms,omitempty"`
-	Err   string `json:"err,omitempty"`
-	Pins  int    `json:"pins"`
+	// methods it can run (agent and Xray new enough)
+	Capable map[string]bool `json:"capable"`
 }
 
 func (a *App) handleTunnels(w http.ResponseWriter, r *http.Request) {
@@ -778,7 +810,7 @@ func (a *App) handleTunnels(w http.ResponseWriter, r *http.Request) {
 		if s.Pending {
 			continue
 		}
-		v := tunnelView{TunnelServer: s, Online: s.LastSeen > 0 && now.Sub(time.Unix(s.LastSeen, 0)) < onlineWindow, Inbound: []string{}, Ports: map[string]int{}, Vias: map[string]string{}, DedView: []dedView{}}
+		v := tunnelView{TunnelServer: s, Online: s.LastSeen > 0 && now.Sub(time.Unix(s.LastSeen, 0)) < onlineWindow, Inbound: []string{}, Ports: map[string]int{}, Capable: map[string]bool{}}
 		if s.Join != "" && s.JoinExp > now.Unix() {
 			v.Command = a.installCmd(s)
 		}
@@ -787,32 +819,23 @@ func (a *App) handleTunnels(w http.ResponseWriter, r *http.Request) {
 				if u.Server == s.ID {
 					v.Inbound = append(v.Inbound, ibid)
 					v.Ports[ibid] = u.Port
-					if u.Via != "" {
-						v.Vias[ibid] = u.Via
-					}
 				}
 			}
 		}
 		v.Remove = "xray-one agent remove"
 		sort.Strings(v.Inbound)
 		v.Token, v.Join, v.UUID, v.RevKey, v.RevUUID = "", "", "", "", ""
-		for _, d := range s.Ded {
-			dv := dedView{Type: d.Type, On: d.On, State: dedState(d, v.Online), OkAt: d.OkAt, ChkAt: d.ChkAt, Ms: d.Ms, Err: d.Err}
-			for _, x := range v.Vias {
-				if x == d.Type {
-					dv.Pins++
-				}
-			}
-			v.DedView = append(v.DedView, dv)
+		for _, m := range []string{tunnelMethodWS, tunnelMethodXHTTP, tunnelMethodRT, tunnelMethodWG, tunnelMethodKCP} {
+			v.Capable[m] = methodCapable(s, m)
 		}
-		v.Ded = nil
+		v.WGKey, v.WGPub, v.WGTKey, v.WGTPub, v.Ded = "", "", "", "", nil
 		v.Speed = speeds.view(s.ID)
 		out = append(out, v)
 	}
 	writeJSONResp(w, 200, map[string]any{"servers": out, "port": set.Port, "domain": a.store.Cfg.Domain,
 		"ready": a.store.Cfg.Domain != "" && a.store.Cfg.CertFile != "", "methods": tunnelMethods, "xport": set.XPort, "rport": set.RPort, "rtarget": set.RTarget, "methodVer": agentMethodVer, "revVer": agentRevVer,
-		"dedTypes": dedTypes, "dedVer": agentDedVer, "wgport": set.WGPort, "wghost": set.WGHost, "kport": set.KPort,
-		"testVer": agentTestVer, "kcpXray": minKCPXray})
+		"wgport": set.WGPort, "wghost": set.WGHost, "kport": set.KPort, "wgOn": set.WGOn, "kOn": set.KOn,
+		"testVer": agentTestVer, "wgTestVer": agentWGTestVer, "kcpXray": minKCPXray, "wgVer": agentWGVer, "kcpVer": agentKCPVer})
 }
 
 func (a *App) handleAddTunnel(w http.ResponseWriter, r *http.Request) {
@@ -1011,14 +1034,7 @@ func (s *Store) checkUsesLocked(id string, uses []TunnelUse, ibPort int, ibPorts
 		if lp == srv.CtlPort || (srv.CtlPort == 0 && lp == agentCtlPort) {
 			return nil, fmt.Errorf("port %d is the agent's own port on %s", lp, srv.Name)
 		}
-		if u.Via != "" && !dedOn(*srv, u.Via) {
-			return nil, fmt.Errorf("the dedicated tunnel %q is not on for %s; turn it on in the Tunnels tab", u.Via, srv.Name)
-		}
-		for _, d := range srv.Ded {
-			if d.On && lp == probePort(*srv, d.Type) {
-				return nil, fmt.Errorf("port %d on %s is used by the dedicated tunnel's status check", lp, srv.Name)
-			}
-		}
+		u.Via = ""
 		mine := false
 		for k, us := range s.TunnelUse {
 			for _, x := range us {
@@ -1239,7 +1255,6 @@ func (a *App) handleBeat(w http.ResponseWriter, r *http.Request) {
 				s.CertExp, s.CertErr = req.CertExp, ""
 			}
 		}
-		saveDedReports(s, req.Ded)
 		srv = *s
 		return nil
 	})
@@ -1282,7 +1297,7 @@ func (a *App) handleBeat(w http.ResponseWriter, r *http.Request) {
 		})
 		go a.refreshTunnelInbounds()
 	}
-	cfg := relayXrayConfig(a.joinFor(srv), fwd, srv.CtlPort, a.revFor(srv), a.dedFor(root, srv))
+	cfg := relayXrayConfig(a.joinFor(srv), fwd, srv.CtlPort, a.revFor(srv))
 	if revCapable(srv) {
 		resp.Domain = srv.Domain
 	}
@@ -1449,7 +1464,6 @@ type TunnelLink struct {
 	Port    int    `json:"port"`
 	State   string `json:"state"` // ok, busy, down, offline, unknown (old agent), pending
 	Online  bool   `json:"online"`
-	Via     string `json:"via,omitempty"` // pinned dedicated tunnel
 }
 
 func (a *App) tunnelStatus(id string, ib *OMap) []TunnelLink {
@@ -1464,7 +1478,7 @@ func (a *App) tunnelStatus(id string, ib *OMap) []TunnelLink {
 			}
 			lp := u.ListenPort(ibPort)
 			l := TunnelLink{Server: s.ID, Name: orDefault(s.Name, "tunnel"), Address: orDefault(s.PublicIP, s.Host), Port: lp,
-				Online: s.LastSeen > 0 && now.Sub(time.Unix(s.LastSeen, 0)) < onlineWindow, Via: u.Via}
+				Online: s.LastSeen > 0 && now.Sub(time.Unix(s.LastSeen, 0)) < onlineWindow}
 			switch {
 			case !l.Online:
 				l.State = "offline"
@@ -1516,7 +1530,26 @@ func (a *App) handleTunnelMethod(w http.ResponseWriter, r *http.Request) {
 		if s.LastSeen == 0 || versionLess(s.AgentVer, agentMethodVer) {
 			return fmt.Errorf("update the middle server first (agent %s or newer): run the install command again there", agentMethodVer)
 		}
+		if !methodCapable(*s, b.Method) {
+			if b.Method == tunnelMethodKCP {
+				return fmt.Errorf("mKCP needs agent %s and Xray %s or newer on %s (it has Xray %s): run the install command there again", agentKCPVer, minKCPXray, s.Name, orDefault(s.XrayVer, "unknown"))
+			}
+			return fmt.Errorf("update the middle server first (agent %s or newer): run the install command again there", agentWGVer)
+		}
+		if set := a.store.TunnelCfg; (b.Method == tunnelMethodWG && !set.WGOn) || (b.Method == tunnelMethodKCP && !set.KOn) {
+			if b.Method == tunnelMethodKCP {
+				return fmt.Errorf("mKCP is not ready on this server: it needs Xray %s or newer here (update Xray in Settings) and the UDP address in the Tunnels tab", minKCPXray)
+			}
+			return errors.New("WireGuard is not ready on this server: set the UDP address in the Tunnels tab")
+		}
 		old = *s
+		var off []string
+		for _, x := range s.Off {
+			if x != b.Method {
+				off = append(off, x)
+			}
+		}
+		s.Off = off
 		if s.PrevMethod == "" {
 			s.PrevMethod = s.Method
 		} else if s.PrevMethod == b.Method {

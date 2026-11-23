@@ -53,7 +53,7 @@ const (
 )
 
 func isRotatingKind(k string) bool { return validMethod(k) }
-func validTestKind(k string) bool  { return validMethod(k) || validDedType(k) }
+func validTestKind(k string) bool  { return validMethod(k) }
 
 // speedSpec: what the agent runs.
 type speedSpec struct {
@@ -283,20 +283,27 @@ func (a *App) handleSpeedTest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	sp := &speedSpec{ID: randHex(6), Kind: b.Kind, Pings: testPings, DL: testDLMax, UL: testULMax, DLSec: testDLSec, ULSec: testULSec}
-	if isRotatingKind(b.Kind) {
-		t := *s
-		t.Method = b.Kind
-		j := a.joinFor(t)
-		if (b.Kind == tunnelMethodXHTTP && j.XPort == 0) || (b.Kind == tunnelMethodRT && (j.RPort == 0 || set.RPub == "")) || (b.Kind == tunnelMethodWS && set.Port == 0) {
-			fail(w, 400, errors.New("this method is not ready on this server yet"))
+	t := *s
+	t.Method = b.Kind
+	j := a.joinWith(t, true)
+	if (b.Kind == tunnelMethodXHTTP && j.XPort == 0) || (b.Kind == tunnelMethodRT && (j.RPort == 0 || set.RPub == "")) || (b.Kind == tunnelMethodWS && set.Port == 0) ||
+		(isUDPMethod(b.Kind) && j.Method != b.Kind) {
+		fail(w, 400, errors.New("this method is not ready on this server yet"))
+		return
+	}
+	if !methodCapable(*s, b.Kind) {
+		fail(w, 400, fmt.Errorf("the middle server cannot run this method yet: run the install command there again (agent %s or newer, Xray %s or newer for mKCP)", agentKCPVer, minKCPXray))
+		return
+	}
+	outs := methodOutbounds(j, "test")
+	if len(outs) == 1 {
+		sp.Out = EncodeIndent(outs[0].(*OMap))
+	} else {
+		if versionLess(s.AgentVer, agentWGTestVer) {
+			fail(w, 400, fmt.Errorf("update the middle server first (agent %s or newer): run the install command again there", agentWGTestVer))
 			return
 		}
-		o := mainOutbound(j)
-		o.Set("tag", "test")
-		sp.Out = EncodeIndent(o)
-	} else if !dedOn(*s, b.Kind) {
-		fail(w, 400, errors.New("turn this dedicated tunnel on first"))
-		return
+		sp.Out = EncodeIndent(outs)
 	}
 	if err := speeds.start(id, sp); err != nil {
 		fail(w, 409, err)
@@ -436,13 +443,8 @@ func runSpeedTest(sp *speedSpec, st agentState, xrayBin, dir string) speedResult
 		pu, _ := url.Parse(fmt.Sprintf("socks5://127.0.0.1:%d", port))
 		tr.Proxy = http.ProxyURL(pu)
 	} else {
-		cfg, _ := os.ReadFile(filepath.Join(dir, "xray.json"))
-		port := probeTargets(cfg)[sp.Kind]
-		if port == 0 {
-			res.Err = "this dedicated tunnel is not running on the middle server yet"
-			return res
-		}
-		u.Host = net.JoinHostPort("127.0.0.1", strconv.Itoa(port))
+		res.Err = "the panel sent no outbound to test"
+		return res
 	}
 	defer tr.CloseIdleConnections()
 	c := &http.Client{Transport: tr, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
@@ -602,14 +604,20 @@ func startTestXray(out json.RawMessage, xrayBin, dir string) (int, func(), error
 	}
 	port := l.Addr().(*net.TCPAddr).Port
 	l.Close()
+	// one outbound, or a list whose first one is the way out (WireGuard: VLESS,
+	// then the WireGuard outbound it dials through)
 	var o any
 	if err := json.Unmarshal(out, &o); err != nil {
 		return 0, nil, errors.New("bad test outbound")
 	}
+	outs, ok := o.([]any)
+	if !ok {
+		outs = []any{o}
+	}
 	cfg, _ := json.MarshalIndent(map[string]any{
 		"log":       map[string]any{"loglevel": "warning"},
 		"inbounds":  []any{map[string]any{"tag": "test-in", "listen": "127.0.0.1", "port": port, "protocol": "socks", "settings": map[string]any{"auth": "noauth", "udp": false}}},
-		"outbounds": []any{o},
+		"outbounds": outs,
 	}, "", " ")
 	p := filepath.Join(dir, "xray.test.json")
 	if err := os.WriteFile(p, cfg, 0o600); err != nil {

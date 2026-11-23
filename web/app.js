@@ -48,7 +48,7 @@ const T = {
     mSoon: "به‌زودی", mActive: "فعال", mTrying: "در حال امتحان…", mAsk: "روش این سرور میانی به «{m}» عوض شود؟ اگر تا ۹۰ ثانیه وصل نشد، خودش به روش قبلی برمی‌گردد.",
     mBack: "روش جدید وصل نشد و به روش قبلی برگشت: {x}", mNeedAgent: "برای عوض کردن روش، دستور نصب را یک بار دیگر روی سرور میانی بزنید (نسخه‌ی {v} به بالا).", tnDeploy: "Deploy با SSH", tnPass: "پسورد SSH (فقط یک بار؛ ذخیره نمی‌شود)", tnPassKey: "کلید پنل نصب شده؛ پسورد لازم نیست",
     tnOnline: "متصل", tnOffline: "قطع", tnNever: "هنوز وصل نشده", tnAgo: "پیش", tnQuick: "نصب سریع بدون پسورد: این دستور را روی سرور میانی (با root) بزنید. تا ۲۴ ساعت معتبر است و بعد از اتصال باطل می‌شود.",
-    tnNewCmd: "دستور نصب جدید", tnCreating: "در حال ساختن… (چند ثانیه)", tnNoSrv: "هنوز سرور میانی اضافه نشده.", tnInfo: "سرور میانی به {domain} وصل می‌شود؛ روش هر سرور را از کارت‌هایش انتخاب کنید (WS روی پورت {port}{x}). کاربر ← سرور میانی ← این سرور ← اینترنت.",
+    tnNewCmd: "دستور نصب جدید", mWg: "WireGuard", mWgD: "روی UDP، مستقیم به IP این سرور. اگر UDP بین دو سرور بسته باشد، چرخش سراغ روش بعدی می‌رود.", mKcp: "mKCP", mKcpD: "VLESS روی mKCP (UDP)، رمزشده؛ روی لینک پرافت پایدارتر، ولی ترافیک بیشتری مصرف می‌کند.", poolIn: "در چرخش", poolHint: "تیک را بردار تا سرور میانی در جستجو و چرخش سراغ این روش نرود. روشِ فعال همیشه در چرخش است.", mNoUdp: "آماده نیست: آدرس UDP را تنظیم کنید", mNoKcp: "آماده نیست: Xray این سرور باید {v} به بالا باشد", mOldMid: "سرور میانی باید به‌روز شود (دستور نصب را دوباره بزنید)", udpTitle: "WireGuard و mKCP", udpHost: "آدرس این سرور برای UDP", udpHint: "سرورهای میانی با UDP مستقیم به این آدرس وصل می‌شوند: IP مستقیم، نه دامنه‌ی پشت CDN.", tnCreating: "در حال ساختن… (چند ثانیه)", tnNoSrv: "هنوز سرور میانی اضافه نشده.", tnInfo: "سرور میانی به {domain} وصل می‌شود؛ روش هر سرور را از کارت‌هایش انتخاب کنید (WS روی پورت {port}{x}). کاربر ← سرور میانی ← این سرور ← اینترنت.",
     tnNeedSSL: "برای تانل WSS اول باید دامنه و SSL را از منوی SSH تنظیم کنید.", tnUse: "تانل", tnPick: "این اینباند از کدام سرورهای میانی استفاده کند؟ برای هر کدام یک لینک جدا ساخته می‌شود.",
     tnTest: "تست اتصال", tnTesting: "در حال تست…", tnTestOk: "وصل است · {ms} میلی‌ثانیه", tnTestBad: "پاسخی از سرور میانی نیامد",
     tnLastFail: "آخرین قطعی", tnFails: "{n} تلاش ناموفق", rvFwd: "مسیر مستقیم: وسط ← اصلی", rvRev: "مسیر برگشتی: اصلی ← وسط", rvVia: "مسیر مستقیم با روش جایگزین {m} (پیدا شده در جستجو)", rvRevVia: "مسیر برگشتی: اصلی ← وسط ({m})", rvSearch: "اصلی دنبال سرور وسط می‌گردد: روش {m}", rvCool: "همه‌ی روش‌ها امتحان شد؛ استراحت تا {t}، بعد دوباره از اول", rvReady: "جستجوی دوطرفه آماده است (پورت‌های وسط: {p})", rvOld: "برای اتصال دوطرفه و دامنه، دستور نصب را یک بار دیگر روی سرور وسط بزنید (نسخه‌ی {v} به بالا).", dmLabel: "دامنه‌ی سرور وسط", dmSave: "ذخیره", dmHint: "یک رکورد A به {ip} بسازید (در کلادفلر ابر خاکستری)، بعد ذخیره کنید. سرور وسط خودش SSL می‌گیرد؛ پورت ۸۰ آن باید آزاد باشد.", dmOk: "✓ SSL تأیید شد، معتبر تا {d}", dmBusy: "در حال گرفتن SSL…", dmWait: "منتظر سرور وسط…", dmErr: "SSL گرفته نشد",
@@ -116,7 +116,7 @@ const T = {
     mSoon: "Soon", mActive: "Active", mTrying: "Trying…", mAsk: "Switch this middle server to \"{m}\"? If it can't connect within 90 s it goes back by itself.",
     mBack: "The new method did not connect and went back: {x}", mNeedAgent: "To switch methods, run the install command on the middle server once more (version {v} or newer).", tnDeploy: "Deploy over SSH", tnPass: "SSH password (used once, never stored)", tnPassKey: "Panel key installed; no password needed",
     tnOnline: "Connected", tnOffline: "Down", tnNever: "not connected yet", tnAgo: "ago", tnQuick: "Quick install without a password: run this on the middle server as root. Valid 24 h, void after it connects.",
-    tnNewCmd: "New install command", tnCreating: "Creating… (a few seconds)", tnNoSrv: "No middle server yet.", tnInfo: "The middle server connects to {domain}; pick each server's method on its cards (WS on port {port}{x}). User → middle server → this server → internet.",
+    tnNewCmd: "New install command", mWg: "WireGuard", mWgD: "Over UDP, straight to this server's IP. If UDP is blocked between the servers, rotation moves on to the next method.", mKcp: "mKCP", mKcpD: "VLESS over mKCP (UDP), encrypted; steadier on lossy links, but uses more traffic.", poolIn: "In rotation", poolHint: "Untick to keep the middle server from searching or rotating to this method. The active method is always in.", mNoUdp: "Not ready: set the UDP address", mNoKcp: "Not ready: this server needs Xray {v} or newer", mOldMid: "Update the middle server (run the install command again)", udpTitle: "WireGuard and mKCP", udpHost: "This server's address for UDP", udpHint: "Middle servers connect to this address over UDP: a direct IP, not a domain behind a CDN.", tnCreating: "Creating… (a few seconds)", tnNoSrv: "No middle server yet.", tnInfo: "The middle server connects to {domain}; pick each server's method on its cards (WS on port {port}{x}). User → middle server → this server → internet.",
     tnNeedSSL: "The WSS tunnel needs this server's domain and SSL: set them in the SSH menu first.", tnUse: "Tunnel", tnPick: "Which middle servers should this inbound use? Each one gets its own link.",
     tnTest: "Test connection", tnTesting: "Testing…", tnTestOk: "Connected · {ms} ms", tnTestBad: "No answer from the middle server",
     tnLastFail: "Last drop", tnFails: "{n} failed attempts", rvFwd: "Direct path: middle → main", rvRev: "Reverse path: main → middle", rvVia: "Direct path on fallback method {m} (found by searching)", rvRevVia: "Reverse path: main → middle ({m})", rvSearch: "Main is searching for the middle server: way {m}", rvCool: "Every way tried; resting until {t}, then starting over", rvReady: "Two-way search ready (middle ports: {p})", rvOld: "For two-way reconnect and a domain, run the install command on the middle server once more (version {v} or newer).", dmLabel: "Middle server domain", dmSave: "Save", dmHint: "Add an A record to {ip} (gray cloud in Cloudflare), then save. The middle server gets SSL itself; its port 80 must be free.", dmOk: "✓ SSL confirmed, valid until {d}", dmBusy: "Getting SSL…", dmWait: "Waiting for the middle server…", dmErr: "SSL failed",
@@ -392,7 +392,7 @@ function renderInbounds() {
       ${ib.tunnels && ib.tunnels.length ? `<div class="relays"><span class="muted">${t("tunnels")}:</span>${ib.tunnels.map((x) => {
         const cls = x.state === "ok" ? "ok" : ["busy", "down", "offline"].includes(x.state) ? "bad" : "tun";
         const label = { ok: t("stOk"), busy: t("stBusy"), down: t("stDown"), offline: t("stOffline"), unknown: t("stUnknown"), pending: t("stPending") }[x.state] || x.state;
-        return `<span class="chip ${cls}" title="${esc(label)}">${x.via ? "⇶" : "⇄"} ${esc(x.name + " · " + (x.address || "?") + ":" + x.port)}${x.via ? ` <small class="dvia">${esc(t("dt" + cap(x.via)))}</small>` : ""} <small>${esc(label)}</small></span>`;
+        return `<span class="chip ${cls}" title="${esc(label)}">⇄ ${esc(x.name + " · " + (x.address || "?") + ":" + x.port)} <small>${esc(label)}</small></span>`;
       }).join("")}</div>` : ""}
       ${ib.singleLink ? `<div class="clients"><p class="muted">${t("singleUser")}</p>${copyRow(ib.singleLink)}</div>` : ""}
       ${clients}</div>`;
@@ -979,7 +979,7 @@ $("#tunnelPorts").addEventListener("submit", guard(async (e) => {
 $("#dtPorts").addEventListener("submit", guard(async (e) => {
   e.preventDefault();
   const f = e.target;
-  await api("POST", "api/tunnels/dtsettings", { wgport: portNum(f.wgport.value), kport: portNum(f.kport.value), wghost: f.wghost.value.trim() });
+  await api("POST", "api/tunnels/dtsettings", { wghost: f.wghost.value.trim() });
   toast(t("done")); document.activeElement?.blur(); loadTunnels();
 }));
 function renderTunnels() {
@@ -996,15 +996,13 @@ function renderTunnels() {
   else if (!d.ready) tp.innerHTML = "";
   const dp = $("#dtPorts");
   if (d.ready && d.servers.length && document.activeElement?.form !== dp) dp.innerHTML = `
-    <b class="dthead">${t("dtTitle")} · WireGuard · mKCP</b>
-    <label>${t("dtPort")}<input name="wgport" inputmode="numeric" dir="ltr" value="${d.wgport || ""}" placeholder="${t("tpAuto")}"></label>
-    <label>${t("dtPortK")}<input name="kport" inputmode="numeric" dir="ltr" value="${d.kport || ""}" placeholder="${t("tpAuto")}"></label>
-    <label>${t("dtHost")}<input name="wghost" dir="ltr" value="${esc(d.wghost || "")}" placeholder="${t("tpAuto")}"></label>
-    <button class="btn" type="submit">${t("dtSave")}</button><small class="muted">${t("dtSetHint")}</small>`;
+    <b class="dthead">${t("udpTitle")}</b>
+    <label>${t("udpHost")}<input name="wghost" dir="ltr" value="${esc(d.wghost || "")}" placeholder="${t("tpAuto")}"></label>
+    <button class="btn" type="submit">${t("dtSave")}</button><small class="muted">${t("udpHint")}</small>`;
   else if (!d.ready || !d.servers.length) dp.innerHTML = "";
   if (!d.servers.length) { $("#tunnelList").innerHTML = `<div class="card empty">${t("tnNoSrv")}</div>`; return; }
   const now = Date.now() / 1000;
-  clearTimeout(tnPoll); if (d.servers.some((s) => s.prevMethod || (s.domain && !s.certOk && !s.certErr) || (s.dedView || []).some((x) => x.state === "pending")) || spActive()) tnPoll = setTimeout(() => { if (state.view === "tunnels" && !tnTyping()) loadTunnels(); }, spActive() ? 1500 : 3000);
+  clearTimeout(tnPoll); if (d.servers.some((s) => s.prevMethod || (s.domain && !s.certOk && !s.certErr)) || spActive()) tnPoll = setTimeout(() => { if (state.view === "tunnels" && !tnTyping()) loadTunnels(); }, spActive() ? 1500 : 3000);
   $("#tunnelList").innerHTML = d.servers.map((s, i) => {
     const seen = s.lastSeen ? ago(Math.max(0, Math.round(now - s.lastSeen))) + " " + t("tnAgo") : t("tnNever");
     return `<div class="card">
@@ -1024,7 +1022,6 @@ function renderTunnels() {
       </div>
       ${methodCards(s, i)}
       ${revBlock(s, i)}
-      ${dedBlock(s, i)}
       ${s.methodErr ? `<p class="err">${esc(t("mBack").replace("{x}", s.methodErr))}</p>` : ""}
       ${tnTestRes[s.id] ? `<p class="${tnTestRes[s.id].ok ? "okmsg" : "err"}">${esc(tnTestRes[s.id].text)}</p>` : ""}
       ${s.lastFail ? `<p class="muted small">${t("tnLastFail")}: ${esc(s.failAt ? ago(Math.max(0, Math.round(now - s.failAt))) + " " + t("tnAgo") : "")} · ${t("tnFails").replace("{n}", s.fails || 0)} · <span class="mono">${esc(s.lastFail)}</span></p>` : ""}
@@ -1033,34 +1030,6 @@ function renderTunnels() {
       <details class="muted small-details"><summary>${t("tnRemove").replace(/[:：]$/, "")}</summary>${copyRow(s.remove)}</details>
     </div>`;
   }).join("");
-}
-// dedicated tunnels: a block of their own, apart from the rotating method cards
-function dedBlock(s, i) {
-  const d = tunnelData, types = d.dedTypes || [];
-  if (!types.length) return "";
-  const old = !s.agentVer || versionLess(s.agentVer, d.dedVer);
-  const now = Date.now() / 1000;
-  const cards = types.map((m) => {
-    const v = (s.dedView || []).find((x) => x.type === m.id) || { state: "off", on: false, pins: 0 };
-    const name = t("dt" + cap(m.id)), desc = t("dt" + cap(m.id) + "D");
-    if (!m.ready) return `<div class="mcard soon dcard"><b>${esc(name)}</b><small>${esc(desc)}</small><em>${t("mSoon")}</em></div>`;
-    const st = { up: ["ok", t("dtUp")], down: ["bad", t("dtDown")], pending: ["tun", t("dtPending")], offline: ["bad", t("dtOffline")], off: ["gray", t("dtOffState")] }[v.state] || ["gray", v.state];
-    const extra = [];
-    if (v.on && v.state === "up" && v.ms) extra.push(v.ms + " ms");
-    if (v.on && v.okAt) extra.push(t("dtLastOk").replace("{t}", ago(Math.max(0, Math.round(now - v.okAt))) + " " + t("tnAgo")));
-    if (v.on) extra.push(t("dtPins").replace("{n}", v.pins || 0));
-    return `<div class="mcard dcard${v.on ? " on" : ""}${v.on && v.state !== "up" && v.state !== "pending" ? " down" : ""}">
-      <b>${esc(name)}</b><small>${esc(desc)}</small>
-      ${m.id === "wg" ? portLine(i, "wgport") : m.id === "kcp" ? portLine(i, "kport") : ""}
-      <span class="dstate"><span dir="auto" class="pill ${st[0]}">${esc(st[1])}</span>${extra.length ? `<small dir="auto">${esc(extra.join(" · "))}</small>` : ""}</span>
-      ${v.on && v.err && v.state === "down" ? `<small class="err mono">${esc(v.err)}</small>` : ""}
-      <span class="dbtns"><button class="btn small${v.on ? "" : " primary"}" data-tn="ded" data-i="${i}" data-m="${m.id}" data-on="${v.on ? 0 : 1}">${v.on ? t("dtOff") : t("dtOn")}</button>${v.on ? spButton(s, i, m.id) : ""}</span>
-      ${v.on ? spLine(s, m.id) : ""}</div>`;
-  }).join("");
-  return `<div class="dtbox"><b>${t("dtTitle")}</b><p class="muted small">${t("dtHint")}</p>
-    ${old && s.lastSeen ? `<p class="muted small">${esc(t("dtNeedAgent").replace("{v}", d.dedVer))}</p>` : ""}
-    ${!old && s.lastSeen && versionLess(s.agentVer, "0.7.0") ? `<p class="muted small">${esc(t("dtNeedAgent").replace("{v}", "0.7.0"))} (mKCP)</p>` : ""}
-    <div class="mcards">${cards}</div></div>`;
 }
 function revBlock(s, i) {
   const d = tunnelData;
@@ -1093,14 +1062,22 @@ $("#tunnelList").addEventListener("keydown", guard(async (e) => {
   if (inp && e.key === "Escape") { portEdit = ""; renderTunnels(); return; }
   if ((e.key === "Enter" || e.key === " ") && e.target.matches("[role=button]")) { e.preventDefault(); e.target.click(); }
 }));
-const tnTyping = () => !!document.activeElement?.closest?.("#tunnelList input");
+const tnTyping = () => !!document.activeElement?.closest?.("#tunnelList input:not([type=checkbox])");
 function versionLess(a, b) {
   const pa = String(a).split(".").map(Number), pb = String(b).split(".").map(Number);
   for (let i = 0; i < 3; i++) { const x = pa[i] || 0, y = pb[i] || 0; if (x !== y) return x < y; }
   return false;
 }
 const cap = (m) => (m === "wss" ? "Wss" : m.charAt(0).toUpperCase() + m.slice(1));
-const methodPort = { wss: "port", xhttp: "xport", reality: "rport" };
+const methodPort = { wss: "port", xhttp: "xport", reality: "rport", wg: "wgport", kcp: "kport" };
+// why a method cannot run between this server and middle server s ("" = it can)
+function methodBlock(s, m) {
+  const d = tunnelData;
+  if (m === "wg" && !d.wgOn) return t("mNoUdp");
+  if (m === "kcp" && !d.kOn) return d.wghost ? t("mNoKcp").replace("{v}", d.kcpXray) : t("mNoUdp");
+  if (s.capable && s.capable[m] === false && s.lastSeen) return t("mOldMid");
+  return "";
+}
 // "Port: N ✎" on a card, or its inline editor
 function portLine(i, k) {
   const v = tunnelData[k];
@@ -1110,22 +1087,27 @@ function portLine(i, k) {
 }
 function methodCards(s, i) {
   const ms = tunnelData.methods || [];
+  const off = s.off || [];
   return `<div class="mcards">${ms.map((m) => {
-    const on = s.method === m.id, trying = on && s.prevMethod, can = m.ready && !on;
-    const cls = "mcard" + (on ? " on" : "") + (m.ready ? "" : " soon");
+    const on = s.method === m.id, trying = on && s.prevMethod, why = m.ready ? methodBlock(s, m.id) : "";
+    const can = m.ready && !on && !why;
+    const inPool = !off.includes(m.id);
+    const cls = "mcard" + (on ? " on" : "") + (m.ready ? "" : " soon") + (m.ready && !on && !inPool ? " out" : "");
     return `<div class="${cls}" data-tn="method" data-i="${i}" data-m="${m.id}" ${can ? `role="button" tabindex="0"` : ""}>
       <b>${esc(t("m" + cap(m.id)))}</b><small>${esc(t("m" + cap(m.id) + "D"))}</small>
-      ${m.ready && methodPort[m.id] && tunnelData.ready ? portLine(i, methodPort[m.id]) : ""}
+      ${m.ready && methodPort[m.id] && tunnelData.ready && !(m.udp && why === t("mNoUdp")) ? portLine(i, methodPort[m.id]) : ""}
+      ${m.ready ? `<label class="pool" title="${esc(t("poolHint"))}"><input type="checkbox" data-pool="${m.id}" data-i="${i}" ${inPool || on ? "checked" : ""} ${on || trying ? "disabled" : ""}> ${t("poolIn")}</label>` : ""}
+      ${why ? `<small class="muted" dir="auto">${esc(why)}</small>` : ""}
       <em>${on ? (trying ? t("mTrying") : "✓ " + t("mActive")) : m.ready ? "" : t("mSoon")}</em>
-      ${m.ready && tunnelData.ready ? spButton(s, i, m.id) + spLine(s, m.id) : ""}</div>`;
+      ${m.ready && tunnelData.ready && !why ? spButton(s, i, m.id) + spLine(s, m.id) : ""}</div>`;
   }).join("")}</div>`;
 }
 // manual test of one card's path: ping + speed, run by the middle server
 const spActive = () => (tunnelData?.servers || []).some((s) => Object.values(s.speed || {}).some((x) => x.state === "queued" || x.state === "running"));
 function spButton(s, i, k) {
-  const old = !s.agentVer || versionLess(s.agentVer, tunnelData.testVer || "0.7.0");
+  const old = !s.agentVer || versionLess(s.agentVer, k === "wg" ? tunnelData.wgTestVer || "0.8.0" : tunnelData.testVer || "0.7.0");
   const cur = (s.speed || {})[k], busy = cur && (cur.state === "queued" || cur.state === "running");
-  if (old) return `<button type="button" class="btn small sbtn" disabled title="${esc(t("spUpd").replace("{v}", tunnelData.testVer || "0.7.0"))}">${t("spTest")}</button>`;
+  if (old) return `<button type="button" class="btn small sbtn" disabled title="${esc(t("spUpd").replace("{v}", k === "wg" ? tunnelData.wgTestVer || "0.8.0" : tunnelData.testVer || "0.7.0"))}">${t("spTest")}</button>`;
   return `<button type="button" class="btn small sbtn" data-sp="${k}" data-i="${i}" title="${esc(t("spTitle"))}" ${busy || spActiveOn(s) || !s.online ? "disabled" : ""}>${t("spTest")}</button>`;
 }
 const spActiveOn = (s) => Object.values(s.speed || {}).some((x) => x.state === "queued" || x.state === "running");
@@ -1154,8 +1136,8 @@ async function savePort(i, k) {
   const n = portNum($(`#pe-${i}-${k}`).value), d = tunnelData;
   if (!n || n === d[k]) { portEdit = ""; renderTunnels(); return; }
   if (k === "wgport" || k === "kport") {
-    const ty = k === "wgport" ? "wg" : "kcp";
-    if (d.servers.some((x) => (x.dedView || []).some((v) => v.type === ty && v.on)) && !confirm(t(ty === "wg" ? "peAskWg" : "peAskKcp").replace("{p}", n))) return;
+    const m = k === "wgport" ? "wg" : "kcp";
+    if (d.servers.some((x) => x.method === m || x.prevMethod === m) && !confirm(t(m === "wg" ? "peAskWg" : "peAskKcp").replace("{p}", n))) return;
     await api("POST", "api/tunnels/dtsettings", { [k]: n });
     toast(t("done"));
   } else {
@@ -1175,24 +1157,17 @@ $("#tunnelList").addEventListener("click", guard(async (e) => {
   if (e.target.closest(".pedit")) return;
   const sb = e.target.closest("button[data-sp]");
   if (sb) { await startSpeed(tunnelData.servers[+sb.dataset.i], sb.dataset.sp); return; }
-  if (e.target.closest(".spres")) return;
+  if (e.target.closest(".spres") || e.target.closest(".pool")) return;
   const mb = e.target.closest("[data-tn=method][role=button]");
   if (mb) {
     const s = tunnelData.servers[+mb.dataset.i], m = mb.dataset.m;
     if (!s.agentVer || versionLess(s.agentVer, tunnelData.methodVer)) { alert(t("mNeedAgent").replace("{v}", tunnelData.methodVer)); return; }
+    const why = methodBlock(s, m); if (why) { alert(why); return; }
     if (!confirm(t("mAsk").replace("{m}", t("m" + cap(m))))) return;
     await api("POST", "api/tunnels/" + s.id + "/method", { method: m }); toast(t("done")); loadTunnels(); return;
   }
   const b = e.target.closest("button[data-tn]"); if (!b) return;
   const s = tunnelData.servers[+b.dataset.i];
-  if (b.dataset.tn === "ded") {
-    const on = b.dataset.on === "1", v = (s.dedView || []).find((x) => x.type === b.dataset.m) || {};
-    if (on && (!s.agentVer || versionLess(s.agentVer, tunnelData.dedVer))) { alert(t("dtNeedAgent").replace("{v}", tunnelData.dedVer)); return; }
-    const kcp = b.dataset.m === "kcp";
-    if (on && kcp && versionLess(s.agentVer, "0.7.0")) { alert(t("dtNeedAgent").replace("{v}", "0.7.0")); return; }
-    if (!confirm(on ? t(kcp ? "dtAskOnKcp" : "dtAskOn").replace("{p}", (kcp ? tunnelData.kport : tunnelData.wgport) || t("tpAuto")) : t("dtAskOff").replace("{t}", t("dt" + cap(b.dataset.m))).replace("{n}", v.pins || 0))) return;
-    await api("POST", "api/tunnels/" + s.id + "/dedicated", { type: b.dataset.m, on }); toast(t("done")); loadTunnels(); refreshInbounds(); return;
-  }
   if (b.dataset.tn === "del") {
     if (!confirm(t("tnConfirmDel"))) return;
     await api("DELETE", "api/tunnels/" + s.id); toast(t("done")); loadTunnels(); refreshInbounds();
@@ -1212,6 +1187,13 @@ $("#tunnelList").addEventListener("click", guard(async (e) => {
     } catch (err) { tnTestRes[s.id] = { ok: false, text: err.message }; }
     loadTunnels();
   }
+}));
+// a method in or out of a middle server's rotation
+$("#tunnelList").addEventListener("change", guard(async (e) => {
+  const cb = e.target.closest("input[data-pool]"); if (!cb) return;
+  const s = tunnelData.servers[+cb.dataset.i];
+  try { await api("POST", "api/tunnels/" + s.id + "/pool", { method: cb.dataset.pool, on: cb.checked }); toast(t("done")); }
+  finally { loadTunnels(); }
 }));
 function openDeploy(s) {
   openModal(`<h3>${t("tnDeploy")} · ${esc(s.name)}</h3>
@@ -1280,21 +1262,14 @@ async function openTunnelPick(ib) {
   const row = (s) => {
     const on = s.inbounds.includes(ib.id);
     const port = on && s.ports[ib.id] ? s.ports[ib.id] : "";
-    const via = on ? (s.vias || {})[ib.id] || "" : "";
-    const ded = (s.dedView || []).filter((x) => x.on || x.type === via);
-    const path = ded.length ? `<label class="tnvia">${t("dtPath")}<select>
-        <option value="">${t("dtRot")}</option>
-        ${ded.map((x) => `<option value="${esc(x.type)}" ${x.type === via ? "selected" : ""}>${esc(t("dt" + cap(x.type)))}</option>`).join("")}
-      </select></label>` : "";
     return `<div class="tnrow" data-id="${esc(s.id)}">
       <label class="pitem"><input type="checkbox" ${on ? "checked" : ""}><span class="dot${s.online ? "" : " bad"}"></span><b>${esc(s.name)}</b><small class="mono">${esc(s.publicIP || s.host || "")}</small></label>
       <label class="tnport">${t("tnPortHere")}<input type="number" min="1" max="65535" placeholder="${esc(ib.port)}" value="${port}"></label>
-      ${path}<small class="err tnbusy"></small></div>`;
+      <small class="err tnbusy"></small></div>`;
   };
   openModal(`<h3>${t("tnUse")} · <span class="mono">${esc(ib.tag || ib.id)}</span></h3>
   <p class="muted">${t("tnPick")}</p>
   <div class="stack">${d.servers.map(row).join("")}</div>
-  ${d.servers.some((s) => (s.dedView || []).some((x) => x.on)) ? `<p class="muted small">${t("dtPickHint")}</p>` : ""}
   <p id="tpErr" class="err"></p>
   <div class="actions"><button class="btn primary" id="tpSave">${t("save")}</button><button class="btn" data-close>${t("cancel")}</button></div>`, true);
   const check = (el) => {
@@ -1307,7 +1282,7 @@ async function openTunnelPick(ib) {
   $("#modalBody").querySelectorAll(".tnrow").forEach((el) => { check(el); el.querySelector(".tnport input").oninput = () => check(el); });
   $("#tpSave").onclick = async () => {
     const uses = [...$("#modalBody").querySelectorAll(".tnrow")].filter((el) => el.querySelector("input[type=checkbox]").checked)
-      .map((el) => ({ server: el.dataset.id, port: +el.querySelector(".tnport input").value || 0, via: el.querySelector(".tnvia select")?.value || "" }));
+      .map((el) => ({ server: el.dataset.id, port: +el.querySelector(".tnport input").value || 0 }));
     try { await api("POST", "api/tunnels/assign", { id: ib.id, uses }); closeModal(); toast(t("done")); refreshInbounds(); }
     catch (e) { $("#tpErr").textContent = e.message; }
   };

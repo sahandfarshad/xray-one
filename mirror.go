@@ -59,6 +59,11 @@ func (a *App) installCmd(s TunnelServer) string {
 		g += " || g 'main server' " + m + "/tunnel.sh 1"
 	}
 	g += " || g 'GitHub again' " + tunnelInstall + " 1"
+	// the first connection always goes over TCP (WS); a UDP method follows
+	// with the first config, tried like any switch
+	if isUDPMethod(s.Method) {
+		s.Method = tunnelMethodWS
+	}
 	g += " && bash /tmp/xo-tunnel.sh " + encodeJoin(a.joinFor(s))
 	if m != "" {
 		g += " " + m

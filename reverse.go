@@ -85,8 +85,8 @@ func (a *App) revFor(s TunnelServer) *revInfo {
 		r.PortW, r.PortX = s.RevPortW, s.RevPortX
 	}
 	// the other ways the middle server can dial us, for its own search
-	for _, m := range []string{tunnelMethodWS, tunnelMethodXHTTP, tunnelMethodRT} {
-		if m == orDefault(s.Method, tunnelMethodWS) {
+	for _, m := range []string{tunnelMethodWS, tunnelMethodXHTTP, tunnelMethodRT, tunnelMethodWG, tunnelMethodKCP} {
+		if m == orDefault(s.Method, tunnelMethodWS) || !inPool(s, m) || !methodCapable(s, m) {
 			continue
 		}
 		t := s
@@ -100,9 +100,7 @@ func (a *App) revFor(s TunnelServer) *revInfo {
 		} else if j.Method != m || (m == tunnelMethodXHTTP && j.XPort == 0) || (m == tunnelMethodRT && (j.RPort == 0 || j.RPub == "")) {
 			continue // not ready on this server
 		}
-		o := mainOutbound(j)
-		o.Set("tag", relayAltPrefix+m)
-		r.Alts = append(r.Alts, o)
+		r.Alts = append(r.Alts, methodOutbounds(j, relayAltPrefix+m)...)
 	}
 	return r
 }

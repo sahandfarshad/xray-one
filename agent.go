@@ -160,7 +160,7 @@ func agentInstall(code string) error {
 			st.Ctl = suggestPort()
 		}
 	}
-	cfg := relayXrayConfig(j, nil, st.Ctl, nil, nil)
+	cfg := relayXrayConfig(j, nil, st.Ctl, nil)
 	if err := os.WriteFile(filepath.Join(agentDir, "xray.json"), cfg, 0o600); err != nil {
 		return err
 	}
@@ -274,9 +274,6 @@ func agentRun() {
 	var sr agentSearch
 	certCh := make(chan certResult, 1)
 	certBusy := false
-	// dedicated tunnels are checked on their own, apart from the heartbeat
-	probes := &dedProbes{}
-	go dedProbeLoop(probes, st.Join.Panel)
 	xrayVer := agentXrayVersion(agentXray())
 	for {
 		select {
@@ -320,7 +317,7 @@ func agentRun() {
 			req := beatReq{Version: version, PublicIP: ip, XrayOK: active == "active", XrayErr: lastErr, Applied: st.Hash, CtlPort: st.Ctl, Busy: busy,
 				Wait: wait, Fails: fails, LastFail: lastFail, PortState: pstate, Rejected: st.Rejected, Pending: st.PendingAt > 0,
 				Mode: mode, Via: st.Via, CertDom: st.CertDomain, CertExp: st.CertExp, CertErr: st.CertErr, CertBusy: certBusy,
-				Ded: probes.snapshot(), XrayVer: xrayVer}
+				XrayVer: xrayVer}
 			if mode == "rev" {
 				req.Via = ""
 			}

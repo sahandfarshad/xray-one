@@ -129,6 +129,9 @@ func OpenStore(dir string) (*Store, error) {
 	for _, t := range s.Tunnels {
 		t.Pending = false
 	}
+	if s.migrateDedicated() {
+		_ = s.saveLocked()
+	}
 	if s.AllToken == "" {
 		s.AllToken = randHex(16)
 		_ = s.saveLocked()

@@ -19,6 +19,13 @@ A light, minimal panel that sits **beside** a headless Xray core. It never repla
 - Quick setup: tick any of 20 ready-made types (REALITY, TLS, plain); each gets a free port and one shared client.
 - Relays: add a relay / CDN IP (and optional port) to one inbound or to all selected ones; links and subscriptions get an extra copy per relay, while SNI / REALITY stay those of the real server.
 
+## v0.8
+- One tunnel system: WireGuard and mKCP are now methods of the rotating tunnel, next to WS, XHTTP and REALITY. A middle server uses one method and searches the others when it can't reach the main server; dedicated (pinned) tunnels are gone and old pins go back to rotation automatically.
+- "In rotation" tick on every method card: untick a method to keep a middle server from rotating to it (the active method always stays in).
+- mKCP is VLESS over mKCP with VLESS Encryption and the mkcp-legacy mask; WireGuard carries VLESS inside it. Both need the main server's UDP address (Tunnels tab), and mKCP needs Xray 26.6.1+ on both servers.
+
+یک سیستم تانل: WireGuard و mKCP حالا روش‌های تانل چرخشی‌اند، کنار WS و XHTTP و REALITY. تیک «در چرخش» روی هر کارت روش، آن روش را از چرخش آن سرور میانی بیرون می‌برد.
+
 ## Install / نصب
 
 ```bash
