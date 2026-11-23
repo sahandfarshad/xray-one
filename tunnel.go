@@ -73,6 +73,9 @@ var tunnelMethods = []map[string]any{
 // minimum agent able to try a method and fall back by itself
 const agentMethodVer = "0.6.1"
 
+// agents from this version leave the reverse path to try a new method
+const agentRevLeaveVer = "0.9.1"
+
 type TunnelServer struct {
 	ID         string            `json:"id"`
 	Name       string            `json:"name"`
@@ -222,6 +225,7 @@ type TunnelSettings struct {
 	// REALITY inbound
 	RPort   int    `json:"rport,omitempty"`
 	RTarget string `json:"rtarget,omitempty"` // host:port of the site it looks like
+	Frag    bool   `json:"frag,omitempty"`    // WS/XHTTP: split the TLS hello into small pieces
 	RKey    string `json:"rkey,omitempty"`    // x25519 private key
 	RPub    string `json:"rpub,omitempty"`
 	RSID    string `json:"rsid,omitempty"`
@@ -668,6 +672,7 @@ type joinInfo struct {
 	// GRE, FRP, Backhaul, SSH: where the carrier delivers VLESS
 	CAddr string `json:"caddr,omitempty"`
 	CPort int    `json:"cport,omitempty"`
+	Frag  bool   `json:"frag,omitempty"` // WS/XHTTP: fragment the TLS hello
 }
 
 func (a *App) panelLocalURL() string {
@@ -707,6 +712,14 @@ func methodOutbounds(j joinInfo, tag string) []any {
 	}
 	o := mainOutbound(j)
 	o.Set("tag", tag)
+	if j.Frag && j.Method != tunnelMethodRT {
+		// the TLS hello goes out in small pieces with short gaps: some
+		// filters only look for the site name in one whole packet
+		ss := asMap(o.Get("streamSettings"))
+		ss.Set("sockopt", om("dialerProxy", tag+"-frag"))
+		return []any{o, om("tag", tag+"-frag", "protocol", "freedom",
+			"settings", om("fragment", om("packets", "tlshello", "length", "100-200", "interval", "10-20")))}
+	}
 	return []any{o}
 }
 
@@ -747,7 +760,7 @@ func (a *App) joinFor(s TunnelServer) joinInfo { return a.joinWith(s, false) }
 func (a *App) joinWith(s TunnelServer, test bool) joinInfo {
 	_, set, _ := a.store.TunnelsCopy()
 	j := joinInfo{V: 1, ID: s.ID, Join: s.Join, Domain: a.store.Cfg.Domain, Port: set.Port, Path: set.Path,
-		UUID: s.UUID, Panel: a.panelLocalURL()}
+		UUID: s.UUID, Panel: a.panelLocalURL(), Frag: set.Frag}
 	switch s.Method {
 	case tunnelMethodXHTTP:
 		j.Method, j.XPort, j.XPath = s.Method, set.XPort, set.XPath
@@ -865,7 +878,7 @@ func (a *App) handleTunnels(w http.ResponseWriter, r *http.Request) {
 		"ready": a.store.Cfg.Domain != "" && a.store.Cfg.CertFile != "", "methods": tunnelMethods, "xport": set.XPort, "rport": set.RPort, "rtarget": set.RTarget, "methodVer": agentMethodVer, "revVer": agentRevVer,
 		"wgport": set.WGPort, "wghost": set.WGHost, "kport": set.KPort, "wgOn": set.WGOn, "kOn": set.KOn,
 		"testVer": agentTestVer, "wgTestVer": agentWGTestVer, "kcpXray": minKCPXray, "wgVer": agentWGVer, "kcpVer": agentKCPVer,
-		"frpport": set.FRPPort, "frpproto": set.FRPProto, "frpgre": set.FRPGre, "bhport": set.BHPort, "bhproto": set.BHProto, "bhgre": set.BHGre,
+		"frpport": set.FRPPort, "frpproto": set.FRPProto, "frpgre": set.FRPGre, "frag": set.Frag, "bhport": set.BHPort, "bhproto": set.BHProto, "bhgre": set.BHGre,
 		"sshport": set.SSHPort, "carrierVer": agentCarrierVer, "greIP": mainGREIP(set)})
 }
 
@@ -1578,8 +1591,8 @@ func (a *App) handleTunnelMethod(w http.ResponseWriter, r *http.Request) {
 		if s.Method == b.Method {
 			return nil
 		}
-		if s.Mode == "rev" {
-			return errors.New("this middle server is connected over the reverse path right now; switch the method when it is back on the direct path")
+		if s.Mode == "rev" && versionLess(s.AgentVer, agentRevLeaveVer) {
+			return errors.New("this middle server is connected over the reverse path right now; switch the method when it is back on the direct path, or update the middle server (agent " + agentRevLeaveVer + " switches from there)")
 		}
 		if s.LastSeen == 0 || versionLess(s.AgentVer, agentMethodVer) {
 			return fmt.Errorf("update the middle server first (agent %s or newer): run the install command again there", agentMethodVer)

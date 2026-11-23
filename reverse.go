@@ -48,6 +48,7 @@ const (
 	revOffline = 90 * time.Second
 	revTry     = 60 * time.Second // per way, this server's side
 	revCool    = 5 * time.Minute  // rest after every way failed (both sides)
+	revRetry   = 10 * time.Minute // on the reverse path: try the direct path again this often
 	// agent side: tries per way and the gap between them
 	searchTries = 3
 	searchGap   = 8 * time.Second

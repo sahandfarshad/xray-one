@@ -225,6 +225,7 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("POST /api/agent/t/res", a.handleTestResult)
 	mux.HandleFunc("POST /api/agent/rc/res", a.handleRCheckResult)
 	mux.HandleFunc("GET /api/agent/bin/{name}", a.handleAgentBin)
+	mux.HandleFunc("GET /api/agent/probe", a.handleAgentProbe)
 	mux.HandleFunc("GET /sub/{token}", a.handleSub)
 	mux.HandleFunc("GET /dl/{token}/{file}", a.handleMirror)
 

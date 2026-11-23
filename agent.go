@@ -266,6 +266,10 @@ func agentRun() {
 	// heartbeats and a short one while searching
 	cl, clShort := client(st.Ctl, 75*time.Second), client(st.Ctl, 20*time.Second)
 	rv, rvShort := client(st.Ctl+1, 75*time.Second), client(st.Ctl+1, 12*time.Second)
+	probeDirect := false // just left the reverse path: one short, unheld try
+	clProbe := client(st.Ctl, probeLimit)
+	var probeAt time.Time
+	probeFails := 0
 	every := beatEvery
 	var ip string
 	var ipAt time.Time
@@ -334,17 +338,41 @@ func agentRun() {
 			if st.Mode == "rev" {
 				c = rv
 			}
-			if fails > 0 {
+			if fails > 0 || probeDirect {
 				c = clShort
 				if st.Mode == "rev" {
 					c = rvShort
 				}
 			}
-			br, reached, ferr = sendBeat(c, st, mkReq(st.Mode, fails == 0))
+			br, reached, ferr = sendBeat(c, st, mkReq(st.Mode, fails == 0 && !probeDirect))
+			probeDirect = false
+		}
+		// the heartbeat got through; does real traffic? (see dataprobe.go)
+		probeBad := false
+		if br != nil && st.Mode != "rev" && st.Token != "" && (sr.active || fails > 0 || time.Since(probeAt) > probeEvery) {
+			probeAt = time.Now()
+			if ok, msg := agentProbe(clProbe, st); ok {
+				probeFails = 0
+			} else {
+				probeFails++
+				fmt.Println(msg)
+				if probeFails >= 2 || sr.active {
+					// this way is broken for real traffic: count it as a failed
+					// round and move on to the next way
+					br, reached, ferr, probeBad = nil, false, msg, true
+					probeFails = 0
+					fails = max(fails, searchTries-1)
+					if sr.active {
+						sr.tries = searchTries - 1
+					}
+				} else {
+					probeAt = time.Time{} // test again next round
+				}
+			}
 		}
 		// meanwhile the main server searches for us too: if a connection it
 		// opened is here, that path wins
-		if br == nil && !reached && st.Mode != "rev" && st.PendingAt == 0 && wantHasRev() {
+		if br == nil && !reached && !probeBad && st.Mode != "rev" && st.PendingAt == 0 && wantHasRev() {
 			if b2, _, _ := sendBeat(rvShort, st, mkReq("rev", false)); b2 != nil {
 				fmt.Println("the main server reached us (reverse path); using it")
 				st.Mode, st.Via, st.ModeAt = "rev", "", time.Now().Unix()
@@ -451,15 +479,29 @@ func agentRun() {
 				// keep what the panel wants; rc.run() applies it minus busy ports
 				if e := os.WriteFile(filepath.Join(agentDir, "xray.want.json"), br.Config, 0o600); e == nil {
 					st.Hash = br.Hash
-					if st.Mode != "rev" {
-						st.Via = "" // a method the admin picked starts on its own way
-					} else {
-						st.PendingAt = 0 // nothing to try: we are on the reverse path
+					// a method the admin picked starts on its own way; on the
+					// reverse path we leave it to try the new method directly
+					// (on failure the trial reverts and the reverse path takes over)
+					if st.Mode == "rev" {
+						fmt.Println("new method from the panel: leaving the reverse path to try it")
+						st.Mode, st.ModeAt = "", time.Now().Unix()
+						probeDirect = true
 					}
+					st.Via = ""
 					_ = saveAgent(st)
 					rc.failed = ""
 					newCfg = true
 				}
+			}
+			// on the reverse path: try the direct path again now and then, so
+			// the middle server does not stay there after the direct way heals
+			// (a failed try costs one short heartbeat; the reverse path is
+			// taken back in the same round)
+			if !newCfg && st.Mode == "rev" && st.PendingAt == 0 && time.Since(time.Unix(st.ModeAt, 0)) > revRetry {
+				fmt.Println("on the reverse path for a while: trying the direct path again")
+				st.Mode, st.Via, st.ModeAt = "", "", time.Now().Unix()
+				_ = saveAgent(st)
+				probeDirect = true
 			}
 			if br.Every >= 10 && br.Every <= 600 {
 				every = time.Duration(br.Every) * time.Second

@@ -118,17 +118,21 @@ func carrierBin(dir, name, arch string) (string, error) {
 	return p, nil
 }
 
-// GET /api/agent/bin/{name}?arch=: a middle server fetching a program.
-func (a *App) handleAgentBin(w http.ResponseWriter, r *http.Request) {
+// agentOK: the request comes from a known middle server's agent
+func (a *App) agentOK(r *http.Request) bool {
 	id, tok := r.Header.Get("X-Agent-ID"), r.Header.Get("X-Agent-Token")
-	ok := false
 	servers, _, _ := a.store.TunnelsCopy()
 	for _, s := range servers {
 		if id != "" && tok != "" && s.ID == id && s.Token != "" && subtle.ConstantTimeCompare([]byte(s.Token), []byte(tok)) == 1 {
-			ok = true
+			return true
 		}
 	}
-	if !ok {
+	return false
+}
+
+// GET /api/agent/bin/{name}?arch=: a middle server fetching a program.
+func (a *App) handleAgentBin(w http.ResponseWriter, r *http.Request) {
+	if !a.agentOK(r) {
 		fail(w, 403, errors.New("unknown middle server"))
 		return
 	}

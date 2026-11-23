@@ -657,6 +657,7 @@ func (a *App) handleCarrierSettings(w http.ResponseWriter, r *http.Request) {
 		FRPPort  int    `json:"frpport"`
 		FRPProto string `json:"frpproto"`
 		FRPGre   *bool  `json:"frpgre"`
+		Frag     *bool  `json:"frag"`
 		BHPort   int    `json:"bhport"`
 		BHProto  string `json:"bhproto"`
 		BHGre    *bool  `json:"bhgre"`
@@ -717,6 +718,9 @@ func (a *App) handleCarrierSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = a.store.EditTunnels(func() error {
 		c := &a.store.TunnelCfg
+		if b.Frag != nil {
+			c.Frag = *b.Frag
+		}
 		c.FRPPort, c.BHPort, c.SSHPort, c.FRPProto, c.BHProto, c.FRPGre, c.BHGre = n.FRPPort, n.BHPort, n.SSHPort, n.FRPProto, n.BHProto, n.FRPGre, n.BHGre
 		return nil
 	})

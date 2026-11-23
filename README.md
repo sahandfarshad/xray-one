@@ -37,6 +37,10 @@ A light, minimal panel that sits **beside** a headless Xray core. It never repla
 
 چهار روش تازه در همان تانل چرخشی: GRE، FRP (با انتخاب پروتکل)، Backhaul (با انتخاب پروتکل) و SSH. FRP و Backhaul می‌توانند روی GRE هم بروند.
 
+- 0.9.1: rotation judges a way by real traffic, not only by heartbeats: every 5 minutes (and on every new way) the middle server downloads 256 KB from this server over it; two failures in a row and it moves to the next way. "TLS fragment" switch on the WS and XHTTP cards. A middle server on the reverse path tries the direct path again every 10 minutes, and a method switch is allowed there too. Needs agent 0.9.1.
+
+۰.۹.۱: چرخش با ترافیک واقعی قضاوت می‌کند نه فقط با پینگ (هر ۵ دقیقه یک دانلود ۲۵۶ کیلوبایتی)؛ گزینه‌ی «تکه‌تکه کردن TLS» برای WS و XHTTP؛ سرور میانی روی مسیر برگشت هر ۱۰ دقیقه مسیر مستقیم را دوباره امتحان می‌کند و عوض کردن روش آنجا هم ممکن است.
+
 ## Install / نصب
 
 ```bash
