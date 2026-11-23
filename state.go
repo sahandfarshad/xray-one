@@ -124,6 +124,11 @@ func OpenStore(dir string) (*Store, error) {
 		s.TunnelMap = nil
 		_ = s.saveLocked()
 	}
+	// a create cut short (panel restarted mid-way): show the server; its
+	// config is applied on the next change or heartbeat
+	for _, t := range s.Tunnels {
+		t.Pending = false
+	}
 	if s.AllToken == "" {
 		s.AllToken = randHex(16)
 		_ = s.saveLocked()

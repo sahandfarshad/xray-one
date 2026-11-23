@@ -320,9 +320,13 @@ func restartOrRollback(core Core, orig []byte) error {
 	wasActive := serviceActive(core)
 	rerr := restartCore(core)
 	if rerr == nil {
-		time.Sleep(2 * time.Second)
-		if serviceActive(core) {
-			return nil
+		// a big config can take a few seconds to come up: give it up to 8 s
+		// before rolling back, but it must still be up 2 s after starting
+		for i := 0; i < 4; i++ {
+			time.Sleep(2 * time.Second)
+			if serviceActive(core) {
+				return nil
+			}
 		}
 	}
 	if !wasActive || len(orig) == 0 {

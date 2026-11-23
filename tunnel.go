@@ -125,6 +125,9 @@ type TunnelServer struct {
 	CertBusy bool   `json:"certBusy,omitempty"`
 	// dedicated tunnels (dedicated.go): fixed paths, separate from the above
 	Ded []DedTunnel `json:"dedicated,omitempty"`
+	// being created: hidden from the panel until xray accepted it, so a
+	// failed create never shows a card (and an install command) that vanishes
+	Pending bool `json:"pending,omitempty"`
 }
 
 // agentHub wakes held heartbeats (long-poll) and lets a manual test wait for
@@ -772,6 +775,9 @@ func (a *App) handleTunnels(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
 	out := []tunnelView{}
 	for _, s := range servers {
+		if s.Pending {
+			continue
+		}
 		v := tunnelView{TunnelServer: s, Online: s.LastSeen > 0 && now.Sub(time.Unix(s.LastSeen, 0)) < onlineWindow, Inbound: []string{}, Ports: map[string]int{}, Vias: map[string]string{}, DedView: []dedView{}}
 		if s.Join != "" && s.JoinExp > now.Unix() {
 			v.Command = a.installCmd(s)
@@ -843,7 +849,7 @@ func (a *App) handleAddTunnel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s := &TunnelServer{ID: randHex(4), Name: b.Name, Method: b.Method, Host: b.Host, SSHPort: b.SSHPort, SSHUser: b.SSHUser,
-		UUID: newUUID(), Join: randHex(16), JoinExp: time.Now().Add(joinTTL).Unix()}
+		UUID: newUUID(), Join: randHex(16), JoinExp: time.Now().Add(joinTTL).Unix(), Pending: true}
 	err := a.cfg.Mutate(func(root *OMap) error {
 		if err := a.ensureTunnelSettings(root); err != nil {
 			return err
@@ -858,6 +864,12 @@ func (a *App) handleAddTunnel(w http.ResponseWriter, r *http.Request) {
 		fail(w, 400, err)
 		return
 	}
+	_ = a.store.EditTunnels(func() error {
+		if x := a.store.tunnelByID(s.ID); x != nil {
+			x.Pending = false
+		}
+		return nil
+	})
 	writeJSONResp(w, 200, map[string]any{"ok": true, "id": s.ID})
 }
 

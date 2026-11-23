@@ -48,7 +48,7 @@ const T = {
     mSoon: "به‌زودی", mActive: "فعال", mTrying: "در حال امتحان…", mAsk: "روش این سرور میانی به «{m}» عوض شود؟ اگر تا ۹۰ ثانیه وصل نشد، خودش به روش قبلی برمی‌گردد.",
     mBack: "روش جدید وصل نشد و به روش قبلی برگشت: {x}", mNeedAgent: "برای عوض کردن روش، دستور نصب را یک بار دیگر روی سرور میانی بزنید (نسخه‌ی {v} به بالا).", tnDeploy: "Deploy با SSH", tnPass: "پسورد SSH (فقط یک بار؛ ذخیره نمی‌شود)", tnPassKey: "کلید پنل نصب شده؛ پسورد لازم نیست",
     tnOnline: "متصل", tnOffline: "قطع", tnNever: "هنوز وصل نشده", tnAgo: "پیش", tnQuick: "نصب سریع بدون پسورد: این دستور را روی سرور میانی (با root) بزنید. تا ۲۴ ساعت معتبر است و بعد از اتصال باطل می‌شود.",
-    tnNewCmd: "دستور نصب جدید", tnNoSrv: "هنوز سرور میانی اضافه نشده.", tnInfo: "سرور میانی به {domain} وصل می‌شود؛ روش هر سرور را از کارت‌هایش انتخاب کنید (WS روی پورت {port}{x}). کاربر ← سرور میانی ← این سرور ← اینترنت.",
+    tnNewCmd: "دستور نصب جدید", tnCreating: "در حال ساختن… (چند ثانیه)", tnNoSrv: "هنوز سرور میانی اضافه نشده.", tnInfo: "سرور میانی به {domain} وصل می‌شود؛ روش هر سرور را از کارت‌هایش انتخاب کنید (WS روی پورت {port}{x}). کاربر ← سرور میانی ← این سرور ← اینترنت.",
     tnNeedSSL: "برای تانل WSS اول باید دامنه و SSL را از منوی SSH تنظیم کنید.", tnUse: "تانل", tnPick: "این اینباند از کدام سرورهای میانی استفاده کند؟ برای هر کدام یک لینک جدا ساخته می‌شود.",
     tnTest: "تست اتصال", tnTesting: "در حال تست…", tnTestOk: "وصل است · {ms} میلی‌ثانیه", tnTestBad: "پاسخی از سرور میانی نیامد",
     tnLastFail: "آخرین قطعی", tnFails: "{n} تلاش ناموفق", rvFwd: "مسیر مستقیم: وسط ← اصلی", rvRev: "مسیر برگشتی: اصلی ← وسط", rvVia: "مسیر مستقیم با روش جایگزین {m} (پیدا شده در جستجو)", rvRevVia: "مسیر برگشتی: اصلی ← وسط ({m})", rvSearch: "اصلی دنبال سرور وسط می‌گردد: روش {m}", rvCool: "همه‌ی روش‌ها امتحان شد؛ استراحت تا {t}، بعد دوباره از اول", rvReady: "جستجوی دوطرفه آماده است (پورت‌های وسط: {p})", rvOld: "برای اتصال دوطرفه و دامنه، دستور نصب را یک بار دیگر روی سرور وسط بزنید (نسخه‌ی {v} به بالا).", dmLabel: "دامنه‌ی سرور وسط", dmSave: "ذخیره", dmHint: "یک رکورد A به {ip} بسازید (در کلادفلر ابر خاکستری)، بعد ذخیره کنید. سرور وسط خودش SSL می‌گیرد؛ پورت ۸۰ آن باید آزاد باشد.", dmOk: "✓ SSL تأیید شد، معتبر تا {d}", dmBusy: "در حال گرفتن SSL…", dmWait: "منتظر سرور وسط…", dmErr: "SSL گرفته نشد",
@@ -116,7 +116,7 @@ const T = {
     mSoon: "Soon", mActive: "Active", mTrying: "Trying…", mAsk: "Switch this middle server to \"{m}\"? If it can't connect within 90 s it goes back by itself.",
     mBack: "The new method did not connect and went back: {x}", mNeedAgent: "To switch methods, run the install command on the middle server once more (version {v} or newer).", tnDeploy: "Deploy over SSH", tnPass: "SSH password (used once, never stored)", tnPassKey: "Panel key installed; no password needed",
     tnOnline: "Connected", tnOffline: "Down", tnNever: "not connected yet", tnAgo: "ago", tnQuick: "Quick install without a password: run this on the middle server as root. Valid 24 h, void after it connects.",
-    tnNewCmd: "New install command", tnNoSrv: "No middle server yet.", tnInfo: "The middle server connects to {domain}; pick each server's method on its cards (WS on port {port}{x}). User → middle server → this server → internet.",
+    tnNewCmd: "New install command", tnCreating: "Creating… (a few seconds)", tnNoSrv: "No middle server yet.", tnInfo: "The middle server connects to {domain}; pick each server's method on its cards (WS on port {port}{x}). User → middle server → this server → internet.",
     tnNeedSSL: "The WSS tunnel needs this server's domain and SSL: set them in the SSH menu first.", tnUse: "Tunnel", tnPick: "Which middle servers should this inbound use? Each one gets its own link.",
     tnTest: "Test connection", tnTesting: "Testing…", tnTestOk: "Connected · {ms} ms", tnTestBad: "No answer from the middle server",
     tnLastFail: "Last drop", tnFails: "{n} failed attempts", rvFwd: "Direct path: middle → main", rvRev: "Reverse path: main → middle", rvVia: "Direct path on fallback method {m} (found by searching)", rvRevVia: "Reverse path: main → middle ({m})", rvSearch: "Main is searching for the middle server: way {m}", rvCool: "Every way tried; resting until {t}, then starting over", rvReady: "Two-way search ready (middle ports: {p})", rvOld: "For two-way reconnect and a domain, run the install command on the middle server once more (version {v} or newer).", dmLabel: "Middle server domain", dmSave: "Save", dmHint: "Add an A record to {ip} (gray cloud in Cloudflare), then save. The middle server gets SSL itself; its port 80 must be free.", dmOk: "✓ SSL confirmed, valid until {d}", dmBusy: "Getting SSL…", dmWait: "Waiting for the middle server…", dmErr: "SSL failed",
@@ -1197,7 +1197,8 @@ $("#tunnelList").addEventListener("click", guard(async (e) => {
     if (!confirm(t("tnConfirmDel"))) return;
     await api("DELETE", "api/tunnels/" + s.id); toast(t("done")); loadTunnels(); refreshInbounds();
   } else if (b.dataset.tn === "join") {
-    await api("POST", "api/tunnels/" + s.id + "/join"); loadTunnels();
+    await api("POST", "api/tunnels/" + s.id + "/join"); await loadTunnels();
+    const ns = tunnelData.servers.find((x) => x.id === s.id); if (ns && ns.command) openJoin(ns);
   } else if (b.dataset.tn === "domain") {
     await api("POST", "api/tunnels/" + s.id + "/domain", { domain: $("#tnDom-" + b.dataset.i).value.trim() });
     document.activeElement?.blur(); toast(t("done")); loadTunnels();
@@ -1248,15 +1249,31 @@ $("#addTunnelBtn").onclick = () => {
   $("#tnForm").addEventListener("submit", (e) => { e.preventDefault(); $("#tnSave").click(); });
   $("#tnSave").onclick = async () => {
     const d = Object.fromEntries(new FormData($("#tnForm"))); d.sshPort = +d.sshPort || 22;
-    try {
-      const r = await api("POST", "api/tunnels", d);
-      closeModal(); await loadTunnels(); refreshInbounds();
-      const s = tunnelData.servers.find((x) => x.id === r.id);
-      if (s && s.host) openDeploy(s);
-      else if (s && s.command) openModal(`<h3>${t("tnCmdTitle")} · ${esc(s.name)}</h3><p class="muted">${t("tnQuick")}</p>${copyRow(s.command)}<div class="actions"><button class="btn" data-close>${t("cancel")}</button></div>`, true);
-    } catch (e) { $("#tnErr").textContent = e.message; }
+    const before = new Set((tunnelData?.servers || []).map((x) => x.id));
+    const btn = $("#tnSave"); btn.disabled = true; btn.textContent = t("tnCreating"); $("#tnErr").textContent = "";
+    let id = "";
+    try { id = (await api("POST", "api/tunnels", d)).id; }
+    catch (e) {
+      // the answer can get lost while xray restarts (when the panel is reached
+      // through xray): look for the new server before calling it a failure
+      if (e.message === "login") return;
+      for (let k = 0; k < 4 && !id; k++) {
+        await new Promise((res) => setTimeout(res, 2500));
+        try { tunnelData = await api("GET", "api/tunnels"); } catch { continue; }
+        id = (tunnelData.servers.find((x) => !before.has(x.id) && x.name === (d.name.trim() || d.host.trim() || "tunnel")) || {}).id || "";
+      }
+      if (!id) { if ($("#tnErr")) { $("#tnErr").textContent = e.message; btn.disabled = false; btn.textContent = t("create"); } return; }
+    }
+    closeModal(); await loadTunnels(); refreshInbounds();
+    const s = tunnelData.servers.find((x) => x.id === id);
+    if (s && s.host) openDeploy(s);
+    else if (s && s.command) openJoin(s);
   };
 };
+// the one-time install command of a middle server, ready to copy
+function openJoin(s) {
+  openModal(`<h3>${t("tnCmdTitle")} · ${esc(s.name)}</h3><p class="muted">${t("tnQuick")}</p>${copyRow(s.command)}<div class="actions"><button class="btn" data-close>${t("close")}</button></div>`, true);
+}
 async function openTunnelPick(ib) {
   const d = await api("GET", "api/tunnels"); tunnelData = d;
   if (!d.servers.length) { toast(d.ready ? t("tnNoSrv") : t("tnNeedSSL")); return; }
