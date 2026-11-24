@@ -94,9 +94,12 @@ h2{font-size:13px;font-weight:600;color:var(--mut);margin:22px 4px 8px;letter-sp
     <img class="qr" id="subqr" alt="QR" src="{{safeURL .SubQR}}">
   </div>
 
-  <h2>{{.T.configs}}</h2>
-  <div class="card items">
-    {{range $i, $c := .Configs}}<div class="item"><span class="nm">{{$c.Name}}</span><button class="btn" data-copy="{{$c.Link}}">{{$.T.copy}}</button><button class="btn" data-qr="cq{{$i}}">{{$.T.qr}}</button><div class="qwrap"><img class="qr" id="cq{{$i}}" alt="QR" src="{{safeURL $c.QR}}"></div></div>
+  {{end}}
+
+  {{if .Apps}}
+  <h2>{{.T.apps}}</h2>
+  <div class="card">
+    {{range .Apps}}<div class="app"><div class="lg">{{slice .Name 0 1}}</div><div class="meta"><b>{{.Name}}</b><span>{{.Platforms}}</span></div><div class="acts">{{if .Import}}<a class="btn pri" href="{{safeURL .Import}}">{{$.T.add}}</a>{{end}}<a class="btn" href="{{.Download}}" target="_blank" rel="noopener">{{$.T.download}}</a>{{range .Store}}<a class="btn" href="{{.URL}}" target="_blank" rel="noopener">{{.Label}}</a>{{end}}</div></div>
     {{end}}
   </div>
   {{end}}
@@ -110,15 +113,24 @@ h2{font-size:13px;font-weight:600;color:var(--mut);margin:22px 4px 8px;letter-sp
   </div>
   {{end}}
 
-  {{if not (or .Configs .WG)}}<div class="card"><p class="empty">{{.T.none}}</p></div>{{end}}
-
-  {{if .Apps}}
-  <h2>{{.T.apps}}</h2>
-  <div class="card">
-    {{range .Apps}}<div class="app"><div class="lg">{{slice .Name 0 1}}</div><div class="meta"><b>{{.Name}}</b><span>{{.Platforms}}</span></div><div class="acts">{{if .Import}}<a class="btn pri" href="{{safeURL .Import}}">{{$.T.add}}</a>{{end}}<a class="btn" href="{{.Download}}" target="_blank" rel="noopener">{{$.T.download}}</a>{{range .Store}}<a class="btn" href="{{.URL}}" target="_blank" rel="noopener">{{.Label}}</a>{{end}}</div></div>
+  {{if .Sni}}
+  <h2>{{.T.sni}}</h2>
+  <div class="card items">
+    <p class="muted">{{.T.sniHint}}</p>
+    {{range .Sni}}<div class="item"><span class="nm">{{if .Name}}{{.Name}} · {{end}}{{$.T.sniDNS}} <span dir="ltr">{{.IP}}</span></span><button class="btn" data-copy="{{.IP}}">{{$.T.copy}}</button><a class="btn pri" href="{{safeURL .Link}}" target="_blank" rel="noopener">{{$.T.sniAct}}</a></div>
     {{end}}
   </div>
   {{end}}
+
+  {{if .Configs}}
+  <h2>{{.T.configs}}</h2>
+  <div class="card items">
+    {{range $i, $c := .Configs}}<div class="item"><span class="nm">{{$c.Name}}</span><button class="btn" data-copy="{{$c.Link}}">{{$.T.copy}}</button><button class="btn" data-qr="cq{{$i}}">{{$.T.qr}}</button><div class="qwrap"><img class="qr" id="cq{{$i}}" alt="QR" src="{{safeURL $c.QR}}"></div></div>
+    {{end}}
+  </div>
+  {{end}}
+
+  {{if not (or .Configs .WG)}}<div class="card"><p class="empty">{{.T.none}}</p></div>{{end}}
 </div>
 <div class="toast" id="toast">{{.T.copied}}</div>
 <script nonce="{{.Nonce}}">

@@ -148,6 +148,10 @@ type TunnelServer struct {
 	// being created: hidden from the panel until xray accepted it, so a
 	// failed create never shows a card (and an install command) that vanishes
 	Pending bool `json:"pending,omitempty"`
+	// anti-sanction entry on this middle server (sni.go), and its report
+	SniOn  bool   `json:"sniOn,omitempty"`
+	SniErr string `json:"sniErr,omitempty"`
+	SniN   int    `json:"sniN,omitempty"`
 }
 
 // agentHub wakes held heartbeats (long-poll) and lets a manual test wait for
@@ -449,6 +453,7 @@ func (a *App) applyTunnelConfig(root *OMap) error {
 		}
 		root.Set("inbounds", keep)
 		setTunnelRules(root, nil)
+		setSniOutbound(root, false)
 		dropBridges(root)
 		dropDedOutbounds(root)
 		return nil
@@ -540,6 +545,8 @@ func (a *App) applyTunnelConfig(root *OMap) error {
 	}
 	tr.extra = append(tr.extra, udpIn...)
 	tr.extra = append(tr.extra, a.applyCarriers(root, servers)...)
+	tr.sni = a.sniTunnelDomains(servers)
+	setSniOutbound(root, len(tr.sni) > 0)
 	defer pokeCarriers()
 	setTunnelRules(root, tr)
 	return nil
@@ -553,6 +560,7 @@ type tunnelRule struct {
 	// for anything else)
 	dt     []any
 	dtTags []any
+	sni    []string // anti-sanction domains the tunnels may carry out
 }
 
 func keys(m map[string]bool) []string {
@@ -593,6 +601,9 @@ func setTunnelRules(root *OMap, r *tunnelRule) {
 			ips = append(ips, ip)
 		}
 		in := append([]any{tunnelTag, tunnelTagXH, tunnelTagRT}, r.extra...)
+		if len(r.sni) > 0 {
+			rules = append(rules, sniRule(in, r.sni))
+		}
 		rules = append(rules, r.dt...)
 		rules = append(rules,
 			om("type", "field", "ruleTag", "xo-tunnel-allow", "inboundTag", in, "ip", ips,
@@ -884,7 +895,7 @@ func (a *App) handleTunnels(w http.ResponseWriter, r *http.Request) {
 		"wgport": set.WGPort, "wghost": set.WGHost, "kport": set.KPort, "wgOn": set.WGOn, "kOn": set.KOn,
 		"testVer": agentTestVer, "wgTestVer": agentWGTestVer, "kcpXray": minKCPXray, "wgVer": agentWGVer, "kcpVer": agentKCPVer,
 		"frpport": set.FRPPort, "frpproto": set.FRPProto, "frpgre": set.FRPGre, "frag": set.Frag, "bhport": set.BHPort, "bhproto": set.BHProto, "bhgre": set.BHGre,
-		"sshport": set.SSHPort, "carrierVer": agentCarrierVer, "greIP": mainGREIP(set)})
+		"sshport": set.SSHPort, "carrierVer": agentCarrierVer, "greIP": mainGREIP(set), "sni": a.sniView(), "sniVer": agentSniVer})
 }
 
 func (a *App) handleAddTunnel(w http.ResponseWriter, r *http.Request) {
@@ -1284,6 +1295,8 @@ type beatReq struct {
 	SSHHost   string               `json:"sshHost,omitempty"`   // the agent's SSH host key (0.9.0+)
 	Ded       map[string]dedReport `json:"dedicated,omitempty"` // check through each dedicated tunnel (0.6.8+)
 	XrayVer   string               `json:"xrayVer,omitempty"`   // Xray core on the middle server (0.7.0+)
+	SniErr    string               `json:"sniErr,omitempty"`    // anti-sanction entry: why a port could not be used (0.12.0+)
+	SniN      int                  `json:"sniN,omitempty"`      // addresses active on it
 }
 
 type beatResp struct {
@@ -1297,6 +1310,7 @@ type beatResp struct {
 	Test     *speedSpec      `json:"test,omitempty"`     // run this speed test (0.7.0+)
 	RCheck   *rcheckSpec     `json:"rcheck,omitempty"`   // check a REALITY target from there (0.8.2+)
 	Carriers *carrierSpec    `json:"carriers,omitempty"` // GRE, FRP, Backhaul, SSH to arm there (0.9.0+)
+	Sni      *sniSpec        `json:"sni,omitempty"`      // anti-sanction entry to run there (0.12.0+)
 }
 
 func (a *App) handleBeat(w http.ResponseWriter, r *http.Request) {
@@ -1343,6 +1357,7 @@ func (a *App) handleBeat(w http.ResponseWriter, r *http.Request) {
 			s.Fails, s.LastFail, s.FailAt = req.Fails, trimTo(req.LastFail, 300), time.Now().Unix()
 		}
 		s.Mode, s.Via = req.Mode, req.Via
+		s.SniErr, s.SniN = trimTo(req.SniErr, 300), req.SniN
 		if req.CState != nil {
 			for k, v := range req.CState {
 				req.CState[k] = trimTo(v, 300)
@@ -1433,6 +1448,7 @@ func (a *App) handleBeat(w http.ResponseWriter, r *http.Request) {
 		go a.refreshTunnelInbounds()
 	}
 	resp.Carriers = a.carrierSpecFor(srv)
+	resp.Sni = a.sniSpecFor(srv)
 	resp.Every = int(beatEvery / time.Second)
 	hub.Beat(srv.ID)
 	resp.Test = speeds.take(srv)

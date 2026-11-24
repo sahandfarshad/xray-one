@@ -256,8 +256,8 @@ img,canvas,svg,input,select,textarea,pre{max-width:100%}
 /* "?" with a short explanation */
 .qm{position:relative;display:inline-flex;align-items:center;justify-content:center;width:1.05rem;height:1.05rem;border-radius:50%;border:1px solid var(--line);color:var(--muted);font-size:.7rem;font-weight:700;cursor:help;vertical-align:middle;line-height:1;user-select:none}
 .qm:hover,.qm:focus{color:var(--accent);border-color:var(--accent);outline:none}
-.qm::after{content:attr(data-tip);position:absolute;top:calc(100% + 6px);inset-inline-start:-.4rem;z-index:50;width:max-content;max-width:min(300px,75vw);padding:.55rem .7rem;border-radius:10px;background:var(--card,#fff);color:var(--ink);border:1px solid var(--line);box-shadow:0 6px 24px rgba(0,0,0,.12);font-size:.78rem;font-weight:400;line-height:1.6;white-space:normal;text-align:start;opacity:0;pointer-events:none;transition:opacity .12s}
-.qm:hover::after,.qm:focus::after{opacity:1}
+.qm::after{content:attr(data-tip);position:absolute;top:calc(100% + 6px);inset-inline-start:-.4rem;z-index:50;width:max-content;max-width:min(300px,75vw);padding:.55rem .7rem;border-radius:10px;background:var(--card,#fff);color:var(--ink);border:1px solid var(--line);box-shadow:0 6px 24px rgba(0,0,0,.12);font-size:.78rem;font-weight:400;line-height:1.6;white-space:normal;text-align:start;display:none;pointer-events:none}
+.qm:hover::after,.qm:focus::after{display:block}
 .tports label>span,.dmrow label>span{display:inline-flex;align-items:center;gap:.3rem}
 .rcout{display:flex;flex-wrap:wrap;align-items:center;gap:.4rem 1rem;margin:-.4rem 0 .9rem;font-size:.82rem}
 .copt{display:flex;flex-wrap:wrap;align-items:center;gap:.3rem .7rem;font-size:.78rem;cursor:default}
@@ -269,3 +269,4 @@ img,canvas,svg,input,select,textarea,pre{max-width:100%}
 nav button.badge::after{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--warn);margin-inline-start:6px;vertical-align:middle}
 
 .ibnum { display: inline-flex; align-items: center; justify-content: center; min-width: 1.7em; height: 1.7em; padding: 0 .35em; border-radius: 999px; background: var(--line); color: var(--muted); font-size: .8em; font-weight: 600; font-variant-numeric: tabular-nums; flex: none; }
+.snif label.wide{flex:1 1 100%}.snif textarea{width:100%;min-height:7rem;font:12px/1.5 ui-monospace,monospace;direction:ltr}.snif .snipre{display:flex;flex-wrap:wrap;gap:.35rem;flex:1 1 100%}.snif label.chk{flex-direction:row;align-items:center;gap:.4rem}.snif input[name=hours]{width:5rem}

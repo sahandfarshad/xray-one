@@ -41,6 +41,12 @@ A light, minimal panel that sits **beside** a headless Xray core. It never repla
 
 ۰.۹.۱: چرخش با ترافیک واقعی قضاوت می‌کند نه فقط با پینگ (هر ۵ دقیقه یک دانلود ۲۵۶ کیلوبایتی)؛ گزینه‌ی «تکه‌تکه کردن TLS» برای WS و XHTTP؛ سرور میانی روی مسیر برگشت هر ۱۰ دقیقه مسیر مستقیم را دوباره امتحان می‌کند و عوض کردن روش آنجا هم ممکن است.
 
+## v0.12.0
+
+- Game unblocker (Tunnels tab): a DNS + SNI entry on the main server or any middle server, for games and sites that refuse Iranian addresses. Only listed domains pass (DNS and proxy), only addresses a user activated from their subscription page may use it; on a middle server traffic goes through the tunnel to the main server. Needs ports 53, 80, 443 free on the entry. Not a filter bypass.
+- Subscription page: apps and WireGuard now come before the config list.
+- Hidden "?" notes no longer make windows scroll sideways.
+
 ## v0.11.0
 
 - New starting methods for a middle server: besides WS, XHTTP and REALITY, the first connection can now go over WireGuard, mKCP (both UDP) or GRE, for networks where all three TCP methods are blocked. The keys travel inside the install command. GRE needs the middle server's public IPv4 address (taken from the SSH field when it is an IP, or a field shown only for GRE). FRP, Backhaul and SSH still join after the server connects. A method this server cannot offer yet is refused with a clear message.

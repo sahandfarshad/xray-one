@@ -330,6 +330,7 @@ func agentRun() {
 				Wait: wait, Fails: fails, LastFail: lastFail, PortState: pstate, Rejected: st.Rejected, Pending: st.PendingAt > 0,
 				Mode: mode, Via: st.Via, CertDom: st.CertDomain, CertExp: st.CertExp, CertErr: st.CertErr, CertBusy: certBusy, CertFor: st.CertTried, CState: agentCarrierState(), SSHHost: agentHostPub(),
 				XrayVer: xrayVer}
+			req.SniErr, req.SniN = sniSvc.Status()
 			if mode == "rev" {
 				req.Via = ""
 			}
@@ -466,6 +467,7 @@ func agentRun() {
 			agentStartTest(br.Test, st) // a manual tunnel test, in the background
 			agentStartRCheck(br.RCheck, st)
 			agentCarriers(br.Carriers, st)
+			agentSni(br.Sni, st)
 			newCfg := false
 			if wasPending && st.PendingAt > 0 { // reached the panel with the new config
 				st.PendingAt = 0
@@ -1117,9 +1119,12 @@ func obtainCertAgent(d string) (string, error) {
 }
 
 // port80Unit: the systemd service listening on port 80, if any.
-func port80Unit() string {
+func port80Unit() string { return portUnit(80) }
+
+// portUnit: the systemd service listening on port p, if any.
+func portUnit(p int) string {
 	inodes := map[string]bool{}
-	for _, l := range scanListeners()[80] {
+	for _, l := range scanListeners()[p] {
 		if l.inode != "0" {
 			inodes["socket:["+l.inode+"]"] = true
 		}

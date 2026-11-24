@@ -59,6 +59,7 @@ const T = {
     tnRemove: "حذف relay از سرور میانی (روی همان سرور بزنید):", tnCmdTitle: "دستور نصب سرور میانی",
     tnInbounds: "اینباندها", tnDeploying: "در حال نصب روی سرور میانی… (تا چند دقیقه)", tnConfirmDel: "این سرور میانی حذف شود؟ اینباندها دیگر از آن استفاده نمی‌کنند.", tnXrayErr: "خطای relay",
     selectAll: "انتخاب همه", wgTitle: "فایل WireGuard", wgHint: "در اپ WireGuard دکمه‌ی + را بزنید، بعد فایل را وارد کنید یا QR را اسکن کنید.", wgFile: "دانلود فایل", ports: "پورت‌ها", portsTitle: "پورت‌های استفاده‌شده", portsHint: "همه‌ی پورت‌های این‌باندها، جدا با کاما؛ برای ساخت relay و تانل.", gSS: "Shadowsocks", gProxy: "پراکسی ساده (SOCKS / HTTP، با یوزر و پسورد جدا)", relayLinks: "لینک‌های relay", singleUser: "تک‌کاربره", confirmDelRelay: "این relay حذف شود؟",
+    sniTitle: "تحریم‌شکن بازی‌ها", qSni: "برای بازی‌ها و سایت‌هایی که آی‌پی ایران را راه نمی‌دهند، بدون فیلترشکن. کاربر دی‌ان‌اس گوشی یا کنسول را روی آی‌پی یک سرور ورودی می‌گذارد؛ فقط دامنه‌های این لیست از آن سرور رد می‌شوند و بقیه‌ی اینترنت مستقیم می‌ماند. فقط آی‌پی کاربرانی کار می‌کند که از صفحه‌ی اشتراکشان فعال‌سازی را زده‌اند. پورت‌های ۵۳، ۸۰ و ۴۴۳ آن سرور باید آزاد باشند. فیلتر را دور نمی‌زند و اسم سایت آشکار می‌رود.", sniDoms: "دامنه‌ها (هر خط یکی؛ زیردامنه‌ها خودشان حساب می‌شوند)", sniPre: "افزودن لیست آماده:", sniMain: "سرور اصلی هم ورودی باشد", sniHours: "مدت هر فعال‌سازی (ساعت)", sniSave: "ذخیره", sniHint: "لیست‌های آماده نقطه‌ی شروع‌اند و باید روی بازی واقعی تست شوند. اگر سرور اصلی فیلتر است، به‌جایش روی کارت هر سرور میانی روشنش کنید.", sniOnSrv: "تحریم‌شکن روی این سرور", sniActive: "فعال · {n} آدرس · دی‌ان‌اس {ip}", sniNoDom: "اول دامنه‌ها را در بخش تحریم‌شکن بالای صفحه وارد کنید.", sniOld: "عامل این سرور باید نسخه‌ی {v} یا بالاتر باشد؛ دستور نصب جدید را روی آن اجرا کنید.", sniNoIP: "آی‌پی عمومی این سرور هنوز معلوم نیست.",
     dtTitle: "تانل‌های اختصاصی", dtHint: "مسیر ثابت و جدا از تانل چرخشی: هرگز عوض نمی‌شود و جایگزین ندارد. اینباندهایی که به آن وصل شوند فقط از همین مسیر می‌روند و اگر قطع شود، قطع می‌مانند.",
     dtWg: "WireGuard اختصاصی", dtWgD: "Xray WireGuard روی UDP؛ سرور میانی مستقیم به IP این سرور وصل می‌شود. اگر UDP بین دو سرور بسته باشد کار نمی‌کند.", dtBackhaul: "Backhaul", dtBackhaulD: "تانل اختصاصی Backhaul.",
     dtKcp: "mKCP اختصاصی", dtKcpD: "Xray VLESS روی mKCP (UDP)، تنظیم‌شده برای بازی و رمزشده با seed؛ سرور میانی مستقیم به IP این سرور وصل می‌شود. روی مسیر پراُفت پایدارتر است، ولی ترافیک بیشتری مصرف می‌کند.",
@@ -133,6 +134,7 @@ const T = {
     tnRemove: "Remove the relay from the middle server (run there):", tnCmdTitle: "Middle server install command",
     tnInbounds: "Inbounds", tnDeploying: "Installing on the middle server… (a few minutes)", tnConfirmDel: "Remove this middle server? Inbounds stop using it.", tnXrayErr: "Relay error",
     selectAll: "Select all", wgTitle: "WireGuard file", wgHint: "For the official WireGuard app: download the file and tap + then Import from file, or scan the QR with Create from QR code.", wgFile: "Download .conf", ports: "Ports", portsTitle: "Used ports", portsHint: "Every inbound port, comma separated, for building relays and tunnels.", gSS: "Shadowsocks", gProxy: "Plain proxies (SOCKS / HTTP, own user and password)", relayLinks: "Relay links", singleUser: "single user", confirmDelRelay: "Remove this relay?",
+    sniTitle: "Game unblocker", qSni: "For games and sites that refuse Iranian addresses, with no VPN. A user sets their phone's or console's DNS to an entry server's IP; only the domains in this list pass through that server, the rest of the internet stays direct. Only addresses of users who pressed Activate on their subscription page can use it. Ports 53, 80 and 443 must be free on that server. It does not get around filtering and the site name is visible.", sniDoms: "Domains (one per line; subdomains are included)", sniPre: "Add a ready list:", sniMain: "The main server is an entry too", sniHours: "Each activation lasts (hours)", sniSave: "Save", sniHint: "Ready lists are a starting point and need a test with the real game. If the main server is filtered, turn it on in a middle server's card instead.", sniOnSrv: "Game unblocker on this server", sniActive: "On · {n} addresses · DNS {ip}", sniNoDom: "Enter the domains in the Game unblocker box at the top first.", sniOld: "This server's agent must be {v} or newer: run a new install command on it.", sniNoIP: "This server's public IP is not known yet.",
     dtTitle: "Dedicated tunnels", dtHint: "A fixed path, separate from the rotating tunnel: it never switches and has no fallback. Inbounds pinned to it go only this way, and stay down if it drops.",
     dtWg: "Dedicated WireGuard", dtWgD: "Xray WireGuard over UDP; the middle server dials this server's IP directly. Won't work if UDP is blocked between the servers.", dtBackhaul: "Backhaul", dtBackhaulD: "Dedicated Backhaul tunnel.",
     dtKcp: "Dedicated mKCP", dtKcpD: "Xray VLESS over mKCP (UDP), tuned for gaming and encrypted with a seed; the middle server dials this server's IP directly. Steadier on lossy links, but uses more traffic.",
@@ -1103,6 +1105,7 @@ function renderTunnels() {
     <label>${t("udpHost")}<input name="wghost" dir="ltr" value="${esc(d.wghost || "")}" placeholder="${t("tpAuto")}"></label>
     <button class="btn" type="submit">${t("dtSave")}</button><small class="muted">${t("udpHint")}</small>`;
   else if (!d.ready || !d.servers.length) dp.innerHTML = "";
+  renderSniForm(d);
   if (!d.servers.length) { $("#tunnelList").innerHTML = `<div class="card empty">${t("tnNoSrv")}</div>`; return; }
   const now = Date.now() / 1000;
   clearTimeout(tnPoll); if (d.servers.some((s) => s.prevMethod || (s.domain && !s.certOk && !s.certErr)) || spActive()) tnPoll = setTimeout(() => { if (state.view === "tunnels" && !tnTyping()) loadTunnels(); }, spActive() ? 1500 : 3000);
@@ -1124,6 +1127,7 @@ function renderTunnels() {
         </div>
       </div>
       ${methodCards(s, i)}
+      ${sniRow(s, i)}
       ${revBlock(s, i)}
       ${s.methodErr ? `<p class="err">${esc(t("mBack").replace("{x}", s.methodErr))}</p>` : ""}
       ${tnTestRes[s.id] ? `<p class="${tnTestRes[s.id].ok ? "okmsg" : "err"}">${esc(tnTestRes[s.id].text)}</p>` : ""}
@@ -1133,6 +1137,52 @@ function renderTunnels() {
       <details class="muted small-details"><summary>${t("tnRemove").replace(/[:：]$/, "")}</summary>${copyRow(s.remove)}</details>
     </div>`;
   }).join("");
+}
+// ready domain lists for the game unblocker: a starting point, test them
+const sniPresets = {
+  Steam: ["steampowered.com", "steamcommunity.com", "steamstatic.com", "steamcontent.com", "steamserver.net", "valvesoftware.com"],
+  Epic: ["epicgames.com", "epicgames.dev", "unrealengine.com", "fortnite.com"],
+  Riot: ["riotgames.com", "riotcdn.net", "leagueoflegends.com", "playvalorant.com"],
+  "Call of Duty": ["activision.com", "callofduty.com", "demonware.net"],
+  PlayStation: ["playstation.com", "playstation.net", "sonyentertainmentnetwork.com"],
+  Xbox: ["xbox.com", "xboxlive.com"],
+  NVIDIA: ["nvidia.com", "geforcenow.com"],
+};
+function renderSniForm(d) {
+  const f = $("#sniForm"), sn = d.sni || {};
+  if (document.activeElement?.form === f) return;
+  let st = "";
+  if (sn.main) st = sn.mainErr ? `<span class="err">${esc(sn.mainErr)}</span>` : `<span class="okmsg">${esc(t("sniActive").replace("{n}", sn.mainN || 0).replace("{ip}", sn.mainIP || "—"))}</span>`;
+  f.innerHTML = `<b class="dthead">${t("sniTitle")} ${qm("qSni")}</b>
+    <label class="wide">${t("sniDoms")}<textarea name="domains" spellcheck="false">${esc((sn.domains || []).join("\n"))}</textarea></label>
+    <div class="snipre"><span class="muted small">${t("sniPre")}</span>${Object.keys(sniPresets).map((k) => `<button class="btn small" type="button" data-sp="${esc(k)}">${esc(k)}</button>`).join("")}</div>
+    <label class="chk"><input type="checkbox" name="main"${sn.main ? " checked" : ""}> ${t("sniMain")}</label>
+    <label>${t("sniHours")}<input name="hours" inputmode="numeric" dir="ltr" value="${sn.hours || 24}"></label>
+    <button class="btn" type="submit">${t("sniSave")}</button>${st ? `<small>${st}</small>` : ""}<small class="muted">${t("sniHint")}</small>`;
+}
+$("#sniForm").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-sp]"); if (!b) return;
+  const ta = $("#sniForm textarea"), have = new Set(ta.value.split(/\s+/).filter(Boolean));
+  sniPresets[b.dataset.sp].forEach((x) => have.add(x));
+  ta.value = [...have].join("\n"); ta.focus();
+});
+$("#sniForm").addEventListener("submit", guard(async (e) => {
+  e.preventDefault();
+  const f = e.target;
+  await api("POST", "api/sni", { domains: f.domains.value, main: f.main.checked, hours: +f.hours.value || 24 });
+  toast(t("done")); document.activeElement?.blur(); loadTunnels();
+}));
+function sniRow(s, i) {
+  const d = tunnelData, sn = d.sni || {};
+  let st = "";
+  if (s.sniOn) {
+    if (!(sn.domains || []).length) st = `<span class="muted">${t("sniNoDom")}</span>`;
+    else if (s.agentVer && versionLess(s.agentVer, d.sniVer)) st = `<span class="err">${esc(t("sniOld").replace("{v}", d.sniVer))}</span>`;
+    else if (!s.publicIP) st = `<span class="muted">${t("sniNoIP")}</span>`;
+    else if (s.sniErr) st = `<span class="err">${esc(s.sniErr)}</span>`;
+    else if (s.online) st = `<span class="okmsg">${esc(t("sniActive").replace("{n}", s.sniN || 0).replace("{ip}", s.publicIP))}</span>`;
+  }
+  return `<div class="dmrow"><label><input type="checkbox" data-sni data-i="${i}"${s.sniOn ? " checked" : ""}> <span>${t("sniOnSrv")} ${qm("qSni")}</span></label> ${st}</div>`;
 }
 function revBlock(s, i) {
   const d = tunnelData;
@@ -1325,6 +1375,12 @@ $("#tunnelList").addEventListener("change", guard(async (e) => {
   if (co) {
     const v = co.type === "checkbox" ? co.checked : co.value;
     try { await api("POST", "api/tunnels/csettings", { [co.dataset.copt]: v }); toast(t("done")); } finally { co.blur(); loadTunnels(); }
+    return;
+  }
+  const sc = e.target.closest("input[data-sni]");
+  if (sc) {
+    const s = tunnelData.servers[+sc.dataset.i];
+    try { await api("POST", "api/tunnels/" + s.id + "/sni", { on: sc.checked }); toast(t("done")); } finally { loadTunnels(); }
     return;
   }
   const cb = e.target.closest("input[data-pool]"); if (!cb) return;

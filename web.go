@@ -213,6 +213,8 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("POST /api/tunnels/assign", a.api(a.handleTunnelAssign))
 	mux.HandleFunc("POST /api/tunnels/bulk", a.api(a.handleTunnelBulk))
 	mux.HandleFunc("POST /api/tunnels/{id}/pool", a.api(a.handleTunnelPool))
+	mux.HandleFunc("POST /api/tunnels/{id}/sni", a.api(a.handleTunnelSni))
+	mux.HandleFunc("POST /api/sni", a.api(a.handleSniSettings))
 	mux.HandleFunc("POST /api/tunnels/{id}/revports", a.api(a.handleRevPorts))
 	mux.HandleFunc("POST /api/tunnels/dtsettings", a.api(a.handleDedSettings))
 	mux.HandleFunc("POST /api/reality/scan", a.api(a.handleRealityScan))

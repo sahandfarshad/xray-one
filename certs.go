@@ -147,8 +147,15 @@ func portFree(port int) bool {
 // ObtainCert gets a Let's Encrypt certificate with an HTTP-01 challenge on
 // port 80 and stores it in <dataDir>/certs/<domain>/.
 func ObtainCert(dataDir, domain, email string, logf func(string, ...any)) (string, string, error) {
+	// the anti-sanction entry lends port 80 for the challenge
+	if back := sniSvc.release80(); back != nil {
+		defer back()
+		for i := 0; i < 20 && !portFree(80); i++ {
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
 	if !portFree(80) {
-		return "", "", errors.New("port 80 is busy (nginx, apache or another program); Let's Encrypt needs it free for a minute")
+		return "", "", errors.New("port 80 is busy (nginx, apache, the anti-sanction entry or another program); Let's Encrypt needs it free for a minute")
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
 	defer cancel()

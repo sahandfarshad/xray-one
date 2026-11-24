@@ -55,6 +55,8 @@ type Store struct {
 	TunnelCfg TunnelSettings         `json:"tunnelCfg"`
 	TunnelUse map[string][]TunnelUse `json:"tunnelUse,omitempty"`
 	TunnelMap map[string][]string    `json:"tunnelMap,omitempty"` // v0.4.0, migrated
+	// anti-sanction entry (sni.go)
+	Sni SniSettings `json:"sni,omitempty"`
 }
 
 type Relay struct {

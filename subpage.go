@@ -61,6 +61,8 @@ type subApp struct {
 
 type subStore struct{ Label, URL string }
 
+type subSni struct{ Name, IP, Link string }
+
 type subView struct {
 	Lang, Dir, Nonce          string
 	T                         map[string]string
@@ -75,6 +77,7 @@ type subView struct {
 	Configs                   []subCfg
 	WG                        []subWG
 	Apps                      []subApp
+	Sni                       []subSni
 	OtherLang                 string
 }
 
@@ -86,6 +89,7 @@ var subText = map[string]map[string]string{
 		"sub": "لینک اشتراک", "subHint": "این لینک را در برنامه اضافه کنید تا همه‌ی کانفیگ‌ها خودکار به‌روز شوند.",
 		"copy": "کپی", "copied": "کپی شد", "qr": "QR", "add": "افزودن به برنامه",
 		"configs": "کانفیگ‌ها", "wg": "وایرگارد", "wgHint": "فایل را در برنامه‌ی رسمی WireGuard وارد کنید یا QR را اسکن کنید.", "wgFile": "دانلود فایل",
+		"sni": "تحریم‌شکن بازی‌ها", "sniHint": "برای بازی‌ها و سایت‌هایی که آی‌پی ایران را راه نمی‌دهند، بدون فیلترشکن. اول فیلترشکن را خاموش کنید و دکمه‌ی فعال‌سازی را بزنید، بعد دی‌ان‌اس گوشی یا کنسول را روی همین آدرس بگذارید. با عوض شدن اینترنت دوباره فعال کنید.", "sniAct": "فعال‌سازی", "sniDNS": "دی‌ان‌اس",
 		"apps": "برنامه‌ها", "download": "دانلود", "none": "کانفیگ فعالی وجود ندارد.", "theme": "تاریک / روشن", "lang": "English",
 	},
 	"en": {
@@ -95,6 +99,7 @@ var subText = map[string]map[string]string{
 		"sub": "Subscription link", "subHint": "Add this link to your app so every config updates by itself.",
 		"copy": "Copy", "copied": "Copied", "qr": "QR", "add": "Add to app",
 		"configs": "Configs", "wg": "WireGuard", "wgHint": "Import the file into the official WireGuard app, or scan the QR.", "wgFile": "Download file",
+		"sni": "Game unblocker", "sniHint": "For games and sites that refuse Iranian addresses, with no VPN. Turn the VPN off, press Activate, then set your phone's or console's DNS to this address. Activate again whenever your internet changes.", "sniAct": "Activate", "sniDNS": "DNS",
 		"apps": "Apps", "download": "Download", "none": "No active configs.", "theme": "Dark / Light", "lang": "فارسی",
 	},
 }
@@ -239,6 +244,15 @@ func (a *App) serveSubPage(w http.ResponseWriter, r *http.Request, m *ClientMeta
 		v.State, v.StateText = "bad", T["traffic"]
 	default:
 		v.State, v.StateText = "bad", T["paused"]
+	}
+	if !m.Disabled {
+		for _, e := range a.sniEntries() {
+			n := e.Name
+			if n == "main" {
+				n = ""
+			}
+			v.Sni = append(v.Sni, subSni{Name: n, IP: e.IP, Link: "http://" + e.IP + "/xo-act/" + sniKey(m.SubToken)})
+		}
 	}
 	v.SubURL = a.subPublicURL(m.SubToken)
 	v.SubQR = qrData(v.SubURL)
