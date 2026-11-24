@@ -41,6 +41,10 @@ A light, minimal panel that sits **beside** a headless Xray core. It never repla
 
 ۰.۹.۱: چرخش با ترافیک واقعی قضاوت می‌کند نه فقط با پینگ (هر ۵ دقیقه یک دانلود ۲۵۶ کیلوبایتی)؛ گزینه‌ی «تکه‌تکه کردن TLS» برای WS و XHTTP؛ سرور میانی روی مسیر برگشت هر ۱۰ دقیقه مسیر مستقیم را دوباره امتحان می‌کند و عوض کردن روش آنجا هم ممکن است.
 
+## v0.11.0
+
+- New starting methods for a middle server: besides WS, XHTTP and REALITY, the first connection can now go over WireGuard, mKCP (both UDP) or GRE, for networks where all three TCP methods are blocked. The keys travel inside the install command. GRE needs the middle server's public IPv4 address (taken from the SSH field when it is an IP, or a field shown only for GRE). FRP, Backhaul and SSH still join after the server connects. A method this server cannot offer yet is refused with a clear message.
+
 ## v0.10.0
 
 - Subscription page: opening a user's subscription link in a browser shows usage, remaining data, days left, status, every config with copy and QR, WireGuard files with QR, "Add to app" buttons and download links (v2rayNG, Hiddify, Streisand, V2Box, WireGuard). Persian/English, dark/light. VPN apps still get the normal subscription. Add `?raw` to force the plain list.

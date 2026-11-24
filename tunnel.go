@@ -673,7 +673,11 @@ type joinInfo struct {
 	// GRE, FRP, Backhaul, SSH: where the carrier delivers VLESS
 	CAddr string `json:"caddr,omitempty"`
 	CPort int    `json:"cport,omitempty"`
-	Frag  bool   `json:"frag,omitempty"` // WS/XHTTP: fragment the TLS hello
+	// GRE: this server's public IP and the middle server's address inside
+	// the link, so a server that starts on GRE can bring its end up at install
+	GRemote string `json:"gremote,omitempty"`
+	GAddr   string `json:"gaddr,omitempty"`
+	Frag    bool   `json:"frag,omitempty"` // WS/XHTTP: fragment the TLS hello
 }
 
 func (a *App) panelLocalURL() string {
@@ -890,11 +894,13 @@ func (a *App) handleAddTunnel(w http.ResponseWriter, r *http.Request) {
 		SSHPort int    `json:"sshPort"`
 		SSHUser string `json:"sshUser"`
 		Method  string `json:"method"`
+		IP      string `json:"ip"` // the middle server's public IP (GRE start)
 	}
 	if err := json.NewDecoder(r.Body).Decode(&b); err != nil {
 		fail(w, 400, err)
 		return
 	}
+	b.IP = strings.TrimSpace(b.IP)
 	b.Name, b.Host, b.SSHUser = strings.TrimSpace(b.Name), strings.TrimSpace(b.Host), strings.TrimSpace(b.SSHUser)
 	if b.Name == "" {
 		b.Name = orDefault(b.Host, "tunnel")
@@ -902,9 +908,23 @@ func (a *App) handleAddTunnel(w http.ResponseWriter, r *http.Request) {
 	if b.Method == "" {
 		b.Method = tunnelMethodWS
 	}
-	if !validMethod(b.Method) {
-		fail(w, 400, errors.New("unsupported tunnel method"))
+	if !validMethod(b.Method) || !isStartMethod(b.Method) {
+		fail(w, 400, errors.New("unsupported starting method"))
 		return
+	}
+	pubIP := ""
+	if b.Method == tunnelMethodGRE {
+		// GRE links two public IPs, so this one is needed from the start
+		for _, c := range []string{b.IP, strings.TrimSpace(b.Host)} {
+			if ip := net.ParseIP(c); ip != nil && ip.To4() != nil {
+				pubIP = ip.String()
+				break
+			}
+		}
+		if pubIP == "" {
+			fail(w, 400, errors.New("starting on GRE needs the middle server's public IPv4 address"))
+			return
+		}
 	}
 	if b.SSHPort == 0 {
 		b.SSHPort = 22
@@ -917,7 +937,7 @@ func (a *App) handleAddTunnel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s := &TunnelServer{ID: randHex(4), Name: b.Name, Method: b.Method, Host: b.Host, SSHPort: b.SSHPort, SSHUser: b.SSHUser,
-		UUID: newUUID(), Join: randHex(16), JoinExp: time.Now().Add(joinTTL).Unix(), Pending: true}
+		UUID: newUUID(), Join: randHex(16), JoinExp: time.Now().Add(joinTTL).Unix(), Pending: true, PublicIP: pubIP}
 	err := a.cfg.Mutate(func(root *OMap) error {
 		if err := a.ensureTunnelSettings(root); err != nil {
 			return err
@@ -932,13 +952,37 @@ func (a *App) handleAddTunnel(w http.ResponseWriter, r *http.Request) {
 		fail(w, 400, err)
 		return
 	}
+	if s.Method != tunnelMethodWS {
+		// a starting method this server cannot offer yet (no UDP address,
+		// Xray too old for mKCP, ...) is refused instead of quietly using WS
+		cur, _, _ := a.store.TunnelsCopy()
+		for _, x := range cur {
+			if x.ID == s.ID && orDefault(a.joinFor(x).Method, tunnelMethodWS) != s.Method {
+				_ = a.store.EditTunnels(func() error { a.store.removeTunnel(s.ID); return nil })
+				_ = a.cfg.Mutate(a.applyTunnelConfig)
+				fail(w, 400, errors.New(startNotReady(s.Method)))
+				return
+			}
+		}
+	}
 	_ = a.store.EditTunnels(func() error {
 		if x := a.store.tunnelByID(s.ID); x != nil {
 			x.Pending = false
 		}
 		return nil
 	})
+	pokeCarriers()
 	writeJSONResp(w, 200, map[string]any{"ok": true, "id": s.ID})
+}
+
+func startNotReady(m string) string {
+	switch m {
+	case tunnelMethodKCP:
+		return "mKCP is not ready on this server (it needs this server's public address and Xray 26.6.1 or newer); start on another method"
+	case tunnelMethodGRE:
+		return "GRE is not ready on this server (it needs this server's public IPv4 address); start on another method"
+	}
+	return "this method is not ready on this server (it needs this server's public address for UDP); start on another method"
 }
 
 func (s *Store) removeTunnel(id string) {

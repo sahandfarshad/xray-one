@@ -172,6 +172,13 @@ func agentInstall(code string) error {
 	if out, err := run(30*time.Second, agentXray(), "run", "-test", "-config", filepath.Join(agentDir, "xray.json")); err != nil {
 		return fmt.Errorf("xray rejected the relay config: %s", out)
 	}
+	if j.Method == tunnelMethodGRE && j.GRemote != "" && j.GAddr != "" {
+		// starting on GRE: our end of the link comes up before the relay
+		fmt.Println("      GRE link to", j.GRemote)
+		if err := greLink("xo-gre", j.GRemote, j.GAddr, greMain); err != nil {
+			return fmt.Errorf("could not bring up the GRE link: %v", err)
+		}
+	}
 	step(3, "services (starting relay and agent)")
 	self, _ := os.Executable()
 	units := map[string]string{

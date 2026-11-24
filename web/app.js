@@ -72,7 +72,8 @@ const T = {
     dtPath: "مسیر", dtRot: "چرخشی (پیش‌فرض)", dtPickHint: "مسیر «اختصاصی» ثابت است و جایگزین ندارد: اگر قطع شود این اینباند روی آن سرور قطع می‌ماند.",
     xuTitle: "هسته‌ی Xray", qXu: "روزی یک بار نسخه‌ی جدید Xray از گیت‌هاب بررسی می‌شود. آپدیت فقط با زدن دکمه انجام می‌شود: اول کانفیگ فعلی با نسخه‌ی جدید تست می‌شود و اگر خطا داشت فقط هشدار می‌دهد.", xuCheck: "بررسی الان", xuCur: "نسخه‌ی این سرور", xuNew: "آخرین نسخه", xuOk: "به‌روز است", xuUpd: "آپدیت به {v}", xuWarn: "تست کانفیگ با نسخه‌ی جدید خطا داد:\n{e}\n\nباز هم آپدیت شود؟", xuMid: "سرورهای میانی با نسخه‌ی قدیمی‌تر", xuMidHint: "برای آپدیت آن‌ها دستور نصب سرور میانی را دوباره روی همان سرور اجرا کنید.",
     rpTitle: "پورت‌های مسیر برگشت", qRevPorts: "این پورت‌ها روی سرور میانی باز می‌شوند و این سرور در مسیر برگشت به آن‌ها وصل می‌شود. به‌طور پیش‌فرض همان پورت‌های تونل این سرور هستند (اگر روی سرور میانی آزاد باشند).", rpAuto: "خودکار", rpManual: "دستی", rpAutoBtn: "مثل این سرور",
-    tnStart: "روش شروع", qStart: "فقط برای اولین اتصال است. بعد از وصل شدن سرور میانی، بقیه‌ی روش‌ها هم وارد چرخش می‌شوند.",
+    tnStart: "روش شروع", qStart: "فقط برای اولین اتصال است. بعد از وصل شدن سرور میانی، بقیه‌ی روش‌ها هم وارد چرخش می‌شوند. اگر WS و XHTTP و REALITY فیلتر باشند، WireGuard یا mKCP (روی UDP) یا GRE را انتخاب کنید. FRP و Backhaul و SSH بعد از اتصال اضافه می‌شوند.",
+    tnPubIP: "IP عمومی سرور میانی", qPubIP: "GRE دو IP عمومی را مستقیم به هم وصل می‌کند، پس IP سرور میانی از همان اول لازم است. اگر در فیلد SSH یک IP نوشته باشید، از همان استفاده می‌شود.",
   },
   en: {
     loginHint: "Sign in to manage the Xray core.", user: "Username", pass: "Password", signIn: "Sign in",
@@ -145,7 +146,8 @@ const T = {
     dtPath: "Path", dtRot: "Rotating (default)", dtPickHint: "A dedicated path is fixed with no fallback: if it drops, this inbound stays down on that server.",
     xuTitle: "Xray core", qXu: "Checks GitHub for a new Xray once a day. It updates only when you press the button: the current config is tested with the new version first, and a failed test only warns.", xuCheck: "Check now", xuCur: "This server", xuNew: "Latest", xuOk: "up to date", xuUpd: "Update to {v}", xuWarn: "The config test with the new version failed:\n{e}\n\nUpdate anyway?", xuMid: "Middle servers on an older version", xuMidHint: "To update them, run the middle server install command on that server again.",
     rpTitle: "Reverse path ports", qRevPorts: "These ports open on the middle server and this server dials them on the reverse path. By default they match this server's tunnel ports (when free on the middle server).", rpAuto: "auto", rpManual: "manual", rpAutoBtn: "Same as this server",
-    tnStart: "Starting method", qStart: "Only for the first connection. Once the middle server is connected, the other methods join the rotation too.",
+    tnStart: "Starting method", qStart: "Only for the first connection. Once the middle server is connected, the other methods join the rotation too. If WS, XHTTP and REALITY are blocked, pick WireGuard or mKCP (over UDP) or GRE. FRP, Backhaul and SSH join after it connects.",
+    tnPubIP: "Middle server public IP", qPubIP: "GRE links two public IPs directly, so the middle server's IP is needed from the start. If the SSH field holds an IP, that one is used.",
   },
 };
 let lang = localStorage.getItem("xo_lang") || "fa";
@@ -1354,7 +1356,8 @@ $("#addTunnelBtn").onclick = () => {
   openModal(`<h3>${t("addTunnel")}</h3>
   <form id="tnForm" class="form">
     <label>${t("tnName")}<input name="name" placeholder="iran-1"></label>
-    <label><span>${t("tnStart")} ${qm("qStart")}</span><select name="method"><option value="wss">Xray WS (WebSocket + TLS)</option><option value="xhttp">Xray XHTTP (HTTP/2 + TLS)</option><option value="reality">Xray REALITY</option></select></label>
+    <label><span>${t("tnStart")} ${qm("qStart")}</span><select name="method"><option value="wss">Xray WS (WebSocket + TLS)</option><option value="xhttp">Xray XHTTP (HTTP/2 + TLS)</option><option value="reality">Xray REALITY</option><option value="wg">WireGuard (UDP)</option><option value="kcp">mKCP (UDP)</option><option value="gre">GRE</option></select></label>
+    <label id="tnIPRow" class="hidden"><span>${t("tnPubIP")} ${qm("qPubIP")}</span><input name="ip" placeholder="1.2.3.4" inputmode="decimal"></label>
     <details><summary>${t("tnSshOpt")}</summary>
     <label>${t("tnHost")}<input name="host" placeholder="1.2.3.4"></label>
     <label>${t("tnSshPort")}<input name="sshPort" type="number" min="1" max="65535" value="22"></label>
@@ -1364,8 +1367,14 @@ $("#addTunnelBtn").onclick = () => {
   <p id="tnErr" class="err"></p>
   <div class="actions"><button class="btn primary" id="tnSave">${t("create")}</button><button class="btn" data-close>${t("cancel")}</button></div>`);
   $("#tnForm").addEventListener("submit", (e) => { e.preventDefault(); $("#tnSave").click(); });
+  const tf = $("#tnForm"), isIP = (v) => /^\d{1,3}(\.\d{1,3}){3}$/.test(v.trim());
+  const ipRow = () => $("#tnIPRow").classList.toggle("hidden", tf.method.value !== "gre");
+  tf.method.onchange = ipRow;
+  tf.host.oninput = () => { if (isIP(tf.host.value) && (!tf.ip.value || tf.ip.dataset.auto)) { tf.ip.value = tf.host.value.trim(); tf.ip.dataset.auto = "1"; } };
+  tf.ip.oninput = () => { delete tf.ip.dataset.auto; };
   $("#tnSave").onclick = async () => {
     const d = Object.fromEntries(new FormData($("#tnForm"))); d.sshPort = +d.sshPort || 22;
+    if (d.method !== "gre") delete d.ip;
     const before = new Set((tunnelData?.servers || []).map((x) => x.id));
     const btn = $("#tnSave"); btn.disabled = true; btn.textContent = t("tnCreating"); $("#tnErr").textContent = "";
     let id = "";

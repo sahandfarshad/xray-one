@@ -123,7 +123,17 @@ type carrierSpec struct {
 // (the active method, and every other in its pool it can run).
 func carrierWanted(s TunnelServer, set TunnelSettings) map[string]bool {
 	w := map[string]bool{}
-	if s.AgentVer == "" || versionLess(s.AgentVer, agentCarrierVer) || !set.WGOn || set.WGVPort == 0 {
+	if !set.WGOn || set.WGVPort == 0 {
+		return w
+	}
+	if s.AgentVer == "" && s.Method == tunnelMethodGRE {
+		// not connected yet and starting on GRE: only this end of the link
+		if s.PublicIP != "" && greNum(s) != 0 && mainGREIP(set) != "" {
+			w[tunnelMethodGRE] = true
+		}
+		return w
+	}
+	if s.AgentVer == "" || versionLess(s.AgentVer, agentCarrierVer) {
 		return w
 	}
 	for _, m := range []string{tunnelMethodGRE, tunnelMethodFRP, tunnelMethodBH, tunnelMethodSSH} {
@@ -193,10 +203,12 @@ func (a *App) carrierJoin(j *joinInfo, s TunnelServer, set TunnelSettings) bool 
 	}
 	switch s.Method {
 	case tunnelMethodGRE:
-		if greNum(s) == 0 || mainGREIP(set) == "" {
+		ip := mainGREIP(set)
+		if greNum(s) == 0 || ip == "" || s.PublicIP == "" {
 			return false
 		}
 		j.CAddr, j.CPort = greMain, set.WGVPort
+		j.GRemote, j.GAddr = ip, greNet+strconv.Itoa(greNum(s))
 	case tunnelMethodFRP:
 		if set.FRPPort == 0 {
 			return false

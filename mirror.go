@@ -59,16 +59,33 @@ func (a *App) installCmd(s TunnelServer) string {
 		g += " || g 'main server' " + m + "/tunnel.sh 1"
 	}
 	g += " || g 'GitHub again' " + tunnelInstall + " 1"
-	// the first connection always goes over TCP (WS); a UDP method follows
-	// with the first config, tried like any switch
-	if isUDPMethod(s.Method) || isCarrier(s.Method) {
-		s.Method = tunnelMethodWS
-	}
-	g += " && bash /tmp/xo-tunnel.sh " + encodeJoin(a.joinFor(s))
+	g += " && bash /tmp/xo-tunnel.sh " + encodeJoin(a.startJoin(s))
 	if m != "" {
 		g += " " + m
 	}
 	return g
+}
+
+// startJoin: the join of the first connection. WS, XHTTP, REALITY,
+// WireGuard, mKCP and GRE can start one (the keys and addresses ride in the
+// install command); FRP, Backhaul and SSH need programs that come through
+// the tunnel, so they start on WS. A method that is not ready also starts
+// on WS.
+func (a *App) startJoin(s TunnelServer) joinInfo {
+	if !isStartMethod(s.Method) {
+		s.Method = tunnelMethodWS
+	}
+	j := a.joinFor(s)
+	if got := orDefault(j.Method, tunnelMethodWS); got != s.Method {
+		s.Method = tunnelMethodWS
+		j = a.joinFor(s)
+	}
+	return j
+}
+
+func isStartMethod(m string) bool {
+	return m == tunnelMethodWS || m == tunnelMethodXHTTP || m == tunnelMethodRT ||
+		m == tunnelMethodWG || m == tunnelMethodKCP || m == tunnelMethodGRE
 }
 
 func (a *App) mirrorOK(tok string) bool {
