@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="{{.Lang}}" dir="{{.Dir}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<meta name="color-scheme" content="light dark">
+<title>{{.T.title}} · {{.Name}}</title>
+<style>
+:root{--bg:#f5f4f0;--card:#fff;--ink:#17171a;--mut:#7b7a76;--line:#e8e6e1;--soft:#efeee9;--acc:#2f8f74;--acc2:#e0f2ec;--bad:#c94a3d;--bad2:#fbe9e6}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#0f0f10;--card:#18181a;--ink:#ededea;--mut:#8f8e89;--line:#26262a;--soft:#1f1f22;--acc:#5fc2a2;--acc2:#16302a;--bad:#ef7a6c;--bad2:#3a1d1a}}
+:root[data-theme=dark]{--bg:#0f0f10;--card:#18181a;--ink:#ededea;--mut:#8f8e89;--line:#26262a;--soft:#1f1f22;--acc:#5fc2a2;--acc2:#16302a;--bad:#ef7a6c;--bad2:#3a1d1a}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 Vazirmatn,"Segoe UI",Tahoma,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
+.wrap{max-width:560px;margin:0 auto;padding:28px 16px 48px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}
+.top .who{display:flex;flex-direction:column;min-width:0}
+.top .eyebrow{font-size:12px;color:var(--mut);letter-spacing:.04em}
+.top h1{margin:0;font-size:22px;font-weight:700;direction:ltr;unicode-bidi:plaintext;overflow-wrap:anywhere}
+.tools{display:flex;gap:6px;flex:none}
+.ic{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;height:34px;min-width:34px;padding:0 12px;font:inherit;font-size:13px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center}
+.card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:18px;margin-bottom:12px}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:3px 10px;border-radius:999px}
+.pill::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+.pill.ok{color:var(--acc);background:var(--acc2)}.pill.bad{color:var(--bad);background:var(--bad2)}
+.usage{margin:14px 0 12px}
+.under{display:flex;justify-content:space-between;gap:10px;font-size:13px;color:var(--mut);margin-top:8px}.under b{color:var(--ink);font-weight:600;direction:ltr;unicode-bidi:isolate}
+.big{font-size:30px;font-weight:700;letter-spacing:-.01em;direction:ltr;unicode-bidi:isolate}
+.big small{font-size:15px;font-weight:500;color:var(--mut)}
+.bar{height:8px;border-radius:99px;background:var(--soft);overflow:hidden}
+.bar i{display:block;height:100%;border-radius:99px;background:var(--acc)}
+.bar i.hot{background:var(--bad)}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px}
+.stat{background:var(--soft);border-radius:14px;padding:10px 12px}
+.stat span{display:block;font-size:12px;color:var(--mut)}
+.stat b{font-weight:600;direction:ltr;unicode-bidi:isolate;font-size:14px;white-space:nowrap}.stat b.nb{direction:inherit}
+h2{font-size:13px;font-weight:600;color:var(--mut);margin:22px 4px 8px;letter-spacing:.03em}
+.muted{color:var(--mut);font-size:13px;margin:0 0 12px}
+.row{display:flex;align-items:center;gap:8px}
+.url{flex:1;min-width:0;background:var(--soft);border-radius:12px;padding:10px 12px;font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;direction:ltr;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.btn{border:0;border-radius:12px;height:40px;padding:0 14px;font:inherit;font-size:13px;font-weight:600;cursor:pointer;background:var(--soft);color:var(--ink);white-space:nowrap;text-decoration:none;display:inline-flex;align-items:center;justify-content:center}
+.btn.pri{background:var(--ink);color:var(--card)}
+.btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.qr{display:none;margin:14px auto 2px;width:220px;max-width:100%;border-radius:14px;background:#fff;padding:8px}
+.qr.on{display:block}
+.item{display:flex;align-items:center;gap:10px;padding:12px 0;border-top:1px solid var(--line)}
+.item:first-child,.items>p+.item{border-top:0;padding-top:0}.item:last-child{padding-bottom:0}
+.item .nm{flex:1;min-width:0;font-weight:600;font-size:14px;direction:ltr;unicode-bidi:plaintext;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.item .btn{height:34px;padding:0 12px;font-size:12px}
+.qwrap{flex-basis:100%}
+.items{display:flex;flex-direction:column}
+.items>div{display:flex;flex-wrap:wrap}
+.app{display:flex;flex-wrap:wrap;align-items:center;gap:10px 12px;padding:12px 0;border-top:1px solid var(--line)}
+.app:first-child{border-top:0;padding-top:0}
+.app .lg{width:38px;height:38px;border-radius:11px;background:var(--soft);display:flex;align-items:center;justify-content:center;font-weight:700;flex:none}
+.app .meta{flex:1 1 150px;min-width:0}
+.app .meta b{display:block;font-size:14px}
+.app .meta span{font-size:12px;color:var(--mut)}
+.app .acts{display:flex;gap:6px;flex-wrap:wrap;margin-inline-start:auto}
+.app .btn{height:32px;font-size:12px;padding:0 10px}
+.empty{color:var(--mut);text-align:center;padding:8px 0;margin:0}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--card);padding:8px 16px;border-radius:999px;font-size:13px;opacity:0;transition:.2s;pointer-events:none}
+.toast.on{opacity:1;transform:translateX(-50%)}
+@media (max-width:420px){.big{font-size:26px}.stat{padding:9px 10px}.stat b{font-size:13px}}
+</style>
+<script nonce="{{.Nonce}}">try{var s=localStorage.getItem("xo_sub_theme");if(s)document.documentElement.dataset.theme=s}catch(e){}</script>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div class="who"><span class="eyebrow">{{.T.title}}</span><h1>{{.Name}}</h1></div>
+    <div class="tools"><a class="ic" href="?lang={{.OtherLang}}">{{.T.lang}}</a><button class="ic" id="theme" title="{{.T.theme}}" aria-label="{{.T.theme}}">◐</button></div>
+  </div>
+
+  <div class="card">
+    <span class="pill {{.State}}">{{.StateText}}</span>
+    <div class="usage"><div class="big">{{.Used}}{{if not .Unlimited}} <small>/ {{.Total}}</small>{{end}}</div></div>
+    {{if not .Unlimited}}<div class="bar"><i class="{{if ge .Pct 85}}hot{{end}}" style="width:{{.Pct}}%"></i></div>{{end}}
+    <div class="under"><span>{{if .Unlimited}}{{.T.unlimited}}{{else}}<b>{{.Left}}</b> {{.T.left}}{{end}}</span>{{if not .Unlimited}}<span>{{.Pct}}%</span>{{end}}</div>
+    <div class="grid">
+      <div class="stat"><span>{{.T.up}}</span><b>{{.Up}}</b></div>
+      <div class="stat"><span>{{.T.down}}</span><b>{{.Dn}}</b></div>
+      <div class="stat"><span>{{.T.expiry}}</span><b class="nb">{{if .Never}}∞{{else if .DaysLeft}}{{.DaysLeft}}{{else}}—{{end}}</b></div>
+    </div>
+    <p class="muted" style="margin:10px 2px 0">{{if .Never}}{{.T.never}}{{else}}{{.T.expiry}}: <span dir="ltr">{{.Expiry}}</span>{{end}}</p>
+  </div>
+
+  {{if .Configs}}
+  <h2>{{.T.sub}}</h2>
+  <div class="card">
+    <p class="muted">{{.T.subHint}}</p>
+    <div class="row"><div class="url">{{.SubURL}}</div><button class="btn pri" data-copy="{{.SubURL}}">{{.T.copy}}</button></div>
+    <div class="btns"><button class="btn" data-qr="subqr">{{.T.qr}}</button></div>
+    <img class="qr" id="subqr" alt="QR" src="{{safeURL .SubQR}}">
+  </div>
+
+  <h2>{{.T.configs}}</h2>
+  <div class="card items">
+    {{range $i, $c := .Configs}}<div class="item"><span class="nm">{{$c.Name}}</span><button class="btn" data-copy="{{$c.Link}}">{{$.T.copy}}</button><button class="btn" data-qr="cq{{$i}}">{{$.T.qr}}</button><div class="qwrap"><img class="qr" id="cq{{$i}}" alt="QR" src="{{safeURL $c.QR}}"></div></div>
+    {{end}}
+  </div>
+  {{end}}
+
+  {{if .WG}}
+  <h2>{{.T.wg}}</h2>
+  <div class="card items">
+    <p class="muted">{{.T.wgHint}}</p>
+    {{range $i, $w := .WG}}<div class="item"><span class="nm">{{$w.Name}}</span><button class="btn pri" data-wg="wg{{$i}}" data-file="{{$w.File}}">{{$.T.wgFile}}</button><button class="btn" data-qr="wq{{$i}}">{{$.T.qr}}</button><textarea hidden id="wg{{$i}}">{{$w.Conf}}</textarea><div class="qwrap"><img class="qr" id="wq{{$i}}" alt="QR" src="{{safeURL $w.QR}}"></div></div>
+    {{end}}
+  </div>
+  {{end}}
+
+  {{if not (or .Configs .WG)}}<div class="card"><p class="empty">{{.T.none}}</p></div>{{end}}
+
+  {{if .Apps}}
+  <h2>{{.T.apps}}</h2>
+  <div class="card">
+    {{range .Apps}}<div class="app"><div class="lg">{{slice .Name 0 1}}</div><div class="meta"><b>{{.Name}}</b><span>{{.Platforms}}</span></div><div class="acts">{{if .Import}}<a class="btn pri" href="{{safeURL .Import}}">{{$.T.add}}</a>{{end}}<a class="btn" href="{{.Download}}" target="_blank" rel="noopener">{{$.T.download}}</a>{{range .Store}}<a class="btn" href="{{.URL}}" target="_blank" rel="noopener">{{.Label}}</a>{{end}}</div></div>
+    {{end}}
+  </div>
+  {{end}}
+</div>
+<div class="toast" id="toast">{{.T.copied}}</div>
+<script nonce="{{.Nonce}}">
+(function(){
+  var r=document.documentElement,k="xo_sub_theme";
+  document.getElementById("theme").onclick=function(){var d=r.dataset.theme||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");r.dataset.theme=d==="dark"?"light":"dark";localStorage.setItem(k,r.dataset.theme)};
+  var t=document.getElementById("toast"),tm;
+  function toast(){t.classList.add("on");clearTimeout(tm);tm=setTimeout(function(){t.classList.remove("on")},1400)}
+  function copy(v){if(navigator.clipboard&&window.isSecureContext){navigator.clipboard.writeText(v).then(toast)}else{var a=document.createElement("textarea");a.value=v;document.body.appendChild(a);a.select();try{document.execCommand("copy");toast()}catch(e){}a.remove()}}
+  document.addEventListener("click",function(e){
+    var b=e.target.closest("[data-copy]");if(b){copy(b.dataset.copy);return}
+    b=e.target.closest("[data-qr]");if(b){document.getElementById(b.dataset.qr).classList.toggle("on");return}
+    b=e.target.closest("[data-wg]");if(b){var c=document.getElementById(b.dataset.wg).value,a=document.createElement("a");a.href=URL.createObjectURL(new Blob([c],{type:"text/plain"}));a.download=b.dataset.file;document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(a.href);a.remove()},1000)}
+  });
+})();
+</script>
+</body>
+</html>

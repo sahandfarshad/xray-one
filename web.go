@@ -633,6 +633,10 @@ func (a *App) handleSub(w http.ResponseWriter, r *http.Request) {
 	if !m.Disabled {
 		links = a.userLinks(root, m.Email, a.host(r))
 	}
+	if wantsSubPage(r) {
+		a.serveSubPage(w, r, m, links)
+		return
+	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("Profile-Title", "base64:"+base64.StdEncoding.EncodeToString([]byte("XRay One · "+m.Email)))
 	w.Header().Set("Profile-Update-Interval", "12")
@@ -742,11 +746,23 @@ func (a *App) disableClient(email, reason string) {
 }
 
 func (a *App) Enforce() {
+	var apiTried time.Time
 	for {
 		func() {
 			core := DetectCore()
 			if !core.Installed || !core.ConfigOK {
 				return
+			}
+			if core.APIAddr == "" && time.Since(apiTried) > 30*time.Minute {
+				// per-user traffic is counted by default; this only adds the
+				// missing stats/api parts and never rewrites other sections
+				apiTried = time.Now()
+				if err := a.cfg.Mutate(EnableAPI); err != nil {
+					log.Printf("could not turn on traffic stats: %v", err)
+				} else {
+					log.Printf("traffic stats turned on")
+					core = DetectCore()
+				}
 			}
 			if core.APIAddr != "" {
 				if st, err := statsQuery(core, core.APIAddr); err == nil {

@@ -41,6 +41,12 @@ A light, minimal panel that sits **beside** a headless Xray core. It never repla
 
 ۰.۹.۱: چرخش با ترافیک واقعی قضاوت می‌کند نه فقط با پینگ (هر ۵ دقیقه یک دانلود ۲۵۶ کیلوبایتی)؛ گزینه‌ی «تکه‌تکه کردن TLS» برای WS و XHTTP؛ سرور میانی روی مسیر برگشت هر ۱۰ دقیقه مسیر مستقیم را دوباره امتحان می‌کند و عوض کردن روش آنجا هم ممکن است.
 
+## v0.10.0
+
+- Subscription page: opening a user's subscription link in a browser shows usage, remaining data, days left, status, every config with copy and QR, WireGuard files with QR, "Add to app" buttons and download links (v2rayNG, Hiddify, Streisand, V2Box, WireGuard). Persian/English, dark/light. VPN apps still get the normal subscription. Add `?raw` to force the plain list.
+- Traffic stats are turned on automatically, so every user's usage is counted and data limits work.
+- WireGuard users' traffic is counted too (needs Xray 26.6.27 or newer).
+
 ## v0.9.3
 
 - Fixed missing labels on the Xray core card, reverse path ports and the starting method (they showed internal key names).

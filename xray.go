@@ -858,7 +858,8 @@ func NewClient(ib *OMap, email string) (*OMap, error) {
 		if addr == "" {
 			return nil, errors.New("no free WireGuard address left")
 		}
-		// email and privateKey are kept for the panel (links, names); xray ignores them
+		// email lets Xray 26.6.27+ count this peer's traffic per user; privateKey is
+		// kept for the panel (links) and ignored by Xray
 		return om("email", email, "publicKey", pub, "privateKey", priv, "allowedIPs", []any{addr}), nil
 	case "vmess":
 		return om("id", newUUID(), "email", email, "level", 0), nil
