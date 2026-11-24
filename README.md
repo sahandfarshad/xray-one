@@ -41,6 +41,13 @@ A light, minimal panel that sits **beside** a headless Xray core. It never repla
 
 ۰.۹.۱: چرخش با ترافیک واقعی قضاوت می‌کند نه فقط با پینگ (هر ۵ دقیقه یک دانلود ۲۵۶ کیلوبایتی)؛ گزینه‌ی «تکه‌تکه کردن TLS» برای WS و XHTTP؛ سرور میانی روی مسیر برگشت هر ۱۰ دقیقه مسیر مستقیم را دوباره امتحان می‌کند و عوض کردن روش آنجا هم ممکن است.
 
+## v0.13.1
+
+- Unblocker names: next to "+ domain" there is "+ only this" to add just that name (for example challenges.cloudflare.com, not all of cloudflare.com).
+- Method cards keep the port and options at the bottom, just above the test, so every card lines up; each "?" sits right after its words.
+- New ready list "Speed test" (speed.cloudflare.com) to measure the unblocker path in a browser.
+- Epic list adds hcaptcha.com, challenges.cloudflare.com, statsigapi.net and featureassets.org (its sign-in captcha failed without them).
+
 ## v0.13.0
 
 - The game unblocker has its own tab, in four parts: domains, entry servers (main or middle, with the DNS address of each), active addresses (IP, user, entry, until when, with a Remove button) and the names active devices asked for, with a one-tap Add for names not in the list.

@@ -289,8 +289,12 @@ input[type=checkbox],input[type=radio]{width:16px;height:16px;padding:0;margin:0
 .mcard .mhead{display:flex;align-items:center;gap:.35rem}
 .mcard .mopts{display:flex;flex-direction:column;gap:.15rem;margin-top:.35rem;padding-top:.35rem;border-top:1px dashed var(--line)}
 .mcard .mopt{display:flex;flex-direction:row;align-items:center;gap:.4rem;font-size:.8rem;color:var(--ink);margin:0;cursor:pointer;min-height:1.6rem}
-.mcard .mopt>span:not(.qm):not(.pport){flex:1;min-width:0}
+.mcard .mopt>span:not(.qm):not(.pport){min-width:0}
 .mcard .mopt select{width:auto;flex:none;font-size:.78rem;padding:.1rem .3rem}
 .mcard .mopt.mport{cursor:default}
 .mcard .mopt .qm{flex:none}
-.mcard .mfoot{display:flex;flex-direction:column;align-items:flex-start;gap:.2rem;margin-top:auto;padding-top:.3rem}
+.mcard .mbottom{margin-top:auto;display:flex;flex-direction:column;gap:.2rem;padding-top:.4rem}
+.mcard .mopts{min-height:4.9rem}
+.mcard .mopt select{margin-inline-start:auto}
+.mcard .mfoot{display:flex;flex-direction:column;align-items:flex-start;gap:.2rem;padding-top:.4rem}
+.snitbl .sadd{display:inline-flex;gap:.3rem}
