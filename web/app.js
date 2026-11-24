@@ -1,3 +1,4 @@
+try { const th = localStorage.getItem("xo_theme"); if (th) document.documentElement.dataset.theme = th; } catch (e) {}
 "use strict";
 const T = {
   fa: {
@@ -25,7 +26,7 @@ const T = {
     confirmRestore: "کانفیگ فعلی با این بکاپ جایگزین شود؟ (از فعلی هم بکاپ گرفته می‌شود)",
     linksTitle: "آدرس لینک‌ها", publicHost: "دامنه یا IP سرور برای لینک‌ها", subBase: "آدرس پایه‌ی سابسکریپشن (اختیاری)",
     sslHint: "SSL پنل و سابسکریپشن از منوی SSH تنظیم می‌شود: دستور xray-one و گزینه‌ی ۴.",
-    backups: "بکاپ‌ها", restore: "بازگردانی", rawConfig: "کانفیگ خام (فقط خواندنی)", show: "نمایش",
+    qBackups: "قبل از هر تغییر، کانفیگ قبلی Xray اینجا ذخیره می‌شود (۴۰ تای آخر). بازگردانی اول آن را تست می‌کند و فقط کانفیگ Xray را برمی‌گرداند؛ کاربران و تنظیمات پنل دست نمی‌خورند.", qRaw: "فایل کانفیگ فعلی Xray همان‌طور که روی سرور است؛ فقط برای دیدن، ویرایش از همین پنل انجام می‌شود.", themeT: "تاریک / روشن", backups: "بکاپ‌ها", restore: "بازگردانی", rawConfig: "کانفیگ خام (فقط خواندنی)", show: "نمایش",
     saved: "ذخیره شد", done: "انجام شد", jobRunning: "در حال اجرا…", jobOk: "با موفقیت تمام شد", jobFail: "خطا خورد",
     up: "آپلود", down: "دانلود", edit: "ویرایش", setExpiry: "تغییر اعتبار", setLimit: "تغییر حجم",
     allSub: "سابسکریپشن همه‌ی کانفیگ‌ها", newLink: "لینک جدید", confirmNewLink: "لینک فعلی سابسکریپشن از کار می‌افتد و لینک تازه ساخته می‌شود. ادامه؟",
@@ -95,7 +96,7 @@ const T = {
     confirmRestore: "Replace the current config with this backup? (the current one is backed up too)",
     linksTitle: "Link address", publicHost: "Server domain or IP for links", subBase: "Subscription base URL (optional)",
     sslHint: "Panel and subscription SSL are set in the SSH menu: run xray-one, option 4.",
-    backups: "Backups", restore: "Restore", rawConfig: "Raw config (read-only)", show: "Show",
+    qBackups: "Before every change the previous Xray config is saved here (last 40). Restore tests it first and only brings back the Xray config; panel users and settings are not touched.", qRaw: "The current Xray config file as it is on the server; view only, edit through this panel.", themeT: "Dark / Light", backups: "Backups", restore: "Restore", rawConfig: "Raw config (read-only)", show: "Show",
     saved: "Saved", done: "Done", jobRunning: "Running…", jobOk: "Finished successfully", jobFail: "Failed",
     up: "Up", down: "Down", edit: "Edit", setExpiry: "Change validity", setLimit: "Change traffic",
     allSub: "Subscription with every config", newLink: "New link", confirmNewLink: "The current subscription link stops working and a new one is made. Continue?",
@@ -151,6 +152,8 @@ function applyLang() {
   document.documentElement.lang = lang;
   document.documentElement.dir = lang === "fa" ? "rtl" : "ltr";
   document.querySelectorAll("[data-t]").forEach((el) => (el.textContent = t(el.dataset.t)));
+  document.querySelectorAll("[data-qm]").forEach((el) => (el.innerHTML = qm(el.dataset.qm)));
+  $("#themeBtn").title = t("themeT");
   $("#langBtn").textContent = lang === "fa" ? "EN" : "فا";
   render();
 }
@@ -195,6 +198,7 @@ $("#loginForm").addEventListener("submit", async (e) => {
   } catch (err) { $("#loginErr").textContent = err.message; }
 });
 $("#logoutBtn").onclick = guard(async () => { await api("POST", "api/logout"); showLogin(); });
+$("#themeBtn").onclick = () => { const d = document.documentElement, cur = d.dataset.theme || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"); d.dataset.theme = cur === "dark" ? "light" : "dark"; localStorage.setItem("xo_theme", d.dataset.theme); };
 $("#langBtn").onclick = () => { lang = lang === "fa" ? "en" : "fa"; localStorage.setItem("xo_lang", lang); applyLang(); };
 
 // ---------- navigation ----------
@@ -232,6 +236,7 @@ async function boot() {
     if (sc && sc.v === state.view && sc.y > 0) requestAnimationFrame(() => scrollTo(0, sc.y));
   } catch {}
   pollJob();
+  loadXray().catch(() => {});
 }
 
 async function refreshStatus() { state.status = await api("GET", "api/status"); render(); }
@@ -899,7 +904,7 @@ $("#quickBtn").onclick = guard(async () => {
   openModal(`<h3>${t("quickTitle")}</h3>
     <p class="muted">${t("quickHint")}</p>
     <div class="actions"><button class="btn small" id="qAll">${t("all")}</button><button class="btn small" id="qNone">${t("none")}</button></div>
-    <div class="presets" id="qList">${groups.map(([g, title]) => `<div class="pgroup"><h4>${esc(title)}</h4><div class="pgrid">${r.presets.filter((p) => p.group === g).map(item).join("")}</div></div>`).join("")}</div>
+    <div class="presets" id="qList">${groups.map(([g, title]) => `<div class="pgroup"><h4><label class="gall"><input type="checkbox" data-gall> ${esc(title)}</label></h4><div class="pgrid">${r.presets.filter((p) => p.group === g).map(item).join("")}</div></div>`).join("")}</div>
     <form id="qForm" class="form" style="grid-template-columns:2fr 1fr 1fr">
       <label>${t("clientName")}<input name="client" value="user1" pattern="[A-Za-z0-9._@+\\-]{1,64}"></label>
       <label>${t("expiryDays")}<input name="expiryDays" type="number" min="0" value="30"></label>
@@ -908,9 +913,10 @@ $("#quickBtn").onclick = guard(async () => {
     </form>
     <p id="qErr" class="err"></p>
     <div class="actions"><button class="btn primary" id="qCreate"></button><button class="btn" data-close>${t("cancel")}</button></div>`, true);
-  const boxes = () => [...$("#qList").querySelectorAll("input:not(:disabled)")];
-  const count = () => { $("#qCreate").textContent = t("createN") + " (" + boxes().filter((b) => b.checked).length + ")"; };
-  $("#qList").onchange = count; count();
+  const boxes = (root) => [...(root || $("#qList")).querySelectorAll(".pgrid input:not(:disabled)")];
+  const syncAll = () => $("#qList").querySelectorAll(".pgroup").forEach((g) => { const bs = boxes(g), c = bs.filter((b) => b.checked).length, a = g.querySelector("[data-gall]"); a.checked = bs.length > 0 && c === bs.length; a.indeterminate = c > 0 && c < bs.length; a.disabled = !bs.length; });
+  const count = () => { syncAll(); $("#qCreate").textContent = t("createN") + " (" + boxes().filter((b) => b.checked).length + ")"; };
+  $("#qList").onchange = (e) => { if (e.target.matches("[data-gall]")) boxes(e.target.closest(".pgroup")).forEach((b) => (b.checked = e.target.checked)); count(); }; count();
   $("#qScan").onclick = () => openRealityScan((x) => { $("#qForm").dest.value = x.target; $("#qForm").sni.value = x.sni; }, true);
   $("#qAll").onclick = () => { boxes().forEach((b) => (b.checked = true)); count(); };
   $("#qNone").onclick = () => { boxes().forEach((b) => (b.checked = false)); count(); };
@@ -953,11 +959,40 @@ async function pollJob(force) {
 }
 
 // ---------- settings ----------
+async function loadXray(now) {
+  const x = await api("GET", "api/xray/latest" + (now ? "?now=1" : ""));
+  const newer = x.latest && x.current && versionLess(x.current, x.latest);
+  const mids = (tunnelData?.servers || []).filter((s) => s.xrayVer && x.latest && versionLess(s.xrayVer, x.latest));
+  $("#xuBox").innerHTML = `<p>${t("xuCur")}: <b class="mono">${esc(x.current || "?")}</b> · ${t("xuNew")}: <b class="mono">${esc(x.latest || "?")}</b> ${newer ? "" : x.latest ? `<span class="muted">(${t("xuOk")})</span>` : ""}</p>
+    ${x.err ? `<p class="err">${esc(x.err)}</p>` : ""}
+    ${newer ? `<button class="btn primary small" id="xuUpd">${esc(t("xuUpd").replace("{v}", x.latest))}</button>` : ""}
+    ${mids.length ? `<p class="muted small">${t("xuMid")}: ${mids.map((s) => esc(s.name) + " (" + esc(s.xrayVer) + ")").join("، ")}<br>${t("xuMidHint")}</p>` : ""}`;
+  document.querySelector('nav [data-view="settings"]')?.classList.toggle("badge", !!newer);
+  const u = $("#xuUpd");
+  if (u) u.onclick = guard(async () => {
+    u.disabled = true;
+    try { await api("POST", "api/xray/update", {}); }
+    catch (e) {
+      if (!String(e.message).startsWith("TEST: ")) { u.disabled = false; throw e; }
+      if (!confirm(t("xuWarn").replace("{e}", e.message.slice(6)))) { u.disabled = false; return; }
+      await api("POST", "api/xray/update", { force: true });
+    }
+    toast(t("done")); refreshStatus(); loadXray();
+  });
+}
+$("#xuCheck").onclick = guard(() => loadXray(true));
+function bkTime(n) {
+  const m = /config-(\d{4})(\d\d)(\d\d)-(\d\d)(\d\d)(\d\d)/.exec(n);
+  if (!m) return esc(n);
+  const d = new Date(Date.UTC(+m[1], m[2] - 1, +m[3], +m[4], +m[5], +m[6]));
+  return esc(d.toLocaleString(lang === "fa" ? "fa-IR" : "en-GB", { dateStyle: "medium", timeStyle: "medium" }));
+}
 async function loadSettings() {
   const s = state.status.settings, f = $("#settingsForm");
   f.publicHost.value = s.publicHost || ""; f.subBase.value = s.subBase || "";
+  loadXray().catch(() => {});
   const list = await api("GET", "api/backups");
-  $("#backupList").innerHTML = list.length ? list.map((n) => `<div class="item"><span class="mono">${esc(n)}</span><button class="btn small" data-restore="${esc(n)}">${t("restore")}</button></div>`).join("") : `<p class="muted">—</p>`;
+  $("#backupList").innerHTML = list.length ? list.map((n) => `<div class="item"><span title="${esc(n)}">${bkTime(n)}</span><button class="btn small" data-restore="${esc(n)}">${t("restore")}</button></div>`).join("") : `<p class="muted">—</p>`;
 }
 $("#settingsForm").addEventListener("submit", guard(async (e) => {
   e.preventDefault();
@@ -1111,7 +1146,10 @@ function revBlock(s, i) {
     else if (s.certErr) st = `<span class="err">${esc(t("dmErr"))}: ${esc(s.certErr)}</span>`;
     else st = `<span class="muted">${s.certBusy ? t("dmBusy") : t("dmWait")}</span>`;
   }
-  return `${rv ? `<p class="muted small">↔ ${esc(rv)}</p>` : ""}${s.bridgeErr ? `<p class="err">${esc(s.bridgeErr)}</p>` : ""}
+  const rp = s.revPort ? `<details class="muted small-details"><summary>${t("rpTitle")} ${qm("qRevPorts")} · ${esc(s.revSet ? t("rpManual") : t("rpAuto"))}</summary>
+      <div class="dmrow">REALITY <input id="rpR-${i}" class="w6" dir="ltr" value="${s.revPort || ""}"> WS <input id="rpW-${i}" class="w6" dir="ltr" value="${s.revPortW || ""}"> XHTTP <input id="rpX-${i}" class="w6" dir="ltr" value="${s.revPortX || ""}">
+      <button class="btn small" data-tn="rpsave" data-i="${i}">${t("dmSave")}</button> <button class="btn small ghost" data-tn="rpauto" data-i="${i}">${t("rpAutoBtn")}</button></div></details>` : "";
+  return `${rv ? `<p class="muted small">↔ ${esc(rv)}</p>` : ""}${rp}${s.bridgeErr ? `<p class="err">${esc(s.bridgeErr)}</p>` : ""}
     <div class="dmrow"><label><span>${t("dmLabel")} ${qm("qDomain")}</span> <input id="tnDom-${i}" dir="ltr" value="${esc(s.domain || "")}" placeholder="mid.${esc(base)}"></label>
       <button class="btn small" data-tn="domain" data-i="${i}">${t("dmSave")}</button> ${st}</div>
     ${s.domain && s.certOk ? "" : `<p class="muted small">${esc(t("dmHint").replace("{ip}", s.publicIP || s.host || "IP"))}</p>`}`;
@@ -1258,6 +1296,10 @@ $("#tunnelList").addEventListener("click", guard(async (e) => {
   } else if (b.dataset.tn === "domain") {
     await api("POST", "api/tunnels/" + s.id + "/domain", { domain: $("#tnDom-" + b.dataset.i).value.trim() });
     document.activeElement?.blur(); toast(t("done")); loadTunnels();
+  } else if (b.dataset.tn === "rpsave" || b.dataset.tn === "rpauto") {
+    const v = (k) => +$("#rp" + k + "-" + b.dataset.i).value.trim();
+    await api("POST", "api/tunnels/" + s.id + "/revports", b.dataset.tn === "rpauto" ? { auto: true } : { r: v("R"), w: v("W"), x: v("X") });
+    toast(t("done")); loadTunnels();
   } else if (b.dataset.tn === "deploy") openDeploy(s);
   else if (b.dataset.tn === "test") {
     tnTestRes[s.id] = { ok: true, text: t("tnTesting") }; renderTunnels();
@@ -1306,7 +1348,7 @@ $("#addTunnelBtn").onclick = () => {
   openModal(`<h3>${t("addTunnel")}</h3>
   <form id="tnForm" class="form">
     <label>${t("tnName")}<input name="name" placeholder="iran-1"></label>
-    <label>${t("tnMethod")}<select name="method"><option value="wss">Xray WS (WebSocket + TLS)</option><option value="xhttp">Xray XHTTP (HTTP/2 + TLS)</option><option value="reality">Xray REALITY</option></select></label>
+    <label><span>${t("tnStart")} ${qm("qStart")}</span><select name="method"><option value="wss">Xray WS (WebSocket + TLS)</option><option value="xhttp">Xray XHTTP (HTTP/2 + TLS)</option><option value="reality">Xray REALITY</option></select></label>
     <details><summary>${t("tnSshOpt")}</summary>
     <label>${t("tnHost")}<input name="host" placeholder="1.2.3.4"></label>
     <label>${t("tnSshPort")}<input name="sshPort" type="number" min="1" max="65535" value="22"></label>

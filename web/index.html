@@ -30,6 +30,7 @@
       <button data-view="settings" data-t="settings"></button>
     </nav>
     <div class="top-actions">
+      <button id="themeBtn" class="btn ghost small" title="Dark / Light">◐</button>
       <button id="langBtn" class="btn ghost small">EN</button>
       <button id="logoutBtn" class="btn ghost small" data-t="logout"></button>
     </div>
@@ -136,11 +137,15 @@
         <p class="muted" data-t="sslHint"></p>
       </div>
       <div class="card">
-        <h3 data-t="backups"></h3>
+        <div class="row-between"><h3><span data-t="xuTitle"></span> <span data-qm="qXu"></span></h3><button id="xuCheck" class="btn small" data-t="xuCheck"></button></div>
+        <div id="xuBox"></div>
+      </div>
+      <div class="card">
+        <h3><span data-t="backups"></span> <span data-qm="qBackups"></span></h3>
         <div id="backupList" class="list"></div>
       </div>
       <div class="card">
-        <div class="row-between"><h3 data-t="rawConfig"></h3><button id="loadRaw" class="btn small" data-t="show"></button></div>
+        <div class="row-between"><h3><span data-t="rawConfig"></span> <span data-qm="qRaw"></span></h3><button id="loadRaw" class="btn small" data-t="show"></button></div>
         <pre id="rawConfig" class="log hidden"></pre>
       </div>
     </section>

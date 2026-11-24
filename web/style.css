@@ -5,8 +5,9 @@
   font-family:"Vazirmatn","Inter",system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif;
 }
 @media (prefers-color-scheme:dark){
-  :root{--bg:#121211;--card:#1b1b19;--ink:#ecebe7;--muted:#9a968e;--line:#2a2926;--soft:#1f2724;--accent:#5fb39a;--accent-ink:#0f1412;--shadow:none}
+  :root:not([data-theme=light]){--bg:#121211;--card:#1b1b19;--ink:#ecebe7;--muted:#9a968e;--line:#2a2926;--soft:#1f2724;--accent:#5fb39a;--accent-ink:#0f1412;--shadow:none}
 }
+:root[data-theme=dark]{--bg:#121211;--card:#1b1b19;--ink:#ecebe7;--muted:#9a968e;--line:#2a2926;--soft:#1f2724;--accent:#5fb39a;--accent-ink:#0f1412;--shadow:none}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font-size:14.5px;line-height:1.6}
 .hidden{display:none!important}
@@ -263,3 +264,6 @@ img,canvas,svg,input,select,textarea,pre{max-width:100%}
 .copt label{display:inline-flex;align-items:center;gap:.3rem}
 .copt select{font-size:.78rem;padding:.1rem .3rem}
 .mcard small.err{opacity:1}
+.dmrow input.w6 { width: 80px; }
+.pgroup h4 .gall{display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+nav button.badge::after{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--warn);margin-inline-start:6px;vertical-align:middle}

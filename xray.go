@@ -221,7 +221,7 @@ func (s *ConfigStore) backup(data []byte) error {
 	if err := os.MkdirAll(s.backupDir, 0o700); err != nil {
 		return err
 	}
-	name := filepath.Join(s.backupDir, "config-"+time.Now().Format("20060102-150405.000")+".json")
+	name := filepath.Join(s.backupDir, "config-"+time.Now().UTC().Format("20060102-150405.000")+".json")
 	if err := os.WriteFile(name, data, 0o600); err != nil {
 		return err
 	}

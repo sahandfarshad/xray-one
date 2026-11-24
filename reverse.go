@@ -117,7 +117,7 @@ func revWays(r *revInfo) []string {
 
 // ensureRevLocked gives a middle server its listener settings and ports that
 // are free there. Call with the store locked.
-func ensureRevLocked(s *TunnelServer, fwd []fwdPort) bool {
+func ensureRevLocked(s *TunnelServer, fwd []fwdPort, want [3]int) bool {
 	if !revCapable(*s) {
 		return false
 	}
@@ -147,7 +147,15 @@ func ensureRevLocked(s *TunnelServer, fwd []fwdPort) bool {
 	for _, f := range fwd {
 		bad[f.Listen] = true
 	}
-	pick := func(cur *int) {
+	pick := func(cur *int, want int) {
+		// unless the user set ports, follow this server's own tunnel port
+		if !s.RevSet && want > 0 && !bad[want] {
+			if *cur != want {
+				*cur, changed = want, true
+			}
+			bad[want] = true
+			return
+		}
 		if *cur != 0 && !bad[*cur] {
 			bad[*cur] = true
 			return
@@ -169,9 +177,9 @@ func ensureRevLocked(s *TunnelServer, fwd []fwdPort) bool {
 		}
 		bad[p] = true
 	}
-	pick(&s.RevPort)
-	pick(&s.RevPortW)
-	pick(&s.RevPortX)
+	pick(&s.RevPort, want[0])
+	pick(&s.RevPortW, want[1])
+	pick(&s.RevPortX, want[2])
 	return changed
 }
 
@@ -601,4 +609,46 @@ func stripRule(cfg []byte, tag string) []byte {
 	}
 	rt.Set("rules", keep)
 	return EncodeIndent(root)
+}
+
+// POST /api/tunnels/{id}/revports {r, w, x, auto}: the middle server's
+// reverse-path listener ports. auto follows this server's tunnel ports.
+func (a *App) handleRevPorts(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	var b struct {
+		R, W, X int
+		Auto    bool
+	}
+	if err := json.NewDecoder(r.Body).Decode(&b); err != nil {
+		fail(w, 400, err)
+		return
+	}
+	if !b.Auto {
+		seen := map[int]bool{}
+		for _, p := range []int{b.R, b.W, b.X} {
+			if p < 1 || p > 65535 || p == 80 || seen[p] {
+				fail(w, 400, errors.New("each port must be 1-65535, not 80, and all three different"))
+				return
+			}
+			seen[p] = true
+		}
+	}
+	err := a.store.EditTunnels(func() error {
+		s := a.store.tunnelByID(id)
+		if s == nil {
+			return errors.New("middle server not found")
+		}
+		s.RevSet = !b.Auto
+		if !b.Auto {
+			s.RevPort, s.RevPortW, s.RevPortX = b.R, b.W, b.X
+		}
+		return nil
+	})
+	if err != nil {
+		fail(w, 400, err)
+		return
+	}
+	a.reapplyTunnels(id)
+	hub.Poke(id)
+	writeJSONResp(w, 200, map[string]bool{"ok": true})
 }

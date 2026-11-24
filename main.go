@@ -12,7 +12,7 @@ import (
 	"golang.org/x/term"
 )
 
-var version = "0.9.1"
+var version = "0.9.2"
 
 func main() {
 	dir := os.Getenv("XRAY_ONE_DIR")
@@ -65,6 +65,7 @@ func serve(dir string) {
 	go app.certSyncLoop()
 	go app.revLoop()
 	go app.carrierLoop()
+	go xrayCheckLoop()
 	app.graceLater()
 	go app.tunnelsOnStart()
 	speeds.open(dir)

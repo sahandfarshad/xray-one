@@ -41,6 +41,12 @@ A light, minimal panel that sits **beside** a headless Xray core. It never repla
 
 ۰.۹.۱: چرخش با ترافیک واقعی قضاوت می‌کند نه فقط با پینگ (هر ۵ دقیقه یک دانلود ۲۵۶ کیلوبایتی)؛ گزینه‌ی «تکه‌تکه کردن TLS» برای WS و XHTTP؛ سرور میانی روی مسیر برگشت هر ۱۰ دقیقه مسیر مستقیم را دوباره امتحان می‌کند و عوض کردن روش آنجا هم ممکن است.
 
+## v0.9.2
+- Dark / light switch in the top bar. / دکمه‌ی تاریک و روشن.
+- Xray core card: checks GitHub daily, shows this server and outdated middle servers; updates only on the button, after testing the config (a failed test only warns). / بررسی روزانه‌ی نسخه‌ی Xray؛ آپدیت فقط با دکمه.
+- Reverse path ports on the middle server follow this server's tunnel ports and can be set per middle server. / پورت‌های مسیر برگشتی هم‌سان و قابل ویرایش.
+- Select-all per group in quick inbounds; "?" notes for backups, raw config, starting method; backup times in local time.
+
 ## Install / نصب
 
 ```bash

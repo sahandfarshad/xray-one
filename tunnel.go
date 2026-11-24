@@ -117,6 +117,7 @@ type TunnelServer struct {
 	BridgeAt  int64  `json:"bridgeAt,omitempty"`
 	BridgeErr string `json:"bridgeErr,omitempty"`
 	BridgeVia string `json:"bridgeVia,omitempty"` // method this server dials it with
+	RevSet    bool   `json:"revSet,omitempty"`    // the user chose the reverse ports
 	RevPortW  int    `json:"revPortW,omitempty"`  // WS+TLS listener (needs the middle server's domain)
 	RevPortX  int    `json:"revPortX,omitempty"`  // XHTTP+TLS listener
 	RevPath   string `json:"revPath,omitempty"`
@@ -1337,7 +1338,7 @@ func (a *App) handleBeat(w http.ResponseWriter, r *http.Request) {
 			if s := a.store.tunnelByID(srv.ID); s != nil {
 				// new listener settings: the relay config changes, and our
 				// tunnel rules learn this server's reverse inbound tag
-				if ensureRevLocked(s, fwd) {
+				if c := a.store.TunnelCfg; ensureRevLocked(s, fwd, [3]int{c.RPort, c.Port, c.XPort}) {
 					defer a.reapplyTunnels(s.ID)
 				}
 				srv = *s
