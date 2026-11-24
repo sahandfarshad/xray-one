@@ -295,11 +295,17 @@ func drawMenu(app *App, c Core) {
 	if c.Installed {
 		core = c.Version + "  " + dot(c.Active == "active", orDefault(c.Active, "unknown"))
 	}
-	line := dim("  ─────────────────────────────────────────────────")
+	const w = 49
+	title, ver := "✦ XRay One", "v"+version
+	pad := w - 2 - len([]rune(title)) - len(ver)
+	if pad < 1 {
+		pad = 1
+	}
 	fmt.Println()
-	fmt.Println("  " + cCyan + cBold + "✦ XRay One" + cReset + dim("  v"+version))
-	fmt.Println(line)
-	row := func(k, v string) { fmt.Printf("  %s%-7s%s %s\n", cDim, k, cReset, v) }
+	fmt.Println("  " + dim("╭"+strings.Repeat("─", w)+"╮"))
+	fmt.Println("  " + dim("│") + " " + cCyan + cBold + title + cReset + strings.Repeat(" ", pad) + dim(ver) + " " + dim("│"))
+	fmt.Println("  " + dim("╰"+strings.Repeat("─", w)+"╯"))
+	row := func(k, v string) { fmt.Printf("   %s%-7s%s %s\n", cDim, k, cReset, v) }
 	row("Panel", app.PanelURL()+"  "+dot(panelState == "active", orDefault(panelState, "?")))
 	if panelState != "active" {
 		if out, _ := run(5*time.Second, "journalctl", "-u", "xray-one", "-n", "1", "--no-pager", "-o", "cat"); out != "" {
@@ -313,19 +319,25 @@ func drawMenu(app *App, c Core) {
 	}
 	row("SSL", ssl)
 	row("Xray", core)
-	fmt.Println(line)
-	items := [][2]string{
-		{" 1  Username / password", " 6  Install / update Xray"},
-		{" 2  Panel port", " 7  Restart panel"},
-		{" 3  Secret path", " 8  Logs"},
-		{" 4  SSL certificate", " 9  Update XRay One"},
-		{" 5  Access & link address", "10  Uninstall XRay One"},
+	section := func(name string) {
+		fmt.Println()
+		fmt.Println("   " + cDim + cBold + name + cReset + " " + dim(strings.Repeat("─", w-len(name))))
 	}
-	fmt.Println("  " + dim(fmt.Sprintf("%-28s%s", "PANEL", "SYSTEM")))
-	for _, it := range items {
-		fmt.Printf("  %-28s%s\n", it[0], it[1])
-	}
-	fmt.Println("   0  Exit")
+	item := func(n, label string) { fmt.Printf("   %s%3s%s  %s %s\n", cCyan+cBold, n, cReset, dim("│"), label) }
+	section("PANEL")
+	item("1", "Username / password")
+	item("2", "Panel port")
+	item("3", "Secret path")
+	item("4", "SSL certificate")
+	item("5", "Access & link address")
+	section("SYSTEM")
+	item("6", "Install / update Xray")
+	item("7", "Restart panel")
+	item("8", "Logs")
+	item("9", "Update XRay One")
+	item("10", cRed+"Uninstall XRay One"+cReset)
+	fmt.Println()
+	item("0", dim("Exit"))
 	fmt.Println()
 }
 

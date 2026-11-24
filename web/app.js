@@ -70,6 +70,9 @@ const T = {
     dtPort: "پورت WireGuard (UDP)", dtHost: "آدرس این سرور (WireGuard و mKCP)", dtSave: "ذخیره", dtSetHint: "سرور میانی با UDP به این آدرس و پورت‌ها وصل می‌شود. IP مستقیم بدهید، نه دامنه‌ی پشت CDN. پورت باید آزاد باشد (TCP و UDP).",
     pePort: "پورت", peEdit: "تغییر پورت", peSave: "ذخیره", peCancel: "لغو", tpBadNum: "پورت باید یک عدد بین ۱ تا ۶۵۵۳۵ باشد", peAskUsed: "سرورهای میانی روی «{m}» به پورت جدید {p} می‌روند. پورت قبلی تا ۳۰ دقیقه باز می‌ماند تا تانل قطع نشود؛ ممکن است اتصال کاربران چند ثانیه قطع و وصل شود. ادامه؟", peAskWg: "سرورهای میانیِ دارای تانل WireGuard روی پورت جدید {p} دوباره وصل می‌شوند (چند ثانیه قطعی برای اینباندهای وصل‌شده به آن). ادامه؟", peMoved: "پورت عوض شد. سرورهای میانی تا یک دقیقه به پورت جدید می‌روند؛ پورت قبلی ۳۰ دقیقه باز می‌ماند.",
     dtPath: "مسیر", dtRot: "چرخشی (پیش‌فرض)", dtPickHint: "مسیر «اختصاصی» ثابت است و جایگزین ندارد: اگر قطع شود این اینباند روی آن سرور قطع می‌ماند.",
+    xuTitle: "هسته‌ی Xray", qXu: "روزی یک بار نسخه‌ی جدید Xray از گیت‌هاب بررسی می‌شود. آپدیت فقط با زدن دکمه انجام می‌شود: اول کانفیگ فعلی با نسخه‌ی جدید تست می‌شود و اگر خطا داشت فقط هشدار می‌دهد.", xuCheck: "بررسی الان", xuCur: "نسخه‌ی این سرور", xuNew: "آخرین نسخه", xuOk: "به‌روز است", xuUpd: "آپدیت به {v}", xuWarn: "تست کانفیگ با نسخه‌ی جدید خطا داد:\n{e}\n\nباز هم آپدیت شود؟", xuMid: "سرورهای میانی با نسخه‌ی قدیمی‌تر", xuMidHint: "برای آپدیت آن‌ها دستور نصب سرور میانی را دوباره روی همان سرور اجرا کنید.",
+    rpTitle: "پورت‌های مسیر برگشت", qRevPorts: "این پورت‌ها روی سرور میانی باز می‌شوند و این سرور در مسیر برگشت به آن‌ها وصل می‌شود. به‌طور پیش‌فرض همان پورت‌های تونل این سرور هستند (اگر روی سرور میانی آزاد باشند).", rpAuto: "خودکار", rpManual: "دستی", rpAutoBtn: "مثل این سرور",
+    tnStart: "روش شروع", qStart: "فقط برای اولین اتصال است. بعد از وصل شدن سرور میانی، بقیه‌ی روش‌ها هم وارد چرخش می‌شوند.",
   },
   en: {
     loginHint: "Sign in to manage the Xray core.", user: "Username", pass: "Password", signIn: "Sign in",
@@ -140,6 +143,9 @@ const T = {
     dtPort: "WireGuard port (UDP)", dtHost: "This server's address (WireGuard and mKCP)", dtSave: "Save", dtSetHint: "Middle servers dial this address and these ports over UDP. Use the direct IP, not a domain behind a CDN. The port must be free (TCP and UDP).",
     pePort: "Port", peEdit: "Change port", peSave: "Save", peCancel: "Cancel", tpBadNum: "The port must be a number from 1 to 65535", peAskUsed: "Middle servers on \"{m}\" move to the new port {p}. The old port stays open for 30 minutes so the tunnel does not drop; users may see a few seconds of reconnect. Continue?", peAskWg: "Middle servers with the WireGuard tunnel reconnect on the new port {p} (a few seconds of drop for inbounds pinned to it). Continue?", peMoved: "Port changed. Middle servers move to it within a minute; the old port stays open for 30 minutes.",
     dtPath: "Path", dtRot: "Rotating (default)", dtPickHint: "A dedicated path is fixed with no fallback: if it drops, this inbound stays down on that server.",
+    xuTitle: "Xray core", qXu: "Checks GitHub for a new Xray once a day. It updates only when you press the button: the current config is tested with the new version first, and a failed test only warns.", xuCheck: "Check now", xuCur: "This server", xuNew: "Latest", xuOk: "up to date", xuUpd: "Update to {v}", xuWarn: "The config test with the new version failed:\n{e}\n\nUpdate anyway?", xuMid: "Middle servers on an older version", xuMidHint: "To update them, run the middle server install command on that server again.",
+    rpTitle: "Reverse path ports", qRevPorts: "These ports open on the middle server and this server dials them on the reverse path. By default they match this server's tunnel ports (when free on the middle server).", rpAuto: "auto", rpManual: "manual", rpAutoBtn: "Same as this server",
+    tnStart: "Starting method", qStart: "Only for the first connection. Once the middle server is connected, the other methods join the rotation too.",
   },
 };
 let lang = localStorage.getItem("xo_lang") || "fa";
@@ -415,7 +421,7 @@ function renderInbounds() {
     const clients = "";
     return `<div class="card">
       <div class="ib-head">
-        <div class="ib-title">${ib.system ? "" : `<input type="checkbox" data-sel="${esc(ib.id)}" ${state.sel.has(ib.id) ? "checked" : ""}>`}<b>${esc(ib.tag || ib.id)}</b>${pills}<span dir="auto" class="pill">:${esc(ib.port)}</span>
+        <div class="ib-title"><span class="ibnum" dir="ltr">${idx + 1}</span>${ib.system ? "" : `<input type="checkbox" data-sel="${esc(ib.id)}" ${state.sel.has(ib.id) ? "checked" : ""}>`}<b>${esc(ib.tag || ib.id)}</b>${pills}<span dir="auto" class="pill">:${esc(ib.port)}</span>
           ${ib.system ? `<span dir="auto" class="pill gray">${t("system")}</span>` : !ib.managed ? `<span dir="auto" class="pill gray">${t("unmanaged")}</span>` : ""}</div>
         <div class="actions">
           ${ib.system ? "" : `<button class="btn small" data-act="relay" data-i="${idx}">+ ${t("relay")}</button>`}

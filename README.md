@@ -41,6 +41,12 @@ A light, minimal panel that sits **beside** a headless Xray core. It never repla
 
 ۰.۹.۱: چرخش با ترافیک واقعی قضاوت می‌کند نه فقط با پینگ (هر ۵ دقیقه یک دانلود ۲۵۶ کیلوبایتی)؛ گزینه‌ی «تکه‌تکه کردن TLS» برای WS و XHTTP؛ سرور میانی روی مسیر برگشت هر ۱۰ دقیقه مسیر مستقیم را دوباره امتحان می‌کند و عوض کردن روش آنجا هم ممکن است.
 
+## v0.9.3
+
+- Fixed missing labels on the Xray core card, reverse path ports and the starting method (they showed internal key names).
+- Inbounds are numbered in list order (numbers are only a visual help and shift when one is deleted).
+- Cleaner SSH menu (`xray-one`): framed header, options in one numbered column grouped as Panel and System.
+
 ## v0.9.2
 - Dark / light switch in the top bar. / دکمه‌ی تاریک و روشن.
 - Xray core card: checks GitHub daily, shows this server and outdated middle servers; updates only on the button, after testing the config (a failed test only warns). / بررسی روزانه‌ی نسخه‌ی Xray؛ آپدیت فقط با دکمه.

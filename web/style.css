@@ -267,3 +267,5 @@ img,canvas,svg,input,select,textarea,pre{max-width:100%}
 .dmrow input.w6 { width: 80px; }
 .pgroup h4 .gall{display:inline-flex;align-items:center;gap:6px;cursor:pointer}
 nav button.badge::after{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--warn);margin-inline-start:6px;vertical-align:middle}
+
+.ibnum { display: inline-flex; align-items: center; justify-content: center; min-width: 1.7em; height: 1.7em; padding: 0 .35em; border-radius: 999px; background: var(--line); color: var(--muted); font-size: .8em; font-weight: 600; font-variant-numeric: tabular-nums; flex: none; }
