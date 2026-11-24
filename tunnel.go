@@ -1297,6 +1297,8 @@ type beatReq struct {
 	XrayVer   string               `json:"xrayVer,omitempty"`   // Xray core on the middle server (0.7.0+)
 	SniErr    string               `json:"sniErr,omitempty"`    // anti-sanction entry: why a port could not be used (0.12.0+)
 	SniN      int                  `json:"sniN,omitempty"`      // addresses active on it
+	SniList   []sniActive          `json:"sniList,omitempty"`   // addresses active on it (0.12.1+)
+	SniSeen   []sniSeen            `json:"sniSeen,omitempty"`   // names they asked for lately (0.12.1+)
 }
 
 type beatResp struct {
@@ -1358,6 +1360,7 @@ func (a *App) handleBeat(w http.ResponseWriter, r *http.Request) {
 		}
 		s.Mode, s.Via = req.Mode, req.Via
 		s.SniErr, s.SniN = trimTo(req.SniErr, 300), req.SniN
+		sniRemoteSet(s.ID, req.SniList, req.SniSeen)
 		if req.CState != nil {
 			for k, v := range req.CState {
 				req.CState[k] = trimTo(v, 300)

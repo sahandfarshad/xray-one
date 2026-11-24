@@ -27,6 +27,7 @@
       <button data-view="inbounds" data-t="inbounds"></button>
       <button data-view="users" data-t="usersTab"></button>
       <button data-view="tunnels" data-t="tunnels"></button>
+      <button data-view="unblock" data-t="sniTab"></button>
       <button data-view="settings" data-t="settings"></button>
     </nav>
     <div class="top-actions">
@@ -123,8 +124,16 @@
       <form id="tunnelPorts" class="tports"></form>
       <div id="rcOut" class="rcout hidden"></div>
       <form id="dtPorts" class="tports"></form>
-      <form id="sniForm" class="tports snif"></form>
       <div id="tunnelList" class="stack"></div>
+    </section>
+
+    <section id="view-unblock" class="view hidden">
+      <div class="row-between head"><h2><span data-t="sniTitle"></span> <span data-qm="qSni"></span></h2></div>
+      <p class="muted" data-t="sniIntro"></p>
+      <div class="card sec"><h3><span class="snum">1</span><span data-t="sniS1"></span></h3><form id="sniForm" class="tports snif"></form></div>
+      <div class="card sec"><h3><span class="snum">2</span><span data-t="sniS2"></span></h3><p class="muted small" data-t="sniS2h"></p><div id="sniEntries"></div></div>
+      <div class="card sec"><h3><span class="snum">3</span><span data-t="sniS3"></span></h3><p class="muted small" data-t="sniS3h"></p><div id="sniActive"></div></div>
+      <div class="card sec"><div class="row-between"><h3><span class="snum">4</span><span data-t="sniS4"></span></h3><label class="chk"><input type="checkbox" id="sniOnlyNew" checked> <span data-t="sniOnlyNew"></span></label></div><p class="muted small" data-t="sniS4h"></p><div id="sniSeen"></div></div>
     </section>
 
     <section id="view-settings" class="view hidden">

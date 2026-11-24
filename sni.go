@@ -39,6 +39,8 @@ type sniSpec struct {
 	Keys    []string `json:"keys"`  // activation keys of active users
 	IP      string   `json:"ip"`    // address the DNS answers for listed domains
 	Hours   int      `json:"hours"` // how long an activation lasts
+	// addresses the panel removed, with when: activations from before then end
+	Revoke map[string]int64 `json:"revoke,omitempty"`
 	// ports this server's tunnels or inbounds use: never taken (set locally)
 	Avoid []int `json:"-"`
 }
@@ -48,6 +50,8 @@ type SniSettings struct {
 	Domains []string `json:"domains,omitempty"`
 	Main    bool     `json:"main,omitempty"`  // the main server is an entry too
 	Hours   int      `json:"hours,omitempty"` // 0 = 24
+	// addresses removed in the panel -> when (kept a month, then dropped)
+	Revoke map[string]int64 `json:"revoke,omitempty"`
 }
 
 const sniDefaultHours = 24
@@ -104,7 +108,27 @@ func sniMatch(doms map[string]bool, host string) bool {
 type sniAllow struct {
 	Key   string `json:"key"`
 	Until int64  `json:"until"`
+	Since int64  `json:"since,omitempty"`
 }
+
+// sniActive: an address allowed now (reported to the panel).
+type sniActive struct {
+	IP    string `json:"ip"`
+	Key   string `json:"key"`
+	Until int64  `json:"until"`
+	Since int64  `json:"since,omitempty"`
+}
+
+// sniSeen: a name an allowed address asked the DNS for.
+type sniSeen struct {
+	Name   string `json:"name"`
+	IP     string `json:"ip"`
+	N      int    `json:"n"`
+	Last   int64  `json:"last"`
+	Listed bool   `json:"listed,omitempty"`
+}
+
+const sniSeenMax, sniSeenReport = 400, 120
 
 type sniService struct {
 	mu      sync.Mutex
@@ -118,6 +142,7 @@ type sniService struct {
 	closers []io.Closer
 	ln80    net.Listener
 	errs    []string
+	seen    map[string]*sniSeen // name -> last asked
 }
 
 // sniSvc: the entry this process runs, if any (the panel on the main server,
@@ -125,7 +150,7 @@ type sniService struct {
 var sniSvc *sniService
 
 func newSniService(file string, dial func(string, int) (net.Conn, error)) *sniService {
-	s := &sniService{file: file, dial: dial, allow: map[string]sniAllow{}}
+	s := &sniService{file: file, dial: dial, allow: map[string]sniAllow{}, seen: map[string]*sniSeen{}}
 	if b, err := os.ReadFile(file); err == nil {
 		_ = json.Unmarshal(b, &s.allow)
 	}
@@ -158,6 +183,11 @@ func (s *sniService) Update(sp *sniSpec) {
 	now := time.Now().Unix()
 	changed := false
 	for ip, a := range s.allow {
+		if t, ok := sp.Revoke[ip]; ok && a.Since <= t { // removed in the panel
+			delete(s.allow, ip)
+			changed = true
+			continue
+		}
 		if !s.keys[a.Key] || a.Until < now { // user disabled, deleted or expired
 			delete(s.allow, ip)
 			changed = true
@@ -186,6 +216,60 @@ func (s *sniService) Status() (string, int) {
 		}
 	}
 	return strings.Join(s.errs, "; "), n
+}
+
+// Report: errors, the addresses allowed now and the names they asked for
+// lately (newest first).
+func (s *sniService) Report() (string, []sniActive, []sniSeen) {
+	if s == nil {
+		return "", nil, nil
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	now := time.Now().Unix()
+	var act []sniActive
+	for ip, a := range s.allow {
+		if a.Until >= now && s.keys[a.Key] {
+			act = append(act, sniActive{IP: ip, Key: a.Key, Until: a.Until, Since: a.Since})
+		}
+	}
+	sort.Slice(act, func(i, j int) bool { return act[i].Since > act[j].Since })
+	seen := make([]sniSeen, 0, len(s.seen))
+	for _, v := range s.seen {
+		v.Listed = sniMatch(s.doms, v.Name)
+		seen = append(seen, *v)
+	}
+	sort.Slice(seen, func(i, j int) bool { return seen[i].Last > seen[j].Last })
+	if len(seen) > sniSeenReport {
+		seen = seen[:sniSeenReport]
+	}
+	return strings.Join(s.errs, "; "), act, seen
+}
+
+// note: remember a name an allowed address asked for.
+func (s *sniService) note(name, ip string) {
+	name = strings.ToLower(name)
+	if name == "" || strings.HasSuffix(name, ".arpa") || strings.HasSuffix(name, ".local") || !strings.Contains(name, ".") {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	now := time.Now().Unix()
+	if v := s.seen[name]; v != nil {
+		v.N++
+		v.Last, v.IP = now, ip
+		return
+	}
+	if len(s.seen) >= sniSeenMax {
+		old, ot := "", int64(1<<62)
+		for k, v := range s.seen {
+			if v.Last < ot {
+				old, ot = k, v.Last
+			}
+		}
+		delete(s.seen, old)
+	}
+	s.seen[name] = &sniSeen{Name: name, IP: ip, N: 1, Last: now}
 }
 
 func (s *sniService) saveLocked() {
@@ -436,6 +520,9 @@ func (s *sniService) dnsAnswer(q []byte, src string, tcp bool) []byte {
 		return dnsReply(hdr, qs, dnsmessage.RCodeRefused, nil)
 	}
 	name := strings.TrimSuffix(qq.Name.String(), ".")
+	if qq.Type == dnsmessage.TypeA || qq.Type == dnsmessage.TypeAAAA {
+		s.note(name, src)
+	}
 	if s.listed(name) {
 		if qq.Type != dnsmessage.TypeA {
 			return dnsReply(hdr, qs, dnsmessage.RCodeSuccess, nil)
@@ -689,7 +776,7 @@ func (s *sniService) activate(c net.Conn, src, key string) {
 	ok := s.keys[key]
 	hours, ip := s.spec.Hours, s.spec.IP
 	if ok {
-		s.allow[src] = sniAllow{Key: key, Until: time.Now().Add(time.Duration(hours) * time.Hour).Unix()}
+		s.allow[src] = sniAllow{Key: key, Until: time.Now().Add(time.Duration(hours) * time.Hour).Unix(), Since: time.Now().Unix()}
 		s.saveLocked()
 	}
 	s.mu.Unlock()

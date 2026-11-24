@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -20,6 +21,10 @@ const sniOut = "xo-sni-out"
 
 // agentSniVer: the first agent that runs the entry.
 const agentSniVer = "0.12.0"
+
+// agentSniLogVer: the first agent that reports its active addresses and the
+// names they asked for.
+const agentSniLogVer = "0.13.0"
 
 var sniPoke = make(chan struct{}, 1)
 
@@ -35,6 +40,10 @@ func (s *Store) sniCopy() SniSettings {
 	defer s.mu.Unlock()
 	c := s.Sni
 	c.Domains = append([]string{}, s.Sni.Domains...)
+	c.Revoke = map[string]int64{}
+	for k, v := range s.Sni.Revoke {
+		c.Revoke[k] = v
+	}
 	if c.Hours <= 0 {
 		c.Hours = sniDefaultHours
 	}
@@ -120,7 +129,7 @@ func (a *App) sniApplyMain() {
 	if p, err := strconv.Atoi(strings.TrimPrefix(portOf(a.store.Cfg.Listen), ":")); err == nil && (p == 80 || p == 443) {
 		avoid = append(avoid, p)
 	}
-	sniSvc.Update(&sniSpec{Domains: set.Domains, Keys: a.sniKeys(), IP: ip, Hours: set.Hours, Avoid: avoid})
+	sniSvc.Update(&sniSpec{Domains: set.Domains, Keys: a.sniKeys(), IP: ip, Hours: set.Hours, Avoid: avoid, Revoke: set.Revoke})
 }
 
 // sniSpecFor: what a middle server runs (nil: nothing).
@@ -132,7 +141,7 @@ func (a *App) sniSpecFor(s TunnelServer) *sniSpec {
 	if len(set.Domains) == 0 {
 		return nil
 	}
-	return &sniSpec{Domains: set.Domains, Keys: a.sniKeys(), IP: s.PublicIP, Hours: set.Hours}
+	return &sniSpec{Domains: set.Domains, Keys: a.sniKeys(), IP: s.PublicIP, Hours: set.Hours, Revoke: set.Revoke}
 }
 
 // sniTunnelDomains: the domains the tunnels may carry out of this server
@@ -238,7 +247,7 @@ func (a *App) handleSniSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	old := a.store.sniCopy()
 	if err := a.store.EditTunnels(func() error {
-		a.store.Sni = SniSettings{Domains: doms, Main: b.Main, Hours: b.Hours}
+		a.store.Sni.Domains, a.store.Sni.Main, a.store.Sni.Hours = doms, b.Main, b.Hours
 		return nil
 	}); err != nil {
 		fail(w, 500, err)
@@ -312,4 +321,182 @@ func (a *App) sniView() map[string]any {
 		ip = a.sniMainIP()
 	}
 	return map[string]any{"domains": set.Domains, "main": set.Main, "hours": set.Hours, "mainErr": e, "mainN": n, "mainIP": ip}
+}
+
+// ---------- what the entries report ----------
+
+type sniRemote struct {
+	List []sniActive
+	Seen []sniSeen
+	At   int64
+}
+
+var (
+	sniRemMu sync.Mutex
+	sniRem   = map[string]sniRemote{} // middle server id -> its last report
+)
+
+func sniRemoteSet(id string, list []sniActive, seen []sniSeen) {
+	if len(list) > 500 {
+		list = list[:500]
+	}
+	if len(seen) > sniSeenReport {
+		seen = seen[:sniSeenReport]
+	}
+	for i := range seen {
+		seen[i].Name, seen[i].IP = trimTo(seen[i].Name, 253), trimTo(seen[i].IP, 64)
+	}
+	sniRemMu.Lock()
+	defer sniRemMu.Unlock()
+	if list == nil && seen == nil {
+		delete(sniRem, id)
+		return
+	}
+	sniRem[id] = sniRemote{List: list, Seen: seen, At: time.Now().Unix()}
+}
+
+// sniUserNames: activation key -> user name.
+func (a *App) sniUserNames() map[string]string {
+	a.store.mu.Lock()
+	defer a.store.mu.Unlock()
+	out := map[string]string{}
+	for _, m := range a.store.Clients {
+		if m.SubToken != "" {
+			out[sniKey(m.SubToken)] = m.Email
+		}
+	}
+	return out
+}
+
+type sniActiveView struct {
+	IP     string `json:"ip"`
+	User   string `json:"user"`
+	Until  int64  `json:"until"`
+	Since  int64  `json:"since,omitempty"`
+	Entry  string `json:"entry"`
+	EntryI string `json:"entryId,omitempty"`
+}
+
+type sniSeenView struct {
+	sniSeen
+	Entry string `json:"entry"`
+	User  string `json:"user,omitempty"`
+}
+
+// GET /api/sni: settings, entries, active addresses and the names asked.
+func (a *App) handleSniGet(w http.ResponseWriter, r *http.Request) {
+	set := a.store.sniCopy()
+	names := a.sniUserNames()
+	var act []sniActiveView
+	var seen []sniSeenView
+	ipUser := map[string]string{}
+	add := func(entry, id string, list []sniActive, ss []sniSeen) {
+		for _, x := range list {
+			u := names[x.Key]
+			ipUser[x.IP] = u
+			act = append(act, sniActiveView{IP: x.IP, User: u, Until: x.Until, Since: x.Since, Entry: entry, EntryI: id})
+		}
+		for _, x := range ss {
+			seen = append(seen, sniSeenView{sniSeen: x, Entry: entry})
+		}
+	}
+	mainErr, mainList, mainSeen := sniSvc.Report()
+	if sniMainErr != "" {
+		mainErr = sniMainErr
+	}
+	mainIP := ""
+	if set.Main {
+		mainIP = a.sniMainIP()
+		add("main", "", mainList, mainSeen)
+	}
+	var entries []map[string]any
+	servers, _, _ := a.store.TunnelsCopy()
+	sniRemMu.Lock()
+	for _, s := range servers {
+		e := map[string]any{"id": s.ID, "name": s.Name, "ip": s.PublicIP, "on": s.SniOn, "err": s.SniErr, "n": s.SniN,
+			"agentVer": s.AgentVer, "online": s.LastSeen > time.Now().Unix()-int64(onlineWindow/time.Second)}
+		entries = append(entries, e)
+		if s.SniOn {
+			if rr, ok := sniRem[s.ID]; ok {
+				add(s.Name, s.ID, rr.List, rr.Seen)
+			}
+		}
+	}
+	sniRemMu.Unlock()
+	for i := range seen {
+		seen[i].User = ipUser[seen[i].IP]
+	}
+	sort.SliceStable(seen, func(i, j int) bool { return seen[i].Last > seen[j].Last })
+	if len(seen) > 300 {
+		seen = seen[:300]
+	}
+	writeJSONResp(w, 200, map[string]any{"domains": set.Domains, "main": set.Main, "hours": set.Hours,
+		"mainErr": mainErr, "mainIP": mainIP, "mainN": len(mainList), "servers": entries,
+		"active": act, "seen": seen, "sniVer": agentSniVer, "sniLogVer": agentSniLogVer, "now": time.Now().Unix()})
+}
+
+// POST /api/sni/revoke {ip}: end an address's activation on every entry.
+func (a *App) handleSniRevoke(w http.ResponseWriter, r *http.Request) {
+	var b struct {
+		IP string `json:"ip"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&b); err != nil || net.ParseIP(b.IP) == nil {
+		fail(w, 400, errors.New("bad address"))
+		return
+	}
+	now := time.Now().Unix()
+	if err := a.store.EditTunnels(func() error {
+		if a.store.Sni.Revoke == nil {
+			a.store.Sni.Revoke = map[string]int64{}
+		}
+		for k, v := range a.store.Sni.Revoke {
+			if v < now-31*86400 {
+				delete(a.store.Sni.Revoke, k)
+			}
+		}
+		a.store.Sni.Revoke[b.IP] = now
+		return nil
+	}); err != nil {
+		fail(w, 500, err)
+		return
+	}
+	pokeSni()
+	a.pokeSniServers()
+	time.Sleep(300 * time.Millisecond)
+	writeJSONResp(w, 200, map[string]bool{"ok": true})
+}
+
+// POST /api/sni/domains {add}: add names to the list.
+func (a *App) handleSniAdd(w http.ResponseWriter, r *http.Request) {
+	var b struct {
+		Add []string `json:"add"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&b); err != nil {
+		fail(w, 400, err)
+		return
+	}
+	old := a.store.sniCopy()
+	doms := sniNormDomains(append(append([]string{}, old.Domains...), b.Add...))
+	if len(doms) > 2000 {
+		fail(w, 400, errors.New("too many domains (2000 at most)"))
+		return
+	}
+	if err := a.store.EditTunnels(func() error {
+		a.store.Sni.Domains = doms
+		return nil
+	}); err != nil {
+		fail(w, 500, err)
+		return
+	}
+	servers, _, _ := a.store.TunnelsCopy()
+	if a.sniTunnelDomains(servers) != nil {
+		if err := a.sniReapply(); err != nil {
+			fail(w, 500, err)
+			return
+		}
+	}
+	a.pokeSniServers()
+	pokeSni()
+	time.Sleep(300 * time.Millisecond)
+	writeJSONResp(w, 200, map[string]any{"ok": true, "domains": doms})
 }

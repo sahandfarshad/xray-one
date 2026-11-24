@@ -59,7 +59,7 @@ const T = {
     tnRemove: "حذف relay از سرور میانی (روی همان سرور بزنید):", tnCmdTitle: "دستور نصب سرور میانی",
     tnInbounds: "اینباندها", tnDeploying: "در حال نصب روی سرور میانی… (تا چند دقیقه)", tnConfirmDel: "این سرور میانی حذف شود؟ اینباندها دیگر از آن استفاده نمی‌کنند.", tnXrayErr: "خطای relay",
     selectAll: "انتخاب همه", wgTitle: "فایل WireGuard", wgHint: "در اپ WireGuard دکمه‌ی + را بزنید، بعد فایل را وارد کنید یا QR را اسکن کنید.", wgFile: "دانلود فایل", ports: "پورت‌ها", portsTitle: "پورت‌های استفاده‌شده", portsHint: "همه‌ی پورت‌های این‌باندها، جدا با کاما؛ برای ساخت relay و تانل.", gSS: "Shadowsocks", gProxy: "پراکسی ساده (SOCKS / HTTP، با یوزر و پسورد جدا)", relayLinks: "لینک‌های relay", singleUser: "تک‌کاربره", confirmDelRelay: "این relay حذف شود؟",
-    sniTitle: "تحریم‌شکن بازی‌ها", qSni: "برای بازی‌ها و سایت‌هایی که آی‌پی ایران را راه نمی‌دهند، بدون فیلترشکن. کاربر دی‌ان‌اس گوشی یا کنسول را روی آی‌پی یک سرور ورودی می‌گذارد؛ فقط دامنه‌های این لیست از آن سرور رد می‌شوند و بقیه‌ی اینترنت مستقیم می‌ماند. فقط آی‌پی کاربرانی کار می‌کند که از صفحه‌ی اشتراکشان فعال‌سازی را زده‌اند. پورت‌های ۵۳، ۸۰ و ۴۴۳ آن سرور باید آزاد باشند. فیلتر را دور نمی‌زند و اسم سایت آشکار می‌رود.", sniDoms: "دامنه‌ها (هر خط یکی؛ زیردامنه‌ها خودشان حساب می‌شوند)", sniPre: "افزودن لیست آماده:", sniMain: "سرور اصلی هم ورودی باشد", sniHours: "مدت هر فعال‌سازی (ساعت)", sniSave: "ذخیره", sniHint: "لیست‌های آماده نقطه‌ی شروع‌اند و باید روی بازی واقعی تست شوند. اگر سرور اصلی فیلتر است، به‌جایش روی کارت هر سرور میانی روشنش کنید.", sniOnSrv: "تحریم‌شکن روی این سرور", sniActive: "فعال · {n} آدرس · دی‌ان‌اس {ip}", sniNoDom: "اول دامنه‌ها را در بخش تحریم‌شکن بالای صفحه وارد کنید.", sniOld: "عامل این سرور باید نسخه‌ی {v} یا بالاتر باشد؛ دستور نصب جدید را روی آن اجرا کنید.", sniNoIP: "آی‌پی عمومی این سرور هنوز معلوم نیست.",
+    sniTab: "تحریم‌شکن", sniIntro: "کاربر بدون فیلترشکن، دی‌ان‌اس دستگاهش را روی آی‌پی یک سرور ورودی می‌گذارد. فقط دامنه‌های لیست از سرور رد می‌شوند و بقیه‌ی اینترنت مستقیم می‌ماند.", sniS1: "دامنه‌ها", sniS2: "سرورهای ورودی (آی‌پی دی‌ان‌اس)", sniS2h: "روی هر سروری که تیک بخورد، دی‌ان‌اس و ورودی ۸۰ و ۴۴۳ راه می‌افتد. اگر سرور اصلی از ایران فیلتر است، یک سرور میانی را انتخاب کنید.", sniS3: "آی‌پی‌های فعال", sniS3h: "آی‌پی‌هایی که از صفحه‌ی اشتراک دکمه‌ی فعال‌سازی را زده‌اند. با حذف، آن آی‌پی دیگر جواب نمی‌گیرد تا دوباره فعال کند.", sniS4: "اسم‌های پرسیده‌شده", sniS4h: "اسم‌هایی که دستگاه‌های فعال از دی‌ان‌اس پرسیده‌اند. اگر بازی کار نکرد، اسم‌های تازه‌ای که هم‌زمان با باز کردنش آمده‌اند را اضافه کنید.", sniOnlyNew: "فقط اسم‌های خارج از لیست", sniMainSrv: "سرور اصلی", sniNoAct: "هنوز کسی فعال نکرده است.", sniNoSeen: "هنوز چیزی پرسیده نشده.", sniUntil: "تا", sniUser: "کاربر", sniEntry: "ورودی", sniName: "اسم", sniCount: "دفعات", sniLast: "آخرین بار", sniAdd: "افزودن", sniRemove: "حذف", sniInList: "در لیست", sniOff: "خاموش", sniSeenOld: "برای دیدن آی‌پی‌ها و اسم‌های این سرور، عامل آن باید نسخه‌ی {v} باشد.", sniOffline: "سرور در دسترس نیست", sniNeedDom: "اول در قسمت ۱ دامنه‌ها را ذخیره کنید.", sniRemoved: "حذف شد", sniAdded: "اضافه شد: {d}", sniTitle: "تحریم‌شکن بازی‌ها", qSni: "برای بازی‌ها و سایت‌هایی که آی‌پی ایران را راه نمی‌دهند، بدون فیلترشکن. کاربر دی‌ان‌اس گوشی یا کنسول را روی آی‌پی یک سرور ورودی می‌گذارد؛ فقط دامنه‌های این لیست از آن سرور رد می‌شوند و بقیه‌ی اینترنت مستقیم می‌ماند. فقط آی‌پی کاربرانی کار می‌کند که از صفحه‌ی اشتراکشان فعال‌سازی را زده‌اند. پورت‌های ۵۳، ۸۰ و ۴۴۳ آن سرور باید آزاد باشند. فیلتر را دور نمی‌زند و اسم سایت آشکار می‌رود.", sniDoms: "دامنه‌ها (هر خط یکی؛ زیردامنه‌ها خودشان حساب می‌شوند)", sniPre: "افزودن لیست آماده:", sniMain: "سرور اصلی هم ورودی باشد", sniHours: "مدت هر فعال‌سازی (ساعت)", sniSave: "ذخیره", sniHint: "لیست‌های آماده نقطه‌ی شروع‌اند و باید روی بازی واقعی تست شوند؛ اسم‌های کم را از قسمت ۴ اضافه کنید.", sniOnSrv: "تحریم‌شکن روی این سرور", sniActive: "فعال · {n} آدرس · دی‌ان‌اس {ip}", sniNoDom: "اول دامنه‌ها را در بخش تحریم‌شکن بالای صفحه وارد کنید.", sniOld: "عامل این سرور باید نسخه‌ی {v} یا بالاتر باشد؛ دستور نصب جدید را روی آن اجرا کنید.", sniNoIP: "آی‌پی عمومی این سرور هنوز معلوم نیست.",
     dtTitle: "تانل‌های اختصاصی", dtHint: "مسیر ثابت و جدا از تانل چرخشی: هرگز عوض نمی‌شود و جایگزین ندارد. اینباندهایی که به آن وصل شوند فقط از همین مسیر می‌روند و اگر قطع شود، قطع می‌مانند.",
     dtWg: "WireGuard اختصاصی", dtWgD: "Xray WireGuard روی UDP؛ سرور میانی مستقیم به IP این سرور وصل می‌شود. اگر UDP بین دو سرور بسته باشد کار نمی‌کند.", dtBackhaul: "Backhaul", dtBackhaulD: "تانل اختصاصی Backhaul.",
     dtKcp: "mKCP اختصاصی", dtKcpD: "Xray VLESS روی mKCP (UDP)، تنظیم‌شده برای بازی و رمزشده با seed؛ سرور میانی مستقیم به IP این سرور وصل می‌شود. روی مسیر پراُفت پایدارتر است، ولی ترافیک بیشتری مصرف می‌کند.",
@@ -134,7 +134,7 @@ const T = {
     tnRemove: "Remove the relay from the middle server (run there):", tnCmdTitle: "Middle server install command",
     tnInbounds: "Inbounds", tnDeploying: "Installing on the middle server… (a few minutes)", tnConfirmDel: "Remove this middle server? Inbounds stop using it.", tnXrayErr: "Relay error",
     selectAll: "Select all", wgTitle: "WireGuard file", wgHint: "For the official WireGuard app: download the file and tap + then Import from file, or scan the QR with Create from QR code.", wgFile: "Download .conf", ports: "Ports", portsTitle: "Used ports", portsHint: "Every inbound port, comma separated, for building relays and tunnels.", gSS: "Shadowsocks", gProxy: "Plain proxies (SOCKS / HTTP, own user and password)", relayLinks: "Relay links", singleUser: "single user", confirmDelRelay: "Remove this relay?",
-    sniTitle: "Game unblocker", qSni: "For games and sites that refuse Iranian addresses, with no VPN. A user sets their phone's or console's DNS to an entry server's IP; only the domains in this list pass through that server, the rest of the internet stays direct. Only addresses of users who pressed Activate on their subscription page can use it. Ports 53, 80 and 443 must be free on that server. It does not get around filtering and the site name is visible.", sniDoms: "Domains (one per line; subdomains are included)", sniPre: "Add a ready list:", sniMain: "The main server is an entry too", sniHours: "Each activation lasts (hours)", sniSave: "Save", sniHint: "Ready lists are a starting point and need a test with the real game. If the main server is filtered, turn it on in a middle server's card instead.", sniOnSrv: "Game unblocker on this server", sniActive: "On · {n} addresses · DNS {ip}", sniNoDom: "Enter the domains in the Game unblocker box at the top first.", sniOld: "This server's agent must be {v} or newer: run a new install command on it.", sniNoIP: "This server's public IP is not known yet.",
+    sniTab: "Unblocker", sniIntro: "With no VPN, a user sets their device's DNS to an entry server's IP. Only the listed domains go through the server; the rest of the internet stays direct.", sniS1: "Domains", sniS2: "Entry servers (DNS address)", sniS2h: "Each ticked server runs the DNS and the 80/443 entry. If the main server is filtered in Iran, pick a middle server.", sniS3: "Active addresses", sniS3h: "Addresses that pressed Activate on a subscription page. Removing one stops it until it activates again.", sniS4: "Names asked", sniS4h: "Names active devices asked the DNS for. If a game fails, add the new names that showed up while you opened it.", sniOnlyNew: "Only names not in the list", sniMainSrv: "Main server", sniNoAct: "Nobody has activated yet.", sniNoSeen: "Nothing asked yet.", sniUntil: "Until", sniUser: "User", sniEntry: "Entry", sniName: "Name", sniCount: "Times", sniLast: "Last", sniAdd: "Add", sniRemove: "Remove", sniInList: "in list", sniOff: "off", sniSeenOld: "To see this server's addresses and names, its agent must be {v}.", sniOffline: "server offline", sniNeedDom: "Save the domains in part 1 first.", sniRemoved: "Removed", sniAdded: "Added: {d}", sniTitle: "Game unblocker", qSni: "For games and sites that refuse Iranian addresses, with no VPN. A user sets their phone's or console's DNS to an entry server's IP; only the domains in this list pass through that server, the rest of the internet stays direct. Only addresses of users who pressed Activate on their subscription page can use it. Ports 53, 80 and 443 must be free on that server. It does not get around filtering and the site name is visible.", sniDoms: "Domains (one per line; subdomains are included)", sniPre: "Add a ready list:", sniMain: "The main server is an entry too", sniHours: "Each activation lasts (hours)", sniSave: "Save", sniHint: "Ready lists are a starting point and need a test with the real game; add missing names from part 4.", sniOnSrv: "Game unblocker on this server", sniActive: "On · {n} addresses · DNS {ip}", sniNoDom: "Enter the domains in the Game unblocker box at the top first.", sniOld: "This server's agent must be {v} or newer: run a new install command on it.", sniNoIP: "This server's public IP is not known yet.",
     dtTitle: "Dedicated tunnels", dtHint: "A fixed path, separate from the rotating tunnel: it never switches and has no fallback. Inbounds pinned to it go only this way, and stay down if it drops.",
     dtWg: "Dedicated WireGuard", dtWgD: "Xray WireGuard over UDP; the middle server dials this server's IP directly. Won't work if UDP is blocked between the servers.", dtBackhaul: "Backhaul", dtBackhaulD: "Dedicated Backhaul tunnel.",
     dtKcp: "Dedicated mKCP", dtKcpD: "Xray VLESS over mKCP (UDP), tuned for gaming and encrypted with a seed; the middle server dials this server's IP directly. Steadier on lossy links, but uses more traffic.",
@@ -213,7 +213,7 @@ $("#langBtn").onclick = () => { lang = lang === "fa" ? "en" : "fa"; localStorage
 
 // ---------- navigation ----------
 // the open tab lives in the address (#tunnels), so a refresh stays on it
-const views = ["overview", "inbounds", "users", "tunnels", "settings"];
+const views = ["overview", "inbounds", "users", "tunnels", "unblock", "settings"];
 function goView(v) {
   state.view = views.includes(v) ? v : "overview";
   if (location.hash.slice(1) !== state.view) history.replaceState(null, "", state.view === "overview" ? location.pathname + location.search : "#" + state.view);
@@ -222,6 +222,7 @@ function goView(v) {
   if (state.view === "settings") p = loadSettings();
   if (state.view === "tunnels") p = loadTunnels();
   if (state.view === "users") p = loadUsers();
+  if (state.view === "unblock") p = loadSni();
   if (state.view === "overview" && daily.loaded) p = loadDaily();
   return Promise.resolve(p).catch(() => {});
 }
@@ -1105,7 +1106,6 @@ function renderTunnels() {
     <label>${t("udpHost")}<input name="wghost" dir="ltr" value="${esc(d.wghost || "")}" placeholder="${t("tpAuto")}"></label>
     <button class="btn" type="submit">${t("dtSave")}</button><small class="muted">${t("udpHint")}</small>`;
   else if (!d.ready || !d.servers.length) dp.innerHTML = "";
-  renderSniForm(d);
   if (!d.servers.length) { $("#tunnelList").innerHTML = `<div class="card empty">${t("tnNoSrv")}</div>`; return; }
   const now = Date.now() / 1000;
   clearTimeout(tnPoll); if (d.servers.some((s) => s.prevMethod || (s.domain && !s.certOk && !s.certErr)) || spActive()) tnPoll = setTimeout(() => { if (state.view === "tunnels" && !tnTyping()) loadTunnels(); }, spActive() ? 1500 : 3000);
@@ -1127,7 +1127,6 @@ function renderTunnels() {
         </div>
       </div>
       ${methodCards(s, i)}
-      ${sniRow(s, i)}
       ${revBlock(s, i)}
       ${s.methodErr ? `<p class="err">${esc(t("mBack").replace("{x}", s.methodErr))}</p>` : ""}
       ${tnTestRes[s.id] ? `<p class="${tnTestRes[s.id].ok ? "okmsg" : "err"}">${esc(tnTestRes[s.id].text)}</p>` : ""}
@@ -1148,18 +1147,57 @@ const sniPresets = {
   Xbox: ["xbox.com", "xboxlive.com"],
   NVIDIA: ["nvidia.com", "geforcenow.com"],
 };
-function renderSniForm(d) {
-  const f = $("#sniForm"), sn = d.sni || {};
-  if (document.activeElement?.form === f) return;
-  let st = "";
-  if (sn.main) st = sn.mainErr ? `<span class="err">${esc(sn.mainErr)}</span>` : `<span class="okmsg">${esc(t("sniActive").replace("{n}", sn.mainN || 0).replace("{ip}", sn.mainIP || "—"))}</span>`;
-  f.innerHTML = `<b class="dthead">${t("sniTitle")} ${qm("qSni")}</b>
-    <label class="wide">${t("sniDoms")}<textarea name="domains" spellcheck="false">${esc((sn.domains || []).join("\n"))}</textarea></label>
-    <div class="snipre"><span class="muted small">${t("sniPre")}</span>${Object.keys(sniPresets).map((k) => `<button class="btn small" type="button" data-sp="${esc(k)}">${esc(k)}</button>`).join("")}</div>
-    <label class="chk"><input type="checkbox" name="main"${sn.main ? " checked" : ""}> ${t("sniMain")}</label>
-    <label>${t("sniHours")}<input name="hours" inputmode="numeric" dir="ltr" value="${sn.hours || 24}"></label>
-    <button class="btn" type="submit">${t("sniSave")}</button>${st ? `<small>${st}</small>` : ""}<small class="muted">${t("sniHint")}</small>`;
+// ---------- unblocker tab ----------
+let sniData = null, sniPoll;
+async function loadSni() {
+  clearTimeout(sniPoll);
+  try { sniData = await api("GET", "api/sni"); } catch (e) { return; }
+  renderSni();
+  sniPoll = setTimeout(() => { if (state.view === "unblock" && document.visibilityState === "visible") loadSni(); }, 5000);
 }
+function sniBase(n) {
+  const p = n.split(".");
+  const two = /^(co|com|net|org|gov|ac|edu)$/.test(p[p.length - 2] || "") && p.length > 2;
+  return p.slice(two ? -3 : -2).join(".");
+}
+function sniTime(ts) { return new Date(ts * 1000).toLocaleString(lang === "fa" ? "fa-IR" : undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }); }
+function renderSni() {
+  const d = sniData; if (!d) return;
+  const f = $("#sniForm");
+  if (document.activeElement?.form !== f) f.innerHTML = `
+    <label class="wide">${t("sniDoms")}<textarea name="domains" spellcheck="false">${esc((d.domains || []).join("\n"))}</textarea></label>
+    <div class="snipre"><span class="muted small">${t("sniPre")}</span>${Object.keys(sniPresets).map((k) => `<button class="btn small" type="button" data-sp="${esc(k)}">${esc(k)}</button>`).join("")}</div>
+    <label>${t("sniHours")}<input name="hours" inputmode="numeric" dir="ltr" value="${d.hours || 24}"></label>
+    <button class="btn primary" type="submit">${t("sniSave")}</button><small class="muted">${t("sniHint")}</small>`;
+  const noDom = !(d.domains || []).length;
+  const row = (key, name, ip, on, st) => `<div class="snirow"><label class="chk"><input type="checkbox" data-sent="${esc(key)}"${on ? " checked" : ""}${noDom && !on ? " disabled" : ""}> <b>${esc(name)}</b></label><span class="mono" dir="ltr">${esc(ip || "—")}</span>${st}</div>`;
+  let mst = "";
+  if (d.main) mst = d.mainErr ? `<span class="err">${esc(d.mainErr)}</span>` : `<span class="okmsg">${esc(t("sniActive").replace("{n}", d.mainN || 0).replace("{ip}", d.mainIP || "—"))}</span>`;
+  let ent = row("main", t("sniMainSrv"), d.mainIP, d.main, mst);
+  for (const s of d.servers || []) {
+    let st = "";
+    if (s.on) {
+      if (s.agentVer && versionLess(s.agentVer, d.sniVer)) st = `<span class="err">${esc(t("sniOld").replace("{v}", d.sniVer))}</span>`;
+      else if (!s.ip) st = `<span class="muted">${t("sniNoIP")}</span>`;
+      else if (s.err) st = `<span class="err">${esc(s.err)}</span>`;
+      else if (!s.online) st = `<span class="muted">${t("sniOffline")}</span>`;
+      else st = `<span class="okmsg">${esc(t("sniActive").replace("{n}", s.n || 0).replace("{ip}", s.ip))}</span>`;
+      if (s.agentVer && versionLess(s.agentVer, d.sniLogVer) && !versionLess(s.agentVer, d.sniVer)) st += ` <small class="muted">${esc(t("sniSeenOld").replace("{v}", d.sniLogVer))}</small>`;
+    }
+    ent += row(s.id, s.name, s.ip, s.on, st);
+  }
+  $("#sniEntries").innerHTML = (noDom ? `<p class="muted small">${t("sniNeedDom")}</p>` : "") + ent;
+  const act = d.active || [];
+  $("#sniActive").innerHTML = act.length ? `<div class="rsWrap"><table class="rsTable snitbl"><thead><tr><th>IP</th><th>${t("sniUser")}</th><th>${t("sniEntry")}</th><th>${t("sniUntil")}</th><th></th></tr></thead><tbody>${act.map((x) =>
+    `<tr><td class="mono">${esc(x.ip)}</td><td>${esc(x.user || "—")}</td><td>${esc(x.entry === "main" ? t("sniMainSrv") : x.entry)}</td><td>${esc(sniTime(x.until))}</td><td><button class="btn small danger" data-srev="${esc(x.ip)}">${t("sniRemove")}</button></td></tr>`).join("")}</tbody></table></div>` : `<p class="muted">${t("sniNoAct")}</p>`;
+  const only = $("#sniOnlyNew").checked, now = d.now || Date.now() / 1000;
+  const seen = (d.seen || []).filter((x) => !only || !x.listed);
+  $("#sniSeen").innerHTML = seen.length ? `<div class="rsWrap"><table class="rsTable snitbl"><thead><tr><th>${t("sniName")}</th><th>${t("sniCount")}</th><th>${t("sniLast")}</th><th>IP</th><th>${t("sniUser")}</th><th></th></tr></thead><tbody>${seen.map((x) => {
+    const b = sniBase(x.name);
+    return `<tr><td class="mono">${esc(x.name)}</td><td>${x.n}</td><td>${esc(ago(Math.max(0, Math.round(now - x.last))))}</td><td class="mono">${esc(x.ip)}</td><td>${esc(x.user || "—")}</td><td>${x.listed ? `<span class="okmsg">${t("sniInList")}</span>` : `<button class="btn small" data-sadd="${esc(b)}">+ ${esc(b)}</button>`}</td></tr>`;
+  }).join("")}</tbody></table></div>` : `<p class="muted">${t("sniNoSeen")}</p>`;
+}
+$("#sniOnlyNew").addEventListener("change", renderSni);
 $("#sniForm").addEventListener("click", (e) => {
   const b = e.target.closest("[data-sp]"); if (!b) return;
   const ta = $("#sniForm textarea"), have = new Set(ta.value.split(/\s+/).filter(Boolean));
@@ -1169,21 +1207,23 @@ $("#sniForm").addEventListener("click", (e) => {
 $("#sniForm").addEventListener("submit", guard(async (e) => {
   e.preventDefault();
   const f = e.target;
-  await api("POST", "api/sni", { domains: f.domains.value, main: f.main.checked, hours: +f.hours.value || 24 });
-  toast(t("done")); document.activeElement?.blur(); loadTunnels();
+  await api("POST", "api/sni", { domains: f.domains.value, main: !!sniData?.main, hours: +f.hours.value || 24 });
+  toast(t("done")); document.activeElement?.blur(); loadSni();
 }));
-function sniRow(s, i) {
-  const d = tunnelData, sn = d.sni || {};
-  let st = "";
-  if (s.sniOn) {
-    if (!(sn.domains || []).length) st = `<span class="muted">${t("sniNoDom")}</span>`;
-    else if (s.agentVer && versionLess(s.agentVer, d.sniVer)) st = `<span class="err">${esc(t("sniOld").replace("{v}", d.sniVer))}</span>`;
-    else if (!s.publicIP) st = `<span class="muted">${t("sniNoIP")}</span>`;
-    else if (s.sniErr) st = `<span class="err">${esc(s.sniErr)}</span>`;
-    else if (s.online) st = `<span class="okmsg">${esc(t("sniActive").replace("{n}", s.sniN || 0).replace("{ip}", s.publicIP))}</span>`;
-  }
-  return `<div class="dmrow"><label><input type="checkbox" data-sni data-i="${i}"${s.sniOn ? " checked" : ""}> <span>${t("sniOnSrv")} ${qm("qSni")}</span></label> ${st}</div>`;
-}
+$("#sniEntries").addEventListener("change", guard(async (e) => {
+  const c = e.target.closest("input[data-sent]"); if (!c) return;
+  try {
+    if (c.dataset.sent === "main") await api("POST", "api/sni", { domains: (sniData.domains || []).join("\n"), main: c.checked, hours: sniData.hours || 24 });
+    else await api("POST", "api/tunnels/" + c.dataset.sent + "/sni", { on: c.checked });
+    toast(t("done"));
+  } finally { loadSni(); }
+}));
+$("#view-unblock").addEventListener("click", guard(async (e) => {
+  const r = e.target.closest("[data-srev]");
+  if (r) { r.disabled = true; try { await api("POST", "api/sni/revoke", { ip: r.dataset.srev }); toast(t("sniRemoved")); } finally { loadSni(); } return; }
+  const a = e.target.closest("[data-sadd]");
+  if (a) { a.disabled = true; try { await api("POST", "api/sni/domains", { add: [a.dataset.sadd] }); toast(t("sniAdded").replace("{d}", a.dataset.sadd)); } finally { loadSni(); } }
+}));
 function revBlock(s, i) {
   const d = tunnelData;
   if (!s.agentVer || versionLess(s.agentVer, d.revVer)) return s.lastSeen ? `<p class="muted small">${esc(t("rvOld").replace("{v}", d.revVer))}</p>` : "";
@@ -1248,8 +1288,8 @@ function portLine(i, k) {
 // protocol and "over GRE" of FRP / Backhaul (the same for every middle server)
 function carrierOpts(m, i) {
   const [pk, gk] = carrierKeys[m.id], d = tunnelData;
-  return `<span class="copt"><label>${t("cProto")} <select data-copt="${pk}" data-i="${i}" dir="ltr">${m.protos.map((p) => `<option ${d[pk] === p ? "selected" : ""}>${p}</option>`).join("")}</select></label>
-    <label title="${esc(t("cOverGreHint"))}"><input type="checkbox" data-copt="${gk}" data-i="${i}" ${d[gk] ? "checked" : ""}> ${t("cOverGre")}</label></span>`;
+  return `<div class="mopt"><span>${t("cProto")}</span><select data-copt="${pk}" data-i="${i}" dir="ltr">${m.protos.map((p) => `<option ${d[pk] === p ? "selected" : ""}>${p}</option>`).join("")}</select></div>
+    <label class="mopt"><input type="checkbox" data-copt="${gk}" data-i="${i}" ${d[gk] ? "checked" : ""}><span>${t("cOverGre")}</span>${qm("cOverGreHint")}</label>`;
 }
 // what each end of a carrier reports (only problems)
 function carrierState(s, m) {
@@ -1265,15 +1305,20 @@ function methodCards(s, i) {
     const inPool = !off.includes(m.id);
     const cls = "mcard" + (on ? " on" : "") + (m.ready ? "" : " soon") + (m.ready && !on && !inPool ? " out" : "");
     return `<div class="${cls}" data-tn="method" data-i="${i}" data-m="${m.id}" ${can ? `role="button" tabindex="0"` : ""}>
-      <b>${esc(t("m" + cap(m.id)))}</b><small>${esc(t("m" + cap(m.id) + "D"))}</small>
-      ${m.ready && methodPort[m.id] && tunnelData.ready && !(m.udp && why === t("mNoUdp")) ? portLine(i, methodPort[m.id]) : ""}${m.carrier && methodPort[m.id] && tunnelData.ready ? " " + qm("qCPort") : ""}${m.id === "gre" ? qm("qGre") : ""}
-      ${m.protos ? carrierOpts(m, i) : ""}
-      ${(m.id === "wss" || m.id === "xhttp") && m.ready ? `<span class="copt"><label><input type="checkbox" data-copt="frag" data-i="${i}" ${tunnelData.frag ? "checked" : ""}> ${t("cFrag")}</label> ${qm("qFrag")}</span>` : ""}
+      <div class="mhead"><b>${esc(t("m" + cap(m.id)))}</b>${m.id === "gre" ? qm("qGre") : ""}</div><small>${esc(t("m" + cap(m.id) + "D"))}</small>
+      ${(() => {
+        const port = m.ready && methodPort[m.id] && tunnelData.ready && !(m.udp && why === t("mNoUdp")) ? `<div class="mopt mport">${portLine(i, methodPort[m.id])}${m.carrier ? qm("qCPort") : ""}</div>` : "";
+        const opts = [
+          m.protos ? carrierOpts(m, i) : "",
+          (m.id === "wss" || m.id === "xhttp") && m.ready ? `<label class="mopt"><input type="checkbox" data-copt="frag" data-i="${i}" ${tunnelData.frag ? "checked" : ""}><span>${t("cFrag")}</span>${qm("qFrag")}</label>` : "",
+          m.ready ? `<label class="mopt"><input type="checkbox" data-pool="${m.id}" data-i="${i}" ${inPool || on ? "checked" : ""} ${on || trying ? "disabled" : ""}><span>${t("poolIn")}</span>${qm("poolHint")}</label>` : "",
+        ].join("");
+        return port + (opts ? `<div class="mopts">${opts}</div>` : "");
+      })()}
       ${m.carrier ? carrierState(s, m.id) : ""}
-      ${m.ready ? `<label class="pool" title="${esc(t("poolHint"))}"><input type="checkbox" data-pool="${m.id}" data-i="${i}" ${inPool || on ? "checked" : ""} ${on || trying ? "disabled" : ""}> ${t("poolIn")}</label>` : ""}
       ${why ? `<small class="muted" dir="auto">${esc(why)}</small>` : ""}
-      <em>${on ? (trying ? t("mTrying") : "✓ " + t("mActive")) : m.ready ? "" : t("mSoon")}</em>
-      ${m.ready && tunnelData.ready && !why ? spButton(s, i, m.id) + spLine(s, m.id) : ""}</div>`;
+      <div class="mfoot"><em>${on ? (trying ? t("mTrying") : "✓ " + t("mActive")) : m.ready ? "" : t("mSoon")}</em>
+      ${m.ready && tunnelData.ready && !why ? spButton(s, i, m.id) + spLine(s, m.id) : ""}</div></div>`;
   }).join("")}</div>`;
 }
 // manual test of one card's path: ping + speed, run by the middle server
@@ -1334,7 +1379,7 @@ $("#tunnelList").addEventListener("click", guard(async (e) => {
   if (e.target.closest(".pedit")) return;
   const sb = e.target.closest("button[data-sp]");
   if (sb) { await startSpeed(tunnelData.servers[+sb.dataset.i], sb.dataset.sp); return; }
-  if (e.target.closest(".spres") || e.target.closest(".pool") || e.target.closest(".copt") || e.target.closest(".qm")) return;
+  if (e.target.closest(".spres") || e.target.closest(".pool") || e.target.closest(".copt") || e.target.closest(".mopt") || e.target.closest(".qm")) return;
   const mb = e.target.closest("[data-tn=method][role=button]");
   if (mb) {
     const s = tunnelData.servers[+mb.dataset.i], m = mb.dataset.m;
@@ -1375,12 +1420,6 @@ $("#tunnelList").addEventListener("change", guard(async (e) => {
   if (co) {
     const v = co.type === "checkbox" ? co.checked : co.value;
     try { await api("POST", "api/tunnels/csettings", { [co.dataset.copt]: v }); toast(t("done")); } finally { co.blur(); loadTunnels(); }
-    return;
-  }
-  const sc = e.target.closest("input[data-sni]");
-  if (sc) {
-    const s = tunnelData.servers[+sc.dataset.i];
-    try { await api("POST", "api/tunnels/" + s.id + "/sni", { on: sc.checked }); toast(t("done")); } finally { loadTunnels(); }
     return;
   }
   const cb = e.target.closest("input[data-pool]"); if (!cb) return;

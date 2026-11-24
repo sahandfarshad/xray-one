@@ -41,6 +41,12 @@ A light, minimal panel that sits **beside** a headless Xray core. It never repla
 
 ۰.۹.۱: چرخش با ترافیک واقعی قضاوت می‌کند نه فقط با پینگ (هر ۵ دقیقه یک دانلود ۲۵۶ کیلوبایتی)؛ گزینه‌ی «تکه‌تکه کردن TLS» برای WS و XHTTP؛ سرور میانی روی مسیر برگشت هر ۱۰ دقیقه مسیر مستقیم را دوباره امتحان می‌کند و عوض کردن روش آنجا هم ممکن است.
 
+## v0.13.0
+
+- The game unblocker has its own tab, in four parts: domains, entry servers (main or middle, with the DNS address of each), active addresses (IP, user, entry, until when, with a Remove button) and the names active devices asked for, with a one-tap Add for names not in the list.
+- Middle servers report their active addresses and names with agent 0.13.0 (run a new install command on them).
+- Tunnel method cards share one layout: title, words, port, then one row per option (box, words, its own ?), then state and test.
+
 ## v0.12.0
 
 - Game unblocker (Tunnels tab): a DNS + SNI entry on the main server or any middle server, for games and sites that refuse Iranian addresses. Only listed domains pass (DNS and proxy), only addresses a user activated from their subscription page may use it; on a middle server traffic goes through the tunnel to the main server. Needs ports 53, 80, 443 free on the entry. Not a filter bypass.

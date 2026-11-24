@@ -330,7 +330,8 @@ func agentRun() {
 				Wait: wait, Fails: fails, LastFail: lastFail, PortState: pstate, Rejected: st.Rejected, Pending: st.PendingAt > 0,
 				Mode: mode, Via: st.Via, CertDom: st.CertDomain, CertExp: st.CertExp, CertErr: st.CertErr, CertBusy: certBusy, CertFor: st.CertTried, CState: agentCarrierState(), SSHHost: agentHostPub(),
 				XrayVer: xrayVer}
-			req.SniErr, req.SniN = sniSvc.Status()
+			req.SniErr, req.SniList, req.SniSeen = sniSvc.Report()
+			req.SniN = len(req.SniList)
 			if mode == "rev" {
 				req.Via = ""
 			}
