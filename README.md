@@ -41,6 +41,11 @@ A light, minimal panel that sits **beside** a headless Xray core. It never repla
 
 ۰.۹.۱: چرخش با ترافیک واقعی قضاوت می‌کند نه فقط با پینگ (هر ۵ دقیقه یک دانلود ۲۵۶ کیلوبایتی)؛ گزینه‌ی «تکه‌تکه کردن TLS» برای WS و XHTTP؛ سرور میانی روی مسیر برگشت هر ۱۰ دقیقه مسیر مستقیم را دوباره امتحان می‌کند و عوض کردن روش آنجا هم ممکن است.
 
+## v0.15.2
+
+- Removed the "all configs" subscription link (and its bar above the tabs); its old link now returns 404. For your own access to everything, make a client for yourself and give it the inbound folders you want.
+- لینک اشتراکِ «همه‌ی کانفیگ‌ها» حذف شد؛ برای دسترسی خودتان یک کلاینت بسازید و پوشه‌های دلخواه را به آن بدهید.
+
 ## v0.15.1
 
 - "Select all" on the inbound list now picks only what you can see: inbounds outside folders and those in open folders. Each inbound folder has its own checkbox to select everything inside it, open or closed.

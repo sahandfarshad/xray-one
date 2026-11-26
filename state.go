@@ -48,8 +48,6 @@ type Store struct {
 	dir     string
 	Cfg     PanelConfig            `json:"-"`
 	Clients map[string]*ClientMeta `json:"clients"`
-	// AllToken is the secret of the subscription that carries every config.
-	AllToken string `json:"allToken"`
 	// Relays: extra addresses (relay / CDN IPs) per inbound tag.
 	Relays map[string][]Relay `json:"relays"`
 	// Tunnels: middle servers; TunnelUse: inbound id -> servers (+ port there).
@@ -83,20 +81,6 @@ func (s *Store) EditRelays(fn func(m map[string][]Relay)) error {
 	defer s.mu.Unlock()
 	fn(s.Relays)
 	return s.saveLocked()
-}
-
-func (s *Store) GetAllToken() string {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.AllToken
-}
-
-func (s *Store) ResetAllToken() string {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.AllToken = randHex(16)
-	_ = s.saveLocked()
-	return s.AllToken
 }
 
 func OpenStore(dir string) (*Store, error) {
@@ -138,10 +122,6 @@ func OpenStore(dir string) (*Store, error) {
 		t.Pending = false
 	}
 	if s.migrateDedicated() {
-		_ = s.saveLocked()
-	}
-	if s.AllToken == "" {
-		s.AllToken = randHex(16)
 		_ = s.saveLocked()
 	}
 	return s, nil

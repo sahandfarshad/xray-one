@@ -199,9 +199,6 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("POST /api/presets", a.api(a.handleCreatePresets))
 	mux.HandleFunc("POST /api/relays", a.api(a.handleAddRelay))
 	mux.HandleFunc("DELETE /api/relays", a.api(a.handleDelRelay))
-	mux.HandleFunc("POST /api/allsub/reset", a.api(func(w http.ResponseWriter, r *http.Request) {
-		writeJSONResp(w, 200, map[string]string{"allToken": a.store.ResetAllToken()})
-	}))
 	mux.HandleFunc("GET /api/tunnels", a.api(a.handleTunnels))
 	mux.HandleFunc("POST /api/tunnels", a.api(a.handleAddTunnel))
 	mux.HandleFunc("DELETE /api/tunnels/{id}", a.api(a.handleDelTunnel))
@@ -292,7 +289,6 @@ func (a *App) handleStatus(w http.ResponseWriter, r *http.Request) {
 	writeJSONResp(w, 200, map[string]any{
 		"core": DetectCore(), "version": version, "job": a.job.Snapshot(),
 		"settings": map[string]string{"publicHost": cfg.PublicHost, "subBase": cfg.SubBase, "domain": cfg.Domain, "listen": cfg.Listen, "panelURL": a.PanelURL()},
-		"allToken": a.store.GetAllToken(),
 	})
 }
 
@@ -637,10 +633,6 @@ func (a *App) handleSettings(w http.ResponseWriter, r *http.Request) {
 // handleSub serves a client's subscription: every inbound the name is on.
 func (a *App) handleSub(w http.ResponseWriter, r *http.Request) {
 	tok := r.PathValue("token")
-	if tok != "" && tok == a.store.GetAllToken() {
-		a.handleAllSub(w, r)
-		return
-	}
 	m := a.store.ByToken(tok)
 	if m == nil {
 		http.NotFound(w, r)
@@ -663,47 +655,6 @@ func (a *App) handleSub(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Profile-Title", "base64:"+base64.StdEncoding.EncodeToString([]byte("XRay One · "+m.Email)))
 	w.Header().Set("Profile-Update-Interval", "12")
 	w.Header().Set("Subscription-Userinfo", "upload="+itoa(m.Up)+"; download="+itoa(m.Down)+"; total="+itoa(m.LimitBytes)+"; expire="+itoa(m.ExpiryUnix))
-	_, _ = w.Write([]byte(base64.StdEncoding.EncodeToString([]byte(strings.Join(links, "\n")))))
-}
-
-// handleAllSub serves every config on the server (all inbounds, all active
-// clients, plus relay variants) in one subscription.
-func (a *App) handleAllSub(w http.ResponseWriter, r *http.Request) {
-	root, _, err := a.cfg.Load()
-	if err != nil {
-		http.Error(w, "unavailable", 503)
-		return
-	}
-	host := a.host(r)
-	atag := apiTag(root)
-	var links []string
-	for i, v := range asArr(root.Get("inbounds")) {
-		ib := asMap(v)
-		if ib == nil || (atag != "" && asStr(ib.Get("tag")) == atag) || isTunnelTag(asStr(ib.Get("tag"))) {
-			continue
-		}
-		relays := a.relaysFor(inboundID(ib, i))
-		if l := singleUserSS(ib, host, Relay{}); l != "" {
-			var rls []string
-			for _, rl := range relays {
-				rls = append(rls, singleUserSS(ib, host, rl))
-			}
-			links = append(links, subLinks(l, rls, relays)...)
-		}
-		for _, cv := range clientsOf(ib) {
-			c := asMap(cv)
-			if c == nil {
-				continue
-			}
-			l, rl := ClientLinks(ib, c, host, relays)
-			if l != "" {
-				links = append(links, subLinks(l, rl, relays)...)
-			}
-		}
-	}
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.Header().Set("Profile-Title", "base64:"+base64.StdEncoding.EncodeToString([]byte("XRay One · all")))
-	w.Header().Set("Profile-Update-Interval", "12")
 	_, _ = w.Write([]byte(base64.StdEncoding.EncodeToString([]byte(strings.Join(links, "\n")))))
 }
 

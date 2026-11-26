@@ -199,11 +199,7 @@ function baseURL() {
   const s = state.status.settings;
   return (s.subBase || s.panelURL || (location.origin + location.pathname.replace(/[^/]*$/, ""))).replace(/\/$/, "");
 }
-function allSubURL() { return baseURL() + "/sub/" + state.status.allToken; }
 function renderSubBar() {
-  const ok = state.status.allToken && state.inbounds.some((i) => !i.system);
-  $("#subBar").classList.toggle("hidden", !ok);
-  if (ok) $("#allSubUrl").textContent = allSubURL();
   const n = state.sel.size;
   $("#relaySelBtn").textContent = t("relaySel") + (n ? " (" + n + ")" : "");
   $("#relaySelBtn").disabled = !n;
@@ -236,12 +232,6 @@ async function copyText(v) {
   catch { const i = document.createElement("textarea"); i.value = v; document.body.appendChild(i); i.select(); document.execCommand("copy"); i.remove(); }
   toast(t("copied"));
 }
-$("#allSubCopy").onclick = () => copyText(allSubURL());
-$("#allSubQr").onclick = () => openModal(`<h3>${t("allSub")}</h3>${copyRow(allSubURL())}<img class="qr" alt="QR" src="api/qr?text=${encodeURIComponent(allSubURL())}"><div class="actions"><button class="btn" data-close>${t("cancel")}</button></div>`);
-$("#allSubReset").onclick = guard(async () => {
-  if (!confirm(t("confirmNewLink"))) return;
-  const r = await api("POST", "api/allsub/reset"); state.status.allToken = r.allToken; renderSubBar(); toast(t("done"));
-});
 
 function renderOverview() {
   const c = state.status.core;
