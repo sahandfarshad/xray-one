@@ -449,5 +449,15 @@
  "act.okMsg": "이 인터넷 연결은 {h}시간 동안 활성화됩니다. 휴대폰이나 콘솔의 DNS를 다음 주소로 설정하세요:",
  "act.okHint": "인터넷 연결이나 SIM 카드가 바뀌거나 시간이 만료되면 이 링크를 다시 여세요.",
  "act.badTitle": "잘못된 링크",
- "act.badMsg": "이 활성화 링크가 유효하지 않거나 구독이 활성 상태가 아닙니다."
+ "act.badMsg": "이 활성화 링크가 유효하지 않거나 구독이 활성 상태가 아닙니다.",
+ "panel.newFolder": "새 폴더",
+ "panel.folderName": "폴더 이름",
+ "panel.folder": "폴더",
+ "panel.noFolder": "폴더 없음",
+ "panel.renameFolder": "이름 바꾸기",
+ "panel.delFolder": "폴더 삭제",
+ "panel.confirmDelFolder": "이 폴더를 삭제할까요? 안의 항목은 폴더 없이 남습니다.",
+ "panel.moveSel": "폴더로 이동",
+ "panel.followFolder": "폴더 전체, 나중 항목도",
+ "panel.folderEmpty": "비어 있음"
 }

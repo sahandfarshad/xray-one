@@ -449,5 +449,15 @@
  "act.okMsg": "This internet connection is active for {h} hours. Set your phone's or console's DNS to this address:",
  "act.okHint": "Open this link again whenever your internet or SIM card changes, or when the time runs out.",
  "act.badTitle": "Invalid link",
- "act.badMsg": "This activation link is not valid, or your subscription is not active."
+ "act.badMsg": "This activation link is not valid, or your subscription is not active.",
+ "panel.newFolder": "New folder",
+ "panel.folderName": "Folder name",
+ "panel.folder": "Folder",
+ "panel.noFolder": "No folder",
+ "panel.renameFolder": "Rename",
+ "panel.delFolder": "Delete folder",
+ "panel.confirmDelFolder": "Delete this folder? What is inside stays, without a folder.",
+ "panel.moveSel": "Move to folder",
+ "panel.followFolder": "whole folder, later ones too",
+ "panel.folderEmpty": "Empty"
 }

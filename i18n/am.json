@@ -449,5 +449,15 @@
  "act.okMsg": "ይህ የኢንተርኔት ግንኙነት ለ{h} ሰዓታት ንቁ ነው። የስልክዎን ወይም የኮንሶልዎን DNS ወደዚህ አድራሻ ያዘጋጁ፦",
  "act.okHint": "ኢንተርኔትዎ ወይም ሲም ካርድዎ በተቀየረ ቁጥር ወይም ጊዜው ሲያልቅ ይህን ሊንክ እንደገና ይክፈቱ።",
  "act.badTitle": "ልክ ያልሆነ ሊንክ",
- "act.badMsg": "ይህ የማግበሪያ ሊንክ ልክ አይደለም፣ ወይም ምዝገባዎ ንቁ አይደለም።"
+ "act.badMsg": "ይህ የማግበሪያ ሊንክ ልክ አይደለም፣ ወይም ምዝገባዎ ንቁ አይደለም።",
+ "panel.newFolder": "አዲስ አቃፊ",
+ "panel.folderName": "የአቃፊ ስም",
+ "panel.folder": "አቃፊ",
+ "panel.noFolder": "ያለ አቃፊ",
+ "panel.renameFolder": "እንደገና ሰይም",
+ "panel.delFolder": "አቃፊ ሰርዝ",
+ "panel.confirmDelFolder": "ይህ አቃፊ ይሰረዝ? ውስጡ ያለው ያለ አቃፊ ይቀራል።",
+ "panel.moveSel": "ወደ አቃፊ አንቀሳቅስ",
+ "panel.followFolder": "ሙሉ አቃፊ፣ የሚመጡትም",
+ "panel.folderEmpty": "ባዶ"
 }

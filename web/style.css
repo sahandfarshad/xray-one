@@ -305,3 +305,16 @@ input[type=checkbox],input[type=radio]{width:16px;height:16px;padding:0;margin:0
 .top-actions .xl-btn{height:32px}
 .xl{--xl-soft:var(--soft);--xl-acc:var(--accent)}
 @media (max-width:640px){.top-actions .xl-btn{height:28px;padding:0 9px 0 8px}.top-actions .xl-cur{max-width:72px;overflow:hidden;text-overflow:ellipsis}}
+
+/* folders (inbounds and clients) */
+.folder{border:1px solid var(--line);border-radius:var(--radius);background:var(--card)}
+.fhead{display:flex;align-items:center;gap:.55rem;padding:.7rem 1rem;cursor:pointer;user-select:none}
+.fhead .fic{font-size:1.25rem;line-height:1}
+.fhead .actions{margin-inline-start:auto}
+.folder.open>.fhead{border-bottom:1px solid var(--line)}
+.fbody{margin:.7rem;margin-inline-start:1.4rem;padding-inline-start:.8rem;border-inline-start:2px solid var(--line)}
+.ftree{max-height:380px;overflow:auto;display:flex;flex-direction:column;gap:.5rem}
+.ftree .pgrid{max-height:none;overflow:visible}
+.fpick .fall{direction:auto;font-size:14px}
+.fpick .fsub{margin-top:.35rem;margin-inline-start:1.2rem;padding-inline-start:.6rem;border-inline-start:2px solid var(--line)}
+.pitem input:disabled{opacity:.6}

@@ -449,5 +449,15 @@
  "act.okMsg": "Bu internet birikmesi {h} sagat işjeň. Telefonyňyzyň ýa-da konsolyňyzyň DNS-ini şu salga sazlaň:",
  "act.okHint": "Internetiňiz ýa-da SIM kartyňyz üýtgände ýa-da wagt gutaranda bu baglanyşygy ýene açyň.",
  "act.badTitle": "Nädogry baglanyşyk",
- "act.badMsg": "Bu işjeňleşdiriş baglanyşygy nädogry ýa-da abunaňyz işjeň däl."
+ "act.badMsg": "Bu işjeňleşdiriş baglanyşygy nädogry ýa-da abunaňyz işjeň däl.",
+ "panel.newFolder": "Täze bukja",
+ "panel.folderName": "Bukjanyň ady",
+ "panel.folder": "Bukja",
+ "panel.noFolder": "Bukjasyz",
+ "panel.renameFolder": "Adyny üýtget",
+ "panel.delFolder": "Bukjany poz",
+ "panel.confirmDelFolder": "Bu bukja pozulsynmy? Içindäkiler bukjasyz galar.",
+ "panel.moveSel": "Bukja geçir",
+ "panel.followFolder": "tutuş bukja, soňkylar hem",
+ "panel.folderEmpty": "Boş"
 }

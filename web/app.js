@@ -105,7 +105,7 @@ async function boot() {
 async function refreshStatus() { state.status = await api("GET", "api/status"); render(); }
 async function refreshInbounds() {
   try {
-    const r = await api("GET", "api/inbounds"); state.inbounds = r.inbounds; state.host = r.host;
+    const r = await api("GET", "api/inbounds"); state.inbounds = r.inbounds; state.host = r.host; state.folders = r.folders || [];
     const ids = new Set(r.inbounds.map((i) => i.id)); [...state.sel].forEach((x) => ids.has(x) || state.sel.delete(x));
   }
   catch (e) { state.inbounds = []; }
@@ -211,6 +211,8 @@ function renderSubBar() {
   $("#tunSelBtn").disabled = !n;
   $("#delSelBtn").textContent = t("delSel") + (n ? " (" + n + ")" : "");
   $("#delSelBtn").disabled = !n;
+  $("#moveSelBtn").textContent = "📁 " + t("moveSel") + (n ? " (" + n + ")" : "");
+  $("#moveSelBtn").disabled = !n;
   $("#selActs").classList.toggle("hidden", !n);
   const all = state.inbounds.filter((i) => !i.system);
   $("#selAll").checked = all.length > 0 && n === all.length;
@@ -272,8 +274,8 @@ function renderInbounds() {
   const list = $("#inboundList");
   if (!state.status.core.installed) { list.innerHTML = `<div class="card empty">${esc(t("hintMissing"))}</div>`; return; }
   const ibs = state.inbounds;
-  if (!ibs.length) { list.innerHTML = `<div class="card empty">${t("noInbounds")}</div>`; return; }
-  list.innerHTML = ibs.map((ib, idx) => {
+  if (!ibs.length && !(state.folders || []).length) { list.innerHTML = `<div class="card empty">${t("noInbounds")}</div>`; return; }
+  const card = (ib, idx) => {
     const pills = [ib.protocol, ib.network, ib.security].filter(Boolean).map((p) => `<span dir="auto" class="pill gray">${esc(p)}</span>`).join("");
     const clients = "";
     return `<div class="card">
@@ -296,8 +298,69 @@ function renderInbounds() {
       }).join("")}</div>` : ""}
       ${ib.singleLink ? `<div class="clients"><p class="muted">${t("singleUser")} ${qm("qSingle")}</p>${copyRow(ib.singleLink)}</div>` : ""}
       ${clients}</div>`;
-  }).join("");
+  };
+  list.innerHTML = folderTree("in", state.folders || [], ibs.map((ib, idx) => ({ folder: ib.system ? "" : ib.folder, html: card(ib, idx) })));
 }
+
+// ---------- folders (inbounds and clients) ----------
+const openFolders = new Set((() => { try { return JSON.parse(localStorage.getItem("xo_open_folders") || "[]"); } catch (e) { return []; } })());
+function folderTree(kind, folders, items) {
+  const known = new Set(folders.map((f) => f.id));
+  const blocks = folders.map((f) => {
+    const inside = items.filter((x) => x.folder === f.id);
+    const open = openFolders.has(kind + ":" + f.id);
+    return `<div class="folder${open ? " open" : ""}">
+      <div class="fhead" data-ftoggle="${esc(kind + ":" + f.id)}">
+        <span class="fic">${open ? "📂" : "📁"}</span><b dir="auto">${esc(f.name)}</b><span class="pill gray" dir="ltr">${inside.length}</span>
+        <span class="actions"><button class="btn small" data-fact="rename" data-kind="${kind}" data-id="${esc(f.id)}" title="${t("renameFolder")}">✎</button><button class="btn small danger" data-fact="del" data-kind="${kind}" data-id="${esc(f.id)}" title="${t("delFolder")}">✕</button></span>
+      </div>
+      ${open ? `<div class="fbody stack">${inside.map((x) => x.html).join("") || `<p class="muted">${t("folderEmpty")}</p>`}</div>` : ""}
+    </div>`;
+  }).join("");
+  return blocks + items.filter((x) => !x.folder || !known.has(x.folder)).map((x) => x.html).join("");
+}
+async function folderReload() { await refreshInbounds(); if (userData) await loadUsers(); }
+document.addEventListener("click", guard(async (e) => {
+  const b = e.target.closest("button[data-fact]");
+  if (b) {
+    e.stopPropagation();
+    const kind = b.dataset.kind, id = b.dataset.id;
+    const list = kind === "cl" ? (userData ? userData.clFolders : []) : state.folders;
+    const f = (list || []).find((x) => x.id === id) || {};
+    if (b.dataset.fact === "rename") {
+      const name = prompt(t("folderName"), f.name || ""); if (!name || !name.trim()) return;
+      await api("POST", "api/folders/rename", { kind, id, name: name.trim() });
+    } else {
+      if (!confirm(t("confirmDelFolder"))) return;
+      await api("POST", "api/folders/delete", { kind, id });
+    }
+    toast(t("done")); folderReload(); return;
+  }
+  const h = e.target.closest("[data-ftoggle]"); if (!h) return;
+  const k = h.dataset.ftoggle; openFolders.has(k) ? openFolders.delete(k) : openFolders.add(k);
+  try { localStorage.setItem("xo_open_folders", JSON.stringify([...openFolders])); } catch (err) {}
+  k.startsWith("in:") ? renderInbounds() : renderUsers();
+}));
+async function newFolder(kind) {
+  const name = prompt(t("folderName")); if (!name || !name.trim()) return;
+  const f = await api("POST", "api/folders", { kind, name: name.trim() });
+  openFolders.add(kind + ":" + f.id); try { localStorage.setItem("xo_open_folders", JSON.stringify([...openFolders])); } catch (err) {}
+  toast(t("done")); folderReload();
+}
+$("#addInFolderBtn").onclick = guard(() => newFolder("in"));
+$("#addClFolderBtn").onclick = guard(async () => { if (!userData) await loadUsers(); return newFolder("cl"); });
+const folderOpts = (folders, cur) => `<option value="">${t("noFolder")}</option>` + (folders || []).map((f) => `<option value="${esc(f.id)}" ${f.id === cur ? "selected" : ""}>${esc(f.name)}</option>`).join("");
+$("#moveSelBtn").onclick = guard(async () => {
+  const ids = [...state.sel]; if (!ids.length) return;
+  openModal(`<h3>${t("moveSel")} (${ids.length})</h3>
+  <form class="form" id="mvForm"><label>${t("folder")}<select name="folder">${folderOpts(state.folders, "")}</select></label></form>
+  <p id="mvErr" class="err"></p>
+  <div class="actions"><button class="btn primary" id="mvGo">${t("save")}</button><button class="btn" data-close>${t("cancel")}</button></div>`);
+  $("#mvGo").onclick = async () => {
+    try { await api("POST", "api/folders/move", { kind: "in", folder: $("#mvForm").folder.value, ids }); closeModal(); toast(t("done")); folderReload(); }
+    catch (err) { $("#mvErr").textContent = err.message; }
+  };
+});
 
 $("#inboundList").addEventListener("change", (e) => {
   const id = e.target.dataset.sel; if (id === undefined) return;
@@ -344,6 +407,7 @@ async function openInboundForm(ed) {
     <label>${t("network")}<select name="network"><option>tcp</option><option>ws</option><option>grpc</option><option>xhttp</option><option>httpupgrade</option><option>kcp</option></select></label>
     <label>${t("security")}<select name="security"><option>reality</option><option>tls</option><option>none</option></select></label>
     <label>${t("tag")}<input name="tag"></label>
+    <label>${t("folder")}<select name="folder">${folderOpts(state.folders, ed ? ((state.inbounds.find((x) => x.id === ed.id) || {}).folder || "") : "")}</select></label>
     <label data-show="path">${t("path")}<input name="path" placeholder="/"></label>
     <label data-show="grpc">${t("serviceName")}<input name="serviceName"></label>
     <label data-show="tls">${t("serverName")}<input name="serverName" placeholder="www.microsoft.com"></label>
@@ -467,7 +531,11 @@ async function openInboundForm(ed) {
     Object.keys(d).filter((k) => k.startsWith("r_") || k.startsWith("pv_")).forEach((k) => delete d[k]);
     try {
       if (ed && d.network === ed.form.network) d.headerType = ed.form.headerType;
-      if (ed) await api("POST", "api/inbounds/edit", { ...d, id: ed.id }); else await api("POST", "api/inbounds", d);
+      if (ed) {
+        const folder = d.folder || ""; delete d.folder;
+        await api("POST", "api/inbounds/edit", { ...d, id: ed.id });
+        if (folder !== ((state.inbounds.find((x) => x.id === ed.id) || {}).folder || "")) await api("POST", "api/folders/move", { kind: "in", folder, ids: [ed.id] });
+      } else await api("POST", "api/inbounds", d);
       closeModal(); toast(ed ? t("saved") : t("done")); refreshInbounds();
     } catch (e) { $("#ibErr").textContent = e.message; }
   };
@@ -676,8 +744,8 @@ function ibLabel(id) {
 }
 function renderUsers() {
   const d = userData; if (!d) return;
-  if (!d.clients.length) { $("#userList").innerHTML = `<div class="card empty">${t("noUsers")}</div>`; return; }
-  $("#userList").innerHTML = d.clients.map((u, i) => {
+  if (!d.clients.length && !(d.clFolders || []).length) { $("#userList").innerHTML = `<div class="card empty">${t("noUsers")}</div>`; return; }
+  const card = (u, i) => {
     const used = (u.up || 0) + (u.down || 0);
     const pct = u.limitBytes ? Math.min(100, (used / u.limitBytes) * 100) : 0;
     const cl = { meta: u, disabled: u.disabled };
@@ -695,7 +763,8 @@ function renderUsers() {
       ${u.limitBytes ? `<div class="bar"><i style="width:${pct}%"></i></div>` : ""}
       ${copyRow(subURL(u))}
     </div>`;
-  }).join("");
+  };
+  $("#userList").innerHTML = folderTree("cl", d.clFolders || [], d.clients.map((u, i) => ({ folder: u.folder || "", html: card(u, i) })));
 }
 $("#userList").addEventListener("click", guard(async (e) => {
   const cp = e.target.closest("[data-copy]"); if (cp) { copyText(cp.dataset.copy); return; }
@@ -712,15 +781,25 @@ $("#userList").addEventListener("click", guard(async (e) => {
 $("#addUserBtn").onclick = guard(async () => { if (!userData) await loadUsers(); openUser(null); });
 function openUser(u) {
   const isNew = !u;
-  const boxes = userData.inbounds.map((x) => `<label class="pitem"><input type="checkbox" value="${esc(x.id)}" ${u && u.inbounds.includes(x.id) ? "checked" : ""}><span class="mono">${esc(ibLabel(x.id))}</span></label>`).join("");
+  const follow = new Set((u && u.follow) || []);
+  const inFolders = userData.inFolders || [];
+  const known = new Set(inFolders.map((f) => f.id));
+  const ibBox = (x) => `<label class="pitem"><input type="checkbox" data-ib="${esc(x.id)}" ${u && u.inbounds.includes(x.id) ? "checked" : ""}><span class="mono">${esc(ibLabel(x.id))}</span></label>`;
+  const loose = userData.inbounds.filter((x) => !x.folder || !known.has(x.folder));
+  const boxes = inFolders.map((f) => {
+    const inside = userData.inbounds.filter((x) => x.folder === f.id);
+    return `<div class="fpick"><label class="pitem fall"><input type="checkbox" data-follow="${esc(f.id)}" ${follow.has(f.id) ? "checked" : ""}><span>📁 <b dir="auto">${esc(f.name)}</b></span><small>${t("followFolder")}</small></label>
+      <div class="pgrid fsub" data-in="${esc(f.id)}">${inside.map(ibBox).join("") || `<p class="muted">${t("folderEmpty")}</p>`}</div></div>`;
+  }).join("") + (loose.length ? `<div class="pgrid">${loose.map(ibBox).join("")}</div>` : "");
   openModal(`<h3>${isNew ? t("addUser") : esc(u.email)}</h3>
   <form id="usForm" class="form">
     ${isNew ? `<label>${t("name")}<input name="email" required pattern="[A-Za-z0-9._@+\\-]{1,64}" placeholder="ali"></label>` : ""}
+    <label>${t("folder")}<select name="folder">${folderOpts(userData.clFolders, u ? u.folder || "" : "")}</select></label>
     <label>${isNew ? t("expiryDays") : t("setExpiry")}<input name="expiryDays" type="number" min="0" step="1" ${isNew ? 'value="30"' : `placeholder="${t("expiryDays")}"`}></label>
     <label>${isNew ? t("limitGB") : t("setLimit")}<input name="limitGB" type="number" min="0" step="0.5" ${isNew ? 'value="0"' : `placeholder="${t("limitGB")}"`}></label>
   </form>
   <div class="pickhead"><label>${t("pickInbounds")}</label>${boxes ? `<span><button type="button" class="btn small" id="usAll">${t("selAll")}</button> <button type="button" class="btn small" id="usNone">${t("selNone")}</button></span>` : ""}</div>
-  <div class="pgrid" id="usIbs">${boxes || `<p class="muted">${t("noInbounds")}</p>`}</div>
+  <div class="ftree" id="usIbs">${boxes || `<p class="muted">${t("noInbounds")}</p>`}</div>
   <p id="usErr" class="err"></p>
   <div class="actions">
     <button class="btn primary" id="usSave">${isNew ? t("create") : u.disabled ? t("save") + " + " + t("enable") : t("save")}</button>
@@ -729,9 +808,10 @@ function openUser(u) {
   </div>`, true);
   const collect = (extra) => {
     const d = Object.fromEntries(new FormData($("#usForm")));
-    const inbounds = [...$("#usIbs").querySelectorAll("input:checked")].map((x) => x.value);
-    if (isNew) return { email: d.email.trim(), expiryDays: +d.expiryDays, limitGB: +d.limitGB, inbounds };
-    const body = { email: u.email, inbounds, setInbounds: true, enable: !!u.disabled, ...extra };
+    const inbounds = [...$("#usIbs").querySelectorAll("input[data-ib]:checked")].map((x) => x.dataset.ib);
+    const follow = [...$("#usIbs").querySelectorAll("input[data-follow]:checked")].map((x) => x.dataset.follow);
+    if (isNew) return { email: d.email.trim(), expiryDays: +d.expiryDays, limitGB: +d.limitGB, inbounds, follow, folder: d.folder || "" };
+    const body = { email: u.email, inbounds, follow, folder: d.folder || "", setInbounds: true, enable: !!u.disabled, ...extra };
     if (d.expiryDays !== "") { body.setExpiry = true; body.expiryDays = +d.expiryDays; }
     if (d.limitGB !== "") { body.setLimit = true; body.limitGB = +d.limitGB; }
     return body;
@@ -743,9 +823,15 @@ function openUser(u) {
     } catch (e) { $("#usErr").textContent = e.message; }
   };
   $("#usSave").onclick = () => go({});
+  // a followed folder takes all its inbounds (and later ones): tick and lock them
+  const syncFollow = () => $("#usIbs").querySelectorAll("input[data-follow]").forEach((fb) => {
+    $("#usIbs").querySelectorAll(`.fsub[data-in="${CSS.escape(fb.dataset.follow)}"] input`).forEach((x) => { if (fb.checked) x.checked = true; x.disabled = fb.checked; });
+  });
   if (boxes) {
-    const setAll = (v) => $("#usIbs").querySelectorAll("input[type=checkbox]").forEach((x) => (x.checked = v));
+    $("#usIbs").addEventListener("change", (e) => { if (e.target.dataset.follow !== undefined && !e.target.checked) $("#usIbs").querySelectorAll(`.fsub[data-in="${CSS.escape(e.target.dataset.follow)}"] input`).forEach((x) => (x.checked = false)); syncFollow(); });
+    const setAll = (v) => { $("#usIbs").querySelectorAll("input[type=checkbox]").forEach((x) => (x.checked = v)); syncFollow(); };
     $("#usAll").onclick = () => setAll(true); $("#usNone").onclick = () => setAll(false);
+    syncFollow();
   }
   if (!isNew) $("#usReset").onclick = () => go({ resetTraffic: true });
 }

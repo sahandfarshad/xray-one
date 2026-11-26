@@ -449,5 +449,15 @@
  "act.okMsg": "Kết nối internet này đã được kích hoạt trong {h} giờ. Hãy đặt DNS của điện thoại hoặc máy chơi game thành địa chỉ này:",
  "act.okHint": "Mở lại liên kết này mỗi khi internet hoặc SIM thay đổi, hoặc khi hết thời gian.",
  "act.badTitle": "Liên kết không hợp lệ",
- "act.badMsg": "Liên kết kích hoạt này không hợp lệ, hoặc gói đăng ký của bạn không còn hoạt động."
+ "act.badMsg": "Liên kết kích hoạt này không hợp lệ, hoặc gói đăng ký của bạn không còn hoạt động.",
+ "panel.newFolder": "Thư mục mới",
+ "panel.folderName": "Tên thư mục",
+ "panel.folder": "Thư mục",
+ "panel.noFolder": "Không thư mục",
+ "panel.renameFolder": "Đổi tên",
+ "panel.delFolder": "Xóa thư mục",
+ "panel.confirmDelFolder": "Xóa thư mục này? Nội dung bên trong vẫn giữ, không thuộc thư mục.",
+ "panel.moveSel": "Chuyển vào thư mục",
+ "panel.followFolder": "cả thư mục, kể cả mục sau này",
+ "panel.folderEmpty": "Trống"
 }

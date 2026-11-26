@@ -449,5 +449,15 @@
  "act.okMsg": "እዚ ምትእስሳር ኢንተርነት ን{h} ሰዓታት ንቑሕ እዩ። DNS ተሌፎንካ ወይ ኮንሶልካ ናብዚ ኣድራሻ ኣቐምጦ፦",
  "act.okHint": "ኢንተርነትካ ወይ SIM ካርድካ ምስ ዝቕየር፣ ወይ ግዜ ምስ ዝውዳእ፣ ነዚ ሊንክ ደጊምካ ክፈቶ።",
  "act.badTitle": "ዘይቅቡል ሊንክ",
- "act.badMsg": "እዚ ሊንክ ምንቃሕ ቅቡል ኣይኮነን፣ ወይ ምዝገባኻ ንቑሕ ኣይኮነን።"
+ "act.badMsg": "እዚ ሊንክ ምንቃሕ ቅቡል ኣይኮነን፣ ወይ ምዝገባኻ ንቑሕ ኣይኮነን።",
+ "panel.newFolder": "ሓድሽ ፎልደር",
+ "panel.folderName": "ስም ፎልደር",
+ "panel.folder": "ፎልደር",
+ "panel.noFolder": "ብዘይ ፎልደር",
+ "panel.renameFolder": "ስም ቀይር",
+ "panel.delFolder": "ፎልደር ሰርዝ",
+ "panel.confirmDelFolder": "እዚ ፎልደር ይሰረዝ ዶ? ትሕቲኡ ዘሎ ብዘይ ፎልደር ይተርፍ።",
+ "panel.moveSel": "ናብ ፎልደር ኣግዕዝ",
+ "panel.followFolder": "ምሉእ ፎልደር፣ ዝመጽኡ እውን",
+ "panel.folderEmpty": "ባዶ"
 }

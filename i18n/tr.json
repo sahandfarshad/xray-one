@@ -449,5 +449,15 @@
  "act.okMsg": "Bu internet bağlantısı {h} saat boyunca etkin. Telefonunuzun veya konsolunuzun DNS'ini şu adrese ayarlayın:",
  "act.okHint": "İnternetiniz veya SIM kartınız değiştiğinde ya da süre dolduğunda bu bağlantıyı yeniden açın.",
  "act.badTitle": "Geçersiz bağlantı",
- "act.badMsg": "Bu etkinleştirme bağlantısı geçerli değil veya aboneliğiniz etkin değil."
+ "act.badMsg": "Bu etkinleştirme bağlantısı geçerli değil veya aboneliğiniz etkin değil.",
+ "panel.newFolder": "Yeni klasör",
+ "panel.folderName": "Klasör adı",
+ "panel.folder": "Klasör",
+ "panel.noFolder": "Klasörsüz",
+ "panel.renameFolder": "Yeniden adlandır",
+ "panel.delFolder": "Klasörü sil",
+ "panel.confirmDelFolder": "Bu klasör silinsin mi? İçindekiler klasörsüz kalır.",
+ "panel.moveSel": "Klasöre taşı",
+ "panel.followFolder": "tüm klasör, sonrakiler de",
+ "panel.folderEmpty": "Boş"
 }

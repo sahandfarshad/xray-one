@@ -364,6 +364,7 @@ type ClientView struct {
 }
 
 type InboundView struct {
+	Folder   string       `json:"folder,omitempty"` // panel folder (folders.go)
 	ID       string       `json:"id"`
 	Tag      string       `json:"tag"`
 	Protocol string       `json:"protocol"`
@@ -524,6 +525,7 @@ func ensureOutbounds(root *OMap) {
 }
 
 type NewInbound struct {
+	Folder      string       `json:"folder,omitempty"` // panel folder to put it in (not part of Xray)
 	Protocol    string       `json:"protocol"`
 	Port        int          `json:"port"`
 	Tag         string       `json:"tag"`

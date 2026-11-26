@@ -449,5 +449,15 @@
  "act.okMsg": "此网络连接已激活 {h} 小时。请将手机或游戏机的 DNS 设为此地址：",
  "act.okHint": "每当网络或 SIM 卡变更，或时间到期时，请重新打开此链接。",
  "act.badTitle": "链接无效",
- "act.badMsg": "此激活链接无效，或您的订阅未生效。"
+ "act.badMsg": "此激活链接无效，或您的订阅未生效。",
+ "panel.newFolder": "新建文件夹",
+ "panel.folderName": "文件夹名称",
+ "panel.folder": "文件夹",
+ "panel.noFolder": "无文件夹",
+ "panel.renameFolder": "重命名",
+ "panel.delFolder": "删除文件夹",
+ "panel.confirmDelFolder": "删除此文件夹？其中内容将保留，不再属于任何文件夹。",
+ "panel.moveSel": "移到文件夹",
+ "panel.followFolder": "整个文件夹，包括以后加入的",
+ "panel.folderEmpty": "空"
 }

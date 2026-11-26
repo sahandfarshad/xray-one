@@ -97,8 +97,10 @@
           <span id="selActs" class="actions hidden">
             <button id="relaySelBtn" class="btn" disabled></button>
             <button id="tunSelBtn" class="btn" disabled></button>
+            <button id="moveSelBtn" class="btn" disabled></button>
             <button id="delSelBtn" class="btn danger" disabled></button>
           </span>
+          <button id="addInFolderBtn" class="btn" data-t="newFolder"></button>
           <button id="quickBtn" class="btn" data-t="quick"></button>
           <button id="addInboundBtn" class="btn primary" data-t="addInbound"></button>
         </div>
@@ -109,7 +111,7 @@
     <section id="view-users" class="view hidden">
       <div class="row-between head">
         <h2 data-t="usersTab"></h2>
-        <div class="actions"><button id="addUserBtn" class="btn primary" data-t="addUser"></button></div>
+        <div class="actions"><button id="addClFolderBtn" class="btn" data-t="newFolder"></button><button id="addUserBtn" class="btn primary" data-t="addUser"></button></div>
       </div>
       <p class="muted" data-t="usersHint"></p>
       <div id="userList" class="stack"></div>

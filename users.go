@@ -19,6 +19,7 @@ type userView struct {
 type userInbound struct {
 	ID       string `json:"id"`
 	Tag      string `json:"tag"`
+	Folder   string `json:"folder,omitempty"`
 	Protocol string `json:"protocol"`
 	Port     string `json:"port"`
 	Network  string `json:"network"`
@@ -32,6 +33,7 @@ func (a *App) handleUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	atag := apiTag(root)
+	inF, clF, of := a.store.FolderView()
 	on := map[string][]string{}
 	ibs := []userInbound{}
 	for i, v := range asArr(root.Get("inbounds")) {
@@ -45,7 +47,7 @@ func (a *App) handleUsers(w http.ResponseWriter, r *http.Request) {
 		}
 		id := inboundID(ib, i)
 		n, s := streamInfo(ib)
-		ibs = append(ibs, userInbound{ID: id, Tag: tag, Protocol: asStr(ib.Get("protocol")), Port: asStr(ib.Get("port")), Network: n, Security: s})
+		ibs = append(ibs, userInbound{ID: id, Tag: tag, Folder: of[id], Protocol: asStr(ib.Get("protocol")), Port: asStr(ib.Get("port")), Network: n, Security: s})
 		for _, cv := range clientsOf(ib) {
 			if e := asStr(asMap(cv).Get("email")); e != "" && !isTunnelEmail(e) {
 				on[e] = append(on[e], id)
@@ -73,12 +75,33 @@ func (a *App) handleUsers(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Email < out[j].Email })
-	writeJSONResp(w, 200, map[string]any{"clients": out, "inbounds": ibs})
+	writeJSONResp(w, 200, map[string]any{"clients": out, "inbounds": ibs, "inFolders": inF, "clFolders": clF})
 }
 
 type userReq struct {
 	clientReq
 	Inbounds []string `json:"inbounds"`
+	Follow   []string `json:"follow"`           // inbound folders taken whole
+	Folder   *string  `json:"folder,omitempty"` // client folder; nil = unchanged
+}
+
+// applyFolders stores the client's folder and followed folders and returns
+// the inbound list including every inbound of the followed folders.
+func (a *App) applyFolders(email string, req userReq) []string {
+	inF, clF, _ := a.store.FolderView()
+	var follow []string
+	for _, f := range req.Follow {
+		if folderExists(inF, f) {
+			follow = append(follow, f)
+		}
+	}
+	a.store.Update(email, func(m *ClientMeta) {
+		m.Follow = follow
+		if req.Folder != nil && (*req.Folder == "" || folderExists(clF, *req.Folder)) {
+			m.Folder = *req.Folder
+		}
+	})
+	return unionStr(req.Inbounds, a.folderInbounds(follow))
 }
 
 // setUserInbounds puts the client on exactly the given inbounds.
@@ -179,7 +202,7 @@ func (a *App) handleAddUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.store.Update(req.Email, func(m *ClientMeta) { applyLimits(m, req.clientReq, true) })
-	if err := a.setUserInbounds(req.Email, req.Inbounds); err != nil {
+	if err := a.setUserInbounds(req.Email, a.applyFolders(req.Email, req)); err != nil {
 		a.store.Forget(req.Email)
 		fail(w, 400, err)
 		return
@@ -203,7 +226,7 @@ func (a *App) handleEditUser(w http.ResponseWriter, r *http.Request) {
 	}
 	a.store.Update(req.Email, func(m *ClientMeta) { applyLimits(m, req.clientReq, false) })
 	if req.SetInbounds {
-		if err := a.setUserInbounds(req.Email, req.Inbounds); err != nil {
+		if err := a.setUserInbounds(req.Email, a.applyFolders(req.Email, req.userReq)); err != nil {
 			fail(w, 400, err)
 			return
 		}
@@ -284,6 +307,7 @@ func (a *App) handleDelInbounds(w http.ResponseWriter, r *http.Request) {
 			delete(m, id)
 		}
 	})
+	_ = a.moveToFolder("in", "", removed)
 	writeJSONResp(w, 200, map[string]any{"ok": true, "removed": len(removed)})
 }
 

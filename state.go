@@ -24,7 +24,9 @@ type ClientMeta struct {
 	Note       string                     `json:"note,omitempty"`
 	Disabled   bool                       `json:"disabled"`
 	Reason     string                     `json:"reason,omitempty"`
-	Saved      map[string]json.RawMessage `json:"saved,omitempty"` // inbound id -> client json while disabled
+	Saved      map[string]json.RawMessage `json:"saved,omitempty"`  // inbound id -> client json while disabled
+	Folder     string                     `json:"folder,omitempty"` // client folder (folders.go)
+	Follow     []string                   `json:"follow,omitempty"` // inbound folders the client takes whole
 }
 
 type PanelConfig struct {
@@ -57,6 +59,10 @@ type Store struct {
 	TunnelMap map[string][]string    `json:"tunnelMap,omitempty"` // v0.4.0, migrated
 	// anti-sanction entry (sni.go)
 	Sni SniSettings `json:"sni,omitempty"`
+	// folders (folders.go)
+	InFolders  []Folder          `json:"inFolders,omitempty"`
+	ClFolders  []Folder          `json:"clFolders,omitempty"`
+	InFolderOf map[string]string `json:"inFolderOf,omitempty"` // inbound id -> folder id
 }
 
 type Relay struct {

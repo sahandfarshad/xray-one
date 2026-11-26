@@ -41,6 +41,12 @@ A light, minimal panel that sits **beside** a headless Xray core. It never repla
 
 ۰.۹.۱: چرخش با ترافیک واقعی قضاوت می‌کند نه فقط با پینگ (هر ۵ دقیقه یک دانلود ۲۵۶ کیلوبایتی)؛ گزینه‌ی «تکه‌تکه کردن TLS» برای WS و XHTTP؛ سرور میانی روی مسیر برگشت هر ۱۰ دقیقه مسیر مستقیم را دوباره امتحان می‌کند و عوض کردن روش آنجا هم ممکن است.
 
+## v0.15.0
+
+- Folders for inbounds and clients: create, rename and delete them with the "New folder" button; folders start closed and open as a tree. Pick a folder when creating or editing an inbound or a client, or move selected inbounds at once.
+- A client can take a whole inbound folder: it is put on every inbound in it, including inbounds added to the folder later.
+- پوشه برای اینباندها و کلاینت‌ها: پوشه‌ها بسته‌اند و با زدن به‌صورت درختی باز می‌شوند. هنگام ساخت کلاینت می‌شود کل یک پوشه را انتخاب کرد و اینباندهای بعدی آن پوشه هم خودکار اضافه می‌شوند.
+
 ## v0.14.1
 
 - Unblocker traffic now counts against the subscription that activated the address (main and middle servers); every address activated with one subscription uses that subscription's data.

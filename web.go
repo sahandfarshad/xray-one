@@ -172,6 +172,10 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("POST /api/users", a.api(a.handleAddUser))
 	mux.HandleFunc("POST /api/users/edit", a.api(a.handleEditUser))
 	mux.HandleFunc("DELETE /api/users", a.api(a.handleDelUser))
+	mux.HandleFunc("POST /api/folders", a.api(a.handleFolderAdd))
+	mux.HandleFunc("POST /api/folders/rename", a.api(a.handleFolderRename))
+	mux.HandleFunc("POST /api/folders/delete", a.api(a.handleFolderDel))
+	mux.HandleFunc("POST /api/folders/move", a.api(a.handleFolderMove))
 	mux.HandleFunc("POST /api/clients", a.api(a.handleAddClient))
 	mux.HandleFunc("DELETE /api/clients", a.api(a.handleDelClient))
 	mux.HandleFunc("POST /api/clients/update", a.api(a.handleUpdateClient))
@@ -349,7 +353,11 @@ func (a *App) handleInbounds(w http.ResponseWriter, r *http.Request) {
 		}
 		out = append(out, iv)
 	}
-	writeJSONResp(w, 200, map[string]any{"inbounds": out, "core": core, "host": host})
+	inF, _, of := a.store.FolderView()
+	for i := range out {
+		out[i].Folder = of[out[i].ID]
+	}
+	writeJSONResp(w, 200, map[string]any{"inbounds": out, "core": core, "host": host, "folders": inF})
 }
 
 func (a *App) handleAddInbound(w http.ResponseWriter, r *http.Request) {
@@ -358,6 +366,7 @@ func (a *App) handleAddInbound(w http.ResponseWriter, r *http.Request) {
 		fail(w, 400, err)
 		return
 	}
+	newID := ""
 	if !portFree(n.Port) {
 		fail(w, 400, fmt.Errorf("port %d is already in use on this server", n.Port))
 		return
@@ -369,13 +378,20 @@ func (a *App) handleAddInbound(w http.ResponseWriter, r *http.Request) {
 		}
 		ensureOutbounds(root)
 		root.Set("inbounds", append(asArr(root.Get("inbounds")), ib))
+		newID = asStr(ib.Get("tag"))
 		return nil
 	})
 	if err != nil {
 		fail(w, 400, err)
 		return
 	}
-	writeJSONResp(w, 200, map[string]bool{"ok": true})
+	if n.Folder != "" && newID != "" {
+		if err := a.moveToFolder("in", n.Folder, []string{newID}); err != nil {
+			writeJSONResp(w, 200, map[string]any{"ok": true, "id": newID, "warn": err.Error()})
+			return
+		}
+	}
+	writeJSONResp(w, 200, map[string]any{"ok": true, "id": newID})
 }
 
 func (a *App) handleDelInbound(w http.ResponseWriter, r *http.Request) {
@@ -397,6 +413,7 @@ func (a *App) handleDelInbound(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = a.store.EditRelays(func(m map[string][]Relay) { delete(m, id) })
+	_ = a.moveToFolder("in", "", []string{id})
 	writeJSONResp(w, 200, map[string]bool{"ok": true})
 }
 

@@ -449,5 +449,15 @@
  "act.okMsg": "Esta conexión a internet está activa durante {h} horas. Configure el DNS de su teléfono o consola con esta dirección:",
  "act.okHint": "Vuelva a abrir este enlace cada vez que cambie su conexión a internet o su tarjeta SIM, o cuando se agote el tiempo.",
  "act.badTitle": "Enlace no válido",
- "act.badMsg": "Este enlace de activación no es válido o su suscripción no está activa."
+ "act.badMsg": "Este enlace de activación no es válido o su suscripción no está activa.",
+ "panel.newFolder": "Nueva carpeta",
+ "panel.folderName": "Nombre de la carpeta",
+ "panel.folder": "Carpeta",
+ "panel.noFolder": "Sin carpeta",
+ "panel.renameFolder": "Renombrar",
+ "panel.delFolder": "Eliminar carpeta",
+ "panel.confirmDelFolder": "¿Eliminar esta carpeta? Lo que contiene queda sin carpeta.",
+ "panel.moveSel": "Mover a carpeta",
+ "panel.followFolder": "toda la carpeta, también las futuras",
+ "panel.folderEmpty": "Vacía"
 }
