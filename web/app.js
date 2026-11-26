@@ -927,7 +927,7 @@ async function loadXray(now) {
     ${x.err ? `<p class="err">${esc(x.err)}</p>` : ""}
     ${newer ? `<button class="btn primary small" id="xuUpd">${esc(t("xuUpd").replace("{v}", x.latest))}</button>` : ""}
     ${mids.length ? `<p class="muted small">${t("xuMid")}: ${mids.map((s) => esc(s.name) + " (" + esc(s.xrayVer) + ")").join(sep())}<br>${t("xuMidHint")}</p>` : ""}`;
-  document.querySelector('nav [data-view="settings"]')?.classList.toggle("badge", !!newer);
+  document.querySelector('nav [data-view="overview"]')?.classList.toggle("badge", !!newer);
   const u = $("#xuUpd");
   if (u) u.onclick = guard(async () => {
     u.disabled = true;

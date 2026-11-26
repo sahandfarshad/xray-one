@@ -41,6 +41,13 @@ A light, minimal panel that sits **beside** a headless Xray core. It never repla
 
 ۰.۹.۱: چرخش با ترافیک واقعی قضاوت می‌کند نه فقط با پینگ (هر ۵ دقیقه یک دانلود ۲۵۶ کیلوبایتی)؛ گزینه‌ی «تکه‌تکه کردن TLS» برای WS و XHTTP؛ سرور میانی روی مسیر برگشت هر ۱۰ دقیقه مسیر مستقیم را دوباره امتحان می‌کند و عوض کردن روش آنجا هم ممکن است.
 
+## v0.15.3
+
+- The Xray update card (current version, newest version, "Check now", and the update button that appears only when a newer one exists) moved from Settings to the bottom of the Overview page.
+- "Alt address" is now called "Personal tunnel address" (same feature: put your own tunnel's middle-server IP and the links use it with the same ports).
+- «آدرس جایگزین» حالا «آدرس تانل شخصی» نام دارد (همان قابلیت).
+- کارت به‌روزرسانی اکس‌ری (نسخه‌ی فعلی، آخرین نسخه، «بررسی الان» و دکمه‌ی به‌روزرسانی) از تنظیمات به پایین صفحه‌ی اول آمد.
+
 ## v0.15.2
 
 - Removed the "all configs" subscription link (and its bar above the tabs); its old link now returns 404. For your own access to everything, make a client for yourself and give it the inbound folders you want.
