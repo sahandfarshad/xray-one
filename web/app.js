@@ -214,9 +214,22 @@ function renderSubBar() {
   $("#moveSelBtn").textContent = "📁 " + t("moveSel") + (n ? " (" + n + ")" : "");
   $("#moveSelBtn").disabled = !n;
   $("#selActs").classList.toggle("hidden", !n);
-  const all = state.inbounds.filter((i) => !i.system);
-  $("#selAll").checked = all.length > 0 && n === all.length;
-  $("#selAll").indeterminate = n > 0 && n < all.length;
+  syncSelBoxes();
+}
+function syncSelBoxes() {
+  const all = visibleInbounds(), k = all.filter((i) => state.sel.has(i.id)).length;
+  $("#selAll").checked = all.length > 0 && k === all.length;
+  $("#selAll").indeterminate = k > 0 && k < all.length;
+  document.querySelectorAll("input[data-fsel]").forEach((b) => {
+    const ins = folderInbounds(b.dataset.fsel), m = ins.filter((i) => state.sel.has(i.id)).length;
+    b.checked = ins.length > 0 && m === ins.length; b.indeterminate = m > 0 && m < ins.length; b.disabled = !ins.length;
+  });
+}
+// inbounds in a folder, and inbounds the user can see (loose ones plus those in open folders)
+function folderInbounds(fid) { return state.inbounds.filter((i) => !i.system && i.folder === fid); }
+function visibleInbounds() {
+  const known = new Set((state.folders || []).map((f) => f.id));
+  return state.inbounds.filter((i) => !i.system && (!i.folder || !known.has(i.folder) || openFolders.has("in:" + i.folder)));
 }
 async function copyText(v) {
   try { await navigator.clipboard.writeText(v); }
@@ -300,6 +313,7 @@ function renderInbounds() {
       ${clients}</div>`;
   };
   list.innerHTML = folderTree("in", state.folders || [], ibs.map((ib, idx) => ({ folder: ib.system ? "" : ib.folder, html: card(ib, idx) })));
+  syncSelBoxes();
 }
 
 // ---------- folders (inbounds and clients) ----------
@@ -311,7 +325,7 @@ function folderTree(kind, folders, items) {
     const open = openFolders.has(kind + ":" + f.id);
     return `<div class="folder${open ? " open" : ""}">
       <div class="fhead" data-ftoggle="${esc(kind + ":" + f.id)}">
-        <span class="fic">${open ? "📂" : "📁"}</span><b dir="auto">${esc(f.name)}</b><span class="pill gray" dir="ltr">${inside.length}</span>
+        ${kind === "in" ? `<input type="checkbox" data-fsel="${esc(f.id)}" title="${t("selectAll")}">` : ""}<span class="fic">${open ? "📂" : "📁"}</span><b dir="auto">${esc(f.name)}</b><span class="pill gray" dir="ltr">${inside.length}</span>
         <span class="actions"><button class="btn small" data-fact="rename" data-kind="${kind}" data-id="${esc(f.id)}" title="${t("renameFolder")}">✎</button><button class="btn small danger" data-fact="del" data-kind="${kind}" data-id="${esc(f.id)}" title="${t("delFolder")}">✕</button></span>
       </div>
       ${open ? `<div class="fbody stack">${inside.map((x) => x.html).join("") || `<p class="muted">${t("folderEmpty")}</p>`}</div>` : ""}
@@ -336,6 +350,7 @@ document.addEventListener("click", guard(async (e) => {
     }
     toast(t("done")); folderReload(); return;
   }
+  if (e.target.closest("input[data-fsel]")) return;
   const h = e.target.closest("[data-ftoggle]"); if (!h) return;
   const k = h.dataset.ftoggle; openFolders.has(k) ? openFolders.delete(k) : openFolders.add(k);
   try { localStorage.setItem("xo_open_folders", JSON.stringify([...openFolders])); } catch (err) {}
@@ -837,9 +852,15 @@ function openUser(u) {
 }
 $("#relaySelBtn").onclick = () => openRelay([...state.sel]);
 $("#selAll").onchange = (e) => {
-  state.sel = new Set(e.target.checked ? state.inbounds.filter((i) => !i.system).map((i) => i.id) : []);
+  // only what is visible: loose inbounds and those inside open folders
+  visibleInbounds().forEach((i) => e.target.checked ? state.sel.add(i.id) : state.sel.delete(i.id));
   render();
 };
+document.addEventListener("change", (e) => {
+  const b = e.target.closest("input[data-fsel]"); if (!b) return;
+  folderInbounds(b.dataset.fsel).forEach((i) => b.checked ? state.sel.add(i.id) : state.sel.delete(i.id));
+  render();
+});
 
 $("#quickBtn").onclick = guard(async () => {
   const r = await api("GET", "api/presets");

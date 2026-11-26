@@ -41,6 +41,11 @@ A light, minimal panel that sits **beside** a headless Xray core. It never repla
 
 ۰.۹.۱: چرخش با ترافیک واقعی قضاوت می‌کند نه فقط با پینگ (هر ۵ دقیقه یک دانلود ۲۵۶ کیلوبایتی)؛ گزینه‌ی «تکه‌تکه کردن TLS» برای WS و XHTTP؛ سرور میانی روی مسیر برگشت هر ۱۰ دقیقه مسیر مستقیم را دوباره امتحان می‌کند و عوض کردن روش آنجا هم ممکن است.
 
+## v0.15.1
+
+- "Select all" on the inbound list now picks only what you can see: inbounds outside folders and those in open folders. Each inbound folder has its own checkbox to select everything inside it, open or closed.
+- «انتخاب همه» فقط اینباندهای قابل‌دیدن (بیرون پوشه یا داخل پوشه‌ی باز) را انتخاب می‌کند؛ هر پوشه هم تیک جدا برای انتخاب همه‌ی محتوایش دارد.
+
 ## v0.15.0
 
 - Folders for inbounds and clients: create, rename and delete them with the "New folder" button; folders start closed and open as a tree. Pick a folder when creating or editing an inbound or a client, or move selected inbounds at once.
