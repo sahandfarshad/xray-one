@@ -9,6 +9,7 @@ import (
 	crand "crypto/rand"
 	_ "embed"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"math"
@@ -22,6 +23,9 @@ import (
 
 //go:embed subpage.html
 var subPageHTML string
+
+//go:embed web/langpick.js
+var langPickJS string
 
 var subTmpl = template.Must(template.New("sub").Funcs(template.FuncMap{
 	"safeURL": func(s string) template.URL { return template.URL(s) },
@@ -64,44 +68,39 @@ type subStore struct{ Label, URL string }
 type subSni struct{ Name, IP, Link string }
 
 type subView struct {
-	Lang, Dir, Nonce          string
+	Nonce                     string
 	T                         map[string]string
 	Name                      string
-	State, StateText          string
+	State, StateKey           string
+	PickJS                    template.JS
+	LangsJS, I18NJS           template.JS
 	Used, Total, Left, Up, Dn string
 	Pct                       int
 	Unlimited                 bool
-	Expiry, DaysLeft          string
+	Expiry                    string
+	DaysN                     int
+	Today                     bool
 	Never                     bool
 	SubURL, SubQR             string
 	Configs                   []subCfg
 	WG                        []subWG
 	Apps                      []subApp
 	Sni                       []subSni
-	OtherLang                 string
 }
 
-var subText = map[string]map[string]string{
-	"fa": {
-		"title": "اشتراک", "used": "مصرف شده", "of": "از", "left": "باقی‌مانده", "unlimited": "نامحدود", "up": "آپلود", "down": "دانلود",
-		"expiry": "انقضا", "never": "بدون تاریخ انقضا", "days": "روز", "today": "امروز",
-		"active": "فعال", "expired": "منقضی شده", "traffic": "حجم تمام شده", "paused": "متوقف",
-		"sub": "لینک اشتراک", "subHint": "این لینک را در برنامه اضافه کنید تا همه‌ی کانفیگ‌ها خودکار به‌روز شوند.",
-		"copy": "کپی", "copied": "کپی شد", "qr": "QR", "add": "افزودن به برنامه",
-		"configs": "کانفیگ‌ها", "wg": "وایرگارد", "wgHint": "فایل را در برنامه‌ی رسمی WireGuard وارد کنید یا QR را اسکن کنید.", "wgFile": "دانلود فایل",
-		"sni": "تحریم‌شکن بازی‌ها", "sniHint": "برای بازی‌ها و سایت‌هایی که آی‌پی ایران را راه نمی‌دهند، بدون فیلترشکن. اول فیلترشکن را خاموش کنید و دکمه‌ی فعال‌سازی را بزنید، بعد دی‌ان‌اس گوشی یا کنسول را روی همین آدرس بگذارید. با عوض شدن اینترنت دوباره فعال کنید.", "sniAct": "فعال‌سازی", "sniDNS": "دی‌ان‌اس",
-		"apps": "برنامه‌ها", "download": "دانلود", "none": "کانفیگ فعالی وجود ندارد.", "theme": "تاریک / روشن", "lang": "English",
-	},
-	"en": {
-		"title": "Subscription", "used": "Used", "of": "of", "left": "left", "unlimited": "Unlimited", "up": "Upload", "down": "Download",
-		"expiry": "Expires", "never": "No expiry date", "days": "days", "today": "today",
-		"active": "Active", "expired": "Expired", "traffic": "Data used up", "paused": "Paused",
-		"sub": "Subscription link", "subHint": "Add this link to your app so every config updates by itself.",
-		"copy": "Copy", "copied": "Copied", "qr": "QR", "add": "Add to app",
-		"configs": "Configs", "wg": "WireGuard", "wgHint": "Import the file into the official WireGuard app, or scan the QR.", "wgFile": "Download file",
-		"sni": "Game unblocker", "sniHint": "For games and sites that refuse Iranian addresses, with no VPN. Turn the VPN off, press Activate, then set your phone's or console's DNS to this address. Activate again whenever your internet changes.", "sniAct": "Activate", "sniDNS": "DNS",
-		"apps": "Apps", "download": "Download", "none": "No active configs.", "theme": "Dark / Light", "lang": "فارسی",
-	},
+// subText holds the subscription page strings per language (i18n_gen.go);
+// the page is rendered in English and switched in the browser.
+var subText = mustJSONMap(i18nSub)
+
+// actText: the unblocker activation page (sni.go).
+var actText = mustJSONMap(i18nAct)
+
+func mustJSONMap(s string) map[string]map[string]string {
+	var m map[string]map[string]string
+	if err := json.Unmarshal([]byte(s), &m); err != nil {
+		panic(err)
+	}
+	return m
 }
 
 func qrData(s string) string {
@@ -196,19 +195,11 @@ func (a *App) subPublicURL(tok string) string {
 }
 
 func (a *App) serveSubPage(w http.ResponseWriter, r *http.Request, m *ClientMeta, links []string) {
-	lang := "fa"
-	if l := r.URL.Query().Get("lang"); l == "en" || l == "fa" {
-		lang = l
-	} else if al := strings.ToLower(r.Header.Get("Accept-Language")); al != "" && !strings.HasPrefix(al, "fa") {
-		lang = "en"
-	}
-	T := subText[lang]
+	T := subText["en"]
 	nb := make([]byte, 12)
 	_, _ = crand.Read(nb)
-	v := subView{Lang: lang, Dir: "rtl", Nonce: base64.StdEncoding.EncodeToString(nb), T: T, Name: m.Email, OtherLang: "en"}
-	if lang == "en" {
-		v.Dir, v.OtherLang = "ltr", "fa"
-	}
+	v := subView{Nonce: base64.StdEncoding.EncodeToString(nb), T: T, Name: m.Email,
+		PickJS: template.JS(langPickJS), LangsJS: template.JS(i18nLangs), I18NJS: template.JS(i18nSub)}
 	used := m.Up + m.Down
 	v.Used, v.Up, v.Dn = humanBytes(used), humanBytes(m.Up), humanBytes(m.Down)
 	if m.LimitBytes > 0 {
@@ -228,22 +219,22 @@ func (a *App) serveSubPage(w http.ResponseWriter, r *http.Request, m *ClientMeta
 		d := int(math.Ceil(time.Until(t).Hours() / 24))
 		switch {
 		case d > 0:
-			v.DaysLeft = fmt.Sprintf("%d %s", d, T["days"])
+			v.DaysN = d
 		case time.Until(t) > 0:
-			v.DaysLeft = T["today"]
+			v.Today = true
 		}
 	} else {
 		v.Never = true
 	}
 	switch {
 	case !m.Disabled:
-		v.State, v.StateText = "ok", T["active"]
+		v.State, v.StateKey = "ok", "active"
 	case m.Reason == "expired":
-		v.State, v.StateText = "bad", T["expired"]
+		v.State, v.StateKey = "bad", "expired"
 	case m.Reason == "traffic":
-		v.State, v.StateText = "bad", T["traffic"]
+		v.State, v.StateKey = "bad", "traffic"
 	default:
-		v.State, v.StateText = "bad", T["paused"]
+		v.State, v.StateKey = "bad", "paused"
 	}
 	if !m.Disabled {
 		for _, e := range a.sniEntries() {

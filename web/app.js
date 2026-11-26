@@ -1,158 +1,10 @@
 try { const th = localStorage.getItem("xo_theme"); if (th) document.documentElement.dataset.theme = th; } catch (e) {}
 "use strict";
-const T = {
-  fa: {
-    loginHint: "برای مدیریت هسته‌ی XRay وارد شوید.", user: "نام کاربری", pass: "رمز عبور", signIn: "ورود",
-    overview: "نمای کلی", inbounds: "اینباندها", settings: "تنظیمات", logout: "خروج",
-    liveTitle: "مصرف لحظه‌ای سرور", dailyTitle: "مصرف روزانه", d7: "۷ روز", dMonthLbl: "ماه", dlLbl: "دانلود", ulLbl: "آپلود", dSince: "شمارش از", ibCount: "اینباند",
-    coreStatus: "وضعیت هسته", coreVersion: "نسخه‌ی هسته", clients: "کلاینت‌ها", traffic: "ترافیک کل",
-    coreTitle: "هسته‌ی XRay", restart: "ری‌استارت", enableApi: "فعال‌سازی آمار ترافیک",
-    install: "نصب XRay", update: "آپدیت به آخرین نسخه", updateTo: "نصب این نسخه",
-    notInstalled: "نصب نیست", running: "در حال اجرا", stopped: "متوقف",
-    hintMissing: "هسته روی این سرور پیدا نشد. با اسکریپت رسمی XTLS نصب می‌شود؛ مسیرها و سرویس استاندارد می‌مانند.",
-    hintOk: "آپدیت فقط باینری را عوض می‌کند و کانفیگ دست نمی‌خورد.",
-    apiOn: "آمار ترافیک فعال", apiOff: "آمار ترافیک غیرفعال",
-    addInbound: "اینباند جدید", addClient: "کلاینت جدید", del: "حذف", save: "ذخیره", cancel: "انصراف", create: "ساختن",
-    protocol: "پروتکل", port: "پورت", tag: "تگ (اختیاری)", network: "شبکه", security: "امنیت",
-    path: "مسیر (path)", serviceName: "serviceName", serverName: "SNI / serverName", dest: "مقصد REALITY",
-    certFile: "فایل گواهی", keyFile: "فایل کلید", pickCert: "گواهی موجود روی سرور",
-    name: "نام (ایمیل)", expiryDays: "اعتبار (روز، ۰ = نامحدود)", limitGB: "حجم (GB، ۰ = نامحدود)",
-    unlimited: "نامحدود", never: "بدون انقضا", daysLeft: "روز مانده", expired: "منقضی", overLimit: "حجم تمام",
-    paused: "متوقف شده", link: "لینک", sub: "سابسکریپشن", copy: "کپی", copied: "کپی شد",
-    resetTraffic: "صفر کردن ترافیک", enable: "فعال‌سازی دوباره", details: "جزئیات",
-    noInbounds: "هنوز اینباندی نیست.", noClients: "کلاینتی ندارد.", system: "سیستمی", unmanaged: "بدون کلاینت",
-    confirmDelInbound: "این اینباند و همه‌ی کلاینت‌هایش حذف شود؟", confirmDelClient: "این کلاینت حذف شود؟",
-    confirmApi: "یک اینباند API روی 127.0.0.1 و قانون روتینگش به کانفیگ اضافه می‌شود. ادامه؟",
-    confirmRestore: "کانفیگ فعلی با این بکاپ جایگزین شود؟ (از فعلی هم بکاپ گرفته می‌شود)",
-    linksTitle: "آدرس لینک‌ها", publicHost: "دامنه یا IP سرور برای لینک‌ها", subBase: "آدرس پایه‌ی سابسکریپشن (اختیاری)",
-    sslHint: "SSL پنل و سابسکریپشن از منوی SSH تنظیم می‌شود: دستور xray-one و گزینه‌ی ۴.",
-    qBackups: "قبل از هر تغییر، کانفیگ قبلی Xray اینجا ذخیره می‌شود (۴۰ تای آخر). بازگردانی اول آن را تست می‌کند و فقط کانفیگ Xray را برمی‌گرداند؛ کاربران و تنظیمات پنل دست نمی‌خورند.", qRaw: "فایل کانفیگ فعلی Xray همان‌طور که روی سرور است؛ فقط برای دیدن، ویرایش از همین پنل انجام می‌شود.", themeT: "تاریک / روشن", backups: "بکاپ‌ها", restore: "بازگردانی", rawConfig: "کانفیگ خام (فقط خواندنی)", show: "نمایش",
-    saved: "ذخیره شد", done: "انجام شد", jobRunning: "در حال اجرا…", jobOk: "با موفقیت تمام شد", jobFail: "خطا خورد",
-    up: "آپلود", down: "دانلود", edit: "ویرایش", setExpiry: "تغییر اعتبار", setLimit: "تغییر حجم",
-    allSub: "سابسکریپشن همه‌ی کانفیگ‌ها", newLink: "لینک جدید", confirmNewLink: "لینک فعلی سابسکریپشن از کار می‌افتد و لینک تازه ساخته می‌شود. ادامه؟",
-    quick: "ساخت خودکار", quickTitle: "ساخت خودکار کانفیگ‌ها", quickHint: "هر نوعی که تیک بزنی روی یک پورت آزاد ساخته می‌شود و یک کلاینت مشترک می‌گیرد، پس سابسکریپشن همان کلاینت همه را دارد.",
-    gReality: "REALITY (بدون دامنه و گواهی)", gTls: "TLS (با گواهی دامنه)", gPlain: "بدون TLS (برای relay یا CDN روی HTTP)",
-    needCert: "اول SSL را از منوی SSH تنظیم کن", exists: "داری", all: "همه", none: "هیچ", clientName: "نام کلاینت مشترک",
-    createN: "ساختن", relay: "آدرس جایگزین", addRelay: "افزودن آدرس جایگزین", relaySel: "آدرس جایگزین برای انتخاب‌شده‌ها", relayAddr: "IP یا دامنه‌ی جایگزین",
-    relayPort: "پورت (خالی = همان پورت اینباند)", relayName: "اسم (اختیاری)", relayHint: "هر کلاینت یک لینک اضافه با این آدرس می‌گیرد (در QR و سابسکریپشن هم). SNI، کلید و بقیه‌ی تنظیمات همان می‌ماند. پنل مسیر را نمی‌سازد؛ این آدرس باید خودش به این سرور برسد.",
-    relayEx: "مثال‌ها: یک ساب‌دامنه‌ی دیگر که به همین IP اشاره می‌کند (اگر دامنه‌ی اول فیلتر شد) · ساب‌دامنه یا IP تمیز Cloudflare برای اینباندهای WS/XHTTP با TLS · IP سروری که خودت با iptables/HAProxy به اینجا فوروارد کرده‌ای.",
-    relayBefore: "لینک فعلی", relayAfter: "لینک اضافه با این آدرس", relayNoClient: "این اینباند هنوز کلاینتی ندارد که نمونه‌ی لینک نشان داده شود.",
-    delSel: "حذف", selAll: "انتخاب همه", selNone: "هیچ‌کدام", editInbound: "ویرایش اینباند", editIbNote: "پروتکل، تگ و کلاینت‌ها همین‌طور می‌مانند. با عوض کردن پورت یا تنظیمات، لینک‌ها و ساب عوض می‌شوند و کاربرها باید ساب را آپدیت کنند.", rsCheck: "بررسی", rCommas: "با کاما جدا کنید", rNew: "ساخت دوباره", rNewKeys: "کلید جدید", rClear: "پاک کردن", rsFind: "پیدا کردن", rsTitle: "اسکنر مقصد REALITY", rsHint: "از روی همین سرور چک می‌کند کدام سایت برای REALITY مناسب است (TLS 1.3، h2، X25519 و گواهی معتبر). خالی بگذارید تا سایت‌های معروف چک شوند، یا یک دامنه، IP یا رنج مثل 1.2.3.0/24 بدهید.",
-    rsPh: "دامنه، IP یا رنج — خالی = سایت‌های معروف", rsScan: "اسکن", rsStatus: "وضعیت", rsCert: "گواهی", rsLatency: "تأخیر", rsOk: "مناسب", rsNo: "نامناسب", rsUse: "استفاده", rsWait: "در حال اسکن… (تا یک دقیقه)", rsCount: "{a} مناسب از {b} مورد", close: "بستن", tunSel: "⇄ تانل", tbTitle: "تانل گروهی", tbHint: "اینباندهای انتخاب‌شده با همان پورت خودشان روی سرور میانی باز می‌شوند. پورت‌هایی که آنجا اشغال باشند رد می‌شوند و اینجا نشان داده می‌شوند.",
-    tbAdd: "تانل کن", tbRemove: "برداشتن از این سرور", tbSkipped: "رد شدند", tbDone: "{n} اینباند انجام شد", tbProgress: "{a} از {b} روی سرور میانی آماده شد", tbSlow: "سرور میانی جواب نداد. آنلاین بودنش را در تب تانل چک کنید.",
-    stOk: "باز", stBusy: "اشغال روی سرور میانی", stDown: "باز نشد", stOffline: "سرور میانی آفلاین", stUnknown: "ایجنت قدیمی؛ دستور نصب را دوباره اجرا کنید", stPending: "در حال بررسی…", confirmDelSel: "{n} اینباند انتخاب‌شده حذف شود؟ کلاینت‌های داخلشان هم حذف می‌شوند.",
-    usersTab: "کلاینت‌ها", addUser: "کلاینت جدید", usersHint: "هر کلاینت یک اسم است که روی چند اینباند می‌نشیند، با یک محدودیت حجم و زمان و یک لینک سابسکریپشن برای همه.",
-    noUsers: "هنوز کلاینتی نیست.", pickInbounds: "اینباندهای این کلاینت", editUser: "ویرایش", noInboundsYet: "بدون اینباند", confirmDelUser: "این کلاینت از همه‌ی اینباندها حذف شود؟",
-    tunnels: "تانل", addTunnel: "سرور میانی جدید", tnName: "نام", tnHost: "IP یا دامنه‌ی سرور میانی (برای SSH)", tnSshPort: "پورت SSH", tnSshUser: "کاربر SSH",
-    tnMethod: "روش", tpWs: "پورت WS", tpXh: "پورت XHTTP", tpRt: "پورت REALITY", tpRtT: "سایت REALITY", mReality: "Xray REALITY", mRealityD: "بدون دامنه و گواهی؛ شبیه اتصال به یک سایت واقعی.", tpAuto: "خودکار", tpSave: "ذخیره‌ی پورت‌ها", tpHint: "قبل از ذخیره، آزاد بودن پورت (TCP و UDP) چک می‌شود. اگر سروری روی همین روش وصل است، اول روشش را عوض کنید بعد پورت را.", mWss: "Xray WS", mWssD: "WebSocket + TLS. ساده و پایدار.", mXhttp: "Xray XHTTP", mXhttpD: "HTTP/2 + TLS، شبیه HTTPS معمولی؛ جایگزین WS.",
-    mGrefrp: "GRE + FRP", mGrefrpD: "FRP روی لینک GRE.", mBackhaul: "Backhaul", mBackhaulD: "این سرور با Backhaul به سرور میانی وصل می‌شود؛ VLESS داخلش.", mFrpssh: "FRP روی SSH", mFrpsshD: "وقتی فقط SSH رد می‌شود.",
-    mSoon: "به‌زودی", mActive: "فعال", mTrying: "در حال امتحان…", mAsk: "روش این سرور میانی به «{m}» عوض شود؟ اگر تا ۹۰ ثانیه وصل نشد، خودش به روش قبلی برمی‌گردد.",
-    mBack: "روش جدید وصل نشد و به روش قبلی برگشت: {x}", mNeedAgent: "برای عوض کردن روش، دستور نصب را یک بار دیگر روی سرور میانی بزنید (نسخه‌ی {v} به بالا).", tnDeploy: "Deploy با SSH", tnPass: "پسورد SSH (فقط یک بار؛ ذخیره نمی‌شود)", tnPassKey: "کلید پنل نصب شده؛ پسورد لازم نیست",
-    tnOnline: "متصل", tnOffline: "قطع", tnNever: "هنوز وصل نشده", tnAgo: "پیش", tnQuick: "نصب سریع بدون پسورد: این دستور را روی سرور میانی (با root) بزنید. تا ۲۴ ساعت معتبر است و بعد از اتصال باطل می‌شود.",
-    qSingle: "این اینباند (SOCKS یا HTTP) لیست کلاینت ندارد و فقط یک نام کاربری و رمز دارد؛ همه با همین یک لینک وصل می‌شوند. شکل لینک: http://کاربر:رمز@سرور:پورت (در SOCKS کاربر:رمز به base64 است). در هر برنامه‌ای که تنظیم پروکسی دارد یا در v2rayN/NekoBox وارد می‌شود. رمزنگاری ندارد.", qDomain: "اختیاری. اگر سرور میانی نتواند به این سرور وصل شود، این سرور خودش به سرور میانی وصل می‌شود (مسیر برگشت). بدون دامنه فقط REALITY امتحان می‌شود؛ با دامنه و SSL، WS و XHTTP هم. در لینک کاربرها استفاده نمی‌شود.", qRtT: "سایتی که تانل REALITY شبیه بازدید از آن دیده می‌شود؛ هم روی این سرور، هم در مسیر برگشت روی سرور میانی. می‌تواند با سایت اینباندها فرق داشته باشد. باید TLS 1.3، h2 و X25519 داشته باشد: «بررسی» آن را از این سرور و سرورهای میانی تست می‌کند.", rcCheck: "بررسی", rcHere: "این سرور", rcWait: "در حال بررسی…", rcOld: "سرور میانی باید به‌روز شود", rcOff: "وصل نیست", rcNoAns: "جوابی نیامد",
-    mGre: "GRE", mGreD: "لینک GRE بین IP دو سرور (پروتکل ۴۷)، VLESS داخلش. سبک و سریع؛ رمزنگاری خودش را ندارد و پشت NAT کار نمی‌کند.", mFrp: "FRP", mFrpD: "این سرور با FRP به سرور میانی وصل می‌شود (مثل مسیر برگشت)؛ VLESS داخلش.", mSsh: "SSH", mSshD: "تونل SSH داخلی؛ روی سیم دقیقاً یک اتصال SSH است. برنامه‌ی جداگانه نمی‌خواهد.", cProto: "پروتکل", cFrag: "تکه‌تکه کردن TLS", qFrag: "سلام اول TLS در چند تکه‌ی کوچک فرستاده می‌شود؛ بعضی فیلترها فقط وقتی اسم سایت را در یک بسته‌ی کامل ببینند جلویش را می‌گیرند. برای WS و XHTTP همه‌ی سرورهای میانی یکجا روشن یا خاموش می‌شود.", cOverGre: "روی GRE", cOverGreHint: "این سرور از داخل لینک GRE به سرور میانی وصل شود (GRE باید بین دو سرور کار کند).", cMid: "سرور میانی", cMain: "این سرور", mNoGre: "آماده نیست: GRE به IP عمومی هر دو سرور نیاز دارد", mNoSshKey: "در انتظار کلید SSH سرور میانی…", qCPort: "این پورت روی سرورهای میانی باز می‌شود و این سرور به آن وصل می‌شود؛ اگر فایروال دارند، بازش کنید (برای kcp و quic روی UDP).", qGre: "GRE پروتکل ۴۷ است، نه TCP یا UDP؛ اگر فایروال یا دیتاسنتر آن را ببندد، چرخش سراغ روش بعدی می‌رود.",
-    tnNewCmd: "دستور نصب جدید", mWg: "WireGuard", mWgD: "روی UDP، مستقیم به IP این سرور. اگر UDP بین دو سرور بسته باشد، چرخش سراغ روش بعدی می‌رود.", mKcp: "mKCP", mKcpD: "VLESS روی mKCP (UDP)، رمزشده؛ روی لینک پرافت پایدارتر، ولی ترافیک بیشتری مصرف می‌کند.", poolIn: "در چرخش", poolHint: "تیک را بردار تا سرور میانی در جستجو و چرخش سراغ این روش نرود. روشِ فعال همیشه در چرخش است.", mNoUdp: "آماده نیست: آدرس UDP را تنظیم کنید", mNoKcp: "آماده نیست: Xray این سرور باید {v} به بالا باشد", mOldMid: "سرور میانی باید به‌روز شود (دستور نصب را دوباره بزنید)", udpTitle: "WireGuard و mKCP", udpHost: "آدرس این سرور برای UDP", udpHint: "سرورهای میانی با UDP مستقیم به این آدرس وصل می‌شوند: IP مستقیم، نه دامنه‌ی پشت CDN.", tnCreating: "در حال ساختن… (چند ثانیه)", tnNoSrv: "هنوز سرور میانی اضافه نشده.", tnInfo: "سرور میانی به {domain} وصل می‌شود؛ روش هر سرور را از کارت‌هایش انتخاب کنید (WS روی پورت {port}{x}). کاربر ← سرور میانی ← این سرور ← اینترنت.",
-    tnNeedSSL: "برای تانل WSS اول باید دامنه و SSL را از منوی SSH تنظیم کنید.", tnUse: "تانل", tnPick: "این اینباند از کدام سرورهای میانی استفاده کند؟ برای هر کدام یک لینک جدا ساخته می‌شود.",
-    tnTest: "تست اتصال", tnTesting: "در حال تست…", tnTestOk: "وصل است · {ms} میلی‌ثانیه", tnTestBad: "پاسخی از سرور میانی نیامد",
-    tnLastFail: "آخرین قطعی", tnFails: "{n} تلاش ناموفق", rvFwd: "مسیر مستقیم: وسط ← اصلی", rvRev: "مسیر برگشتی: اصلی ← وسط", rvVia: "مسیر مستقیم با روش جایگزین {m} (پیدا شده در جستجو)", rvRevVia: "مسیر برگشتی: اصلی ← وسط ({m})", rvSearch: "اصلی دنبال سرور وسط می‌گردد: روش {m}", rvCool: "همه‌ی روش‌ها امتحان شد؛ استراحت تا {t}، بعد دوباره از اول", rvReady: "جستجوی دوطرفه آماده است (پورت‌های وسط: {p})", rvOld: "برای اتصال دوطرفه و دامنه، دستور نصب را یک بار دیگر روی سرور وسط بزنید (نسخه‌ی {v} به بالا).", dmLabel: "دامنه‌ی سرور وسط", dmSave: "ذخیره", dmHint: "یک رکورد A به {ip} بسازید (در کلادفلر ابر خاکستری)، بعد ذخیره کنید. سرور وسط خودش SSL می‌گیرد؛ پورت ۸۰ آن باید آزاد باشد.", dmOk: "✓ SSL تأیید شد، معتبر تا {d}", dmBusy: "در حال گرفتن SSL…", dmWait: "منتظر سرور وسط…", dmErr: "SSL گرفته نشد",
-    tnInbounds: "اینباندها", tnSshOpt: "Deploy با SSH (اختیاری)", tnPortHere: "پورت روی سرور میانی", tnBusy: "اشغال روی سرور میانی",
-    tnRemove: "حذف relay از سرور میانی (روی همان سرور بزنید):", tnCmdTitle: "دستور نصب سرور میانی",
-    tnInbounds: "اینباندها", tnDeploying: "در حال نصب روی سرور میانی… (تا چند دقیقه)", tnConfirmDel: "این سرور میانی حذف شود؟ اینباندها دیگر از آن استفاده نمی‌کنند.", tnXrayErr: "خطای relay",
-    selectAll: "انتخاب همه", wgTitle: "فایل WireGuard", wgHint: "در اپ WireGuard دکمه‌ی + را بزنید، بعد فایل را وارد کنید یا QR را اسکن کنید.", wgFile: "دانلود فایل", ports: "پورت‌ها", portsTitle: "پورت‌های استفاده‌شده", portsHint: "همه‌ی پورت‌های این‌باندها، جدا با کاما؛ برای ساخت relay و تانل.", gSS: "Shadowsocks", gProxy: "پراکسی ساده (SOCKS / HTTP، با یوزر و پسورد جدا)", relayLinks: "لینک‌های relay", singleUser: "تک‌کاربره", confirmDelRelay: "این relay حذف شود؟",
-    sniTab: "تحریم‌شکن", sniIntro: "کاربر بدون فیلترشکن، دی‌ان‌اس دستگاهش را روی آی‌پی یک سرور ورودی می‌گذارد. فقط دامنه‌های لیست از سرور رد می‌شوند و بقیه‌ی اینترنت مستقیم می‌ماند.", sniS1: "دامنه‌ها", sniS2: "سرورهای ورودی (آی‌پی دی‌ان‌اس)", sniS2h: "روی هر سروری که تیک بخورد، دی‌ان‌اس و ورودی ۸۰ و ۴۴۳ راه می‌افتد. اگر سرور اصلی از ایران فیلتر است، یک سرور میانی را انتخاب کنید.", sniS3: "آی‌پی‌های فعال", sniS3h: "آی‌پی‌هایی که از صفحه‌ی اشتراک دکمه‌ی فعال‌سازی را زده‌اند. با حذف، آن آی‌پی دیگر جواب نمی‌گیرد تا دوباره فعال کند.", sniS4: "اسم‌های پرسیده‌شده", sniS4h: "اسم‌هایی که دستگاه‌های فعال از دی‌ان‌اس پرسیده‌اند. اگر بازی کار نکرد، اسم‌های تازه‌ای که هم‌زمان با باز کردنش آمده‌اند را اضافه کنید.", sniOnlyNew: "فقط اسم‌های خارج از لیست", sniMainSrv: "سرور اصلی", sniNoAct: "هنوز کسی فعال نکرده است.", sniNoSeen: "هنوز چیزی پرسیده نشده.", sniUntil: "تا", sniUser: "کاربر", sniEntry: "ورودی", sniName: "اسم", sniCount: "دفعات", sniLast: "آخرین بار", sniAdd: "افزودن", sniOnlyThis: "+ فقط همین", sniAddAll: "کل دامنه با همه‌ی زیردامنه‌ها", sniAddOne: "فقط همین اسم و زیردامنه‌هایش", sniRemove: "حذف", sniInList: "در لیست", sniOff: "خاموش", sniSeenOld: "برای دیدن آی‌پی‌ها و اسم‌های این سرور، عامل آن باید نسخه‌ی {v} باشد.", sniOffline: "سرور در دسترس نیست", sniNeedDom: "اول در قسمت ۱ دامنه‌ها را ذخیره کنید.", sniRemoved: "حذف شد", sniAdded: "اضافه شد: {d}", sniTitle: "تحریم‌شکن بازی‌ها", qSni: "برای بازی‌ها و سایت‌هایی که آی‌پی ایران را راه نمی‌دهند، بدون فیلترشکن. کاربر دی‌ان‌اس گوشی یا کنسول را روی آی‌پی یک سرور ورودی می‌گذارد؛ فقط دامنه‌های این لیست از آن سرور رد می‌شوند و بقیه‌ی اینترنت مستقیم می‌ماند. فقط آی‌پی کاربرانی کار می‌کند که از صفحه‌ی اشتراکشان فعال‌سازی را زده‌اند. پورت‌های ۵۳، ۸۰ و ۴۴۳ آن سرور باید آزاد باشند. فیلتر را دور نمی‌زند و اسم سایت آشکار می‌رود.", sniDoms: "دامنه‌ها (هر خط یکی؛ زیردامنه‌ها خودشان حساب می‌شوند)", sniPre: "افزودن لیست آماده:", sniMain: "سرور اصلی هم ورودی باشد", sniHours: "مدت هر فعال‌سازی (ساعت)", sniSave: "ذخیره", sniHint: "لیست‌های آماده نقطه‌ی شروع‌اند و باید روی بازی واقعی تست شوند؛ اسم‌های کم را از قسمت ۴ اضافه کنید.", sniOnSrv: "تحریم‌شکن روی این سرور", sniActive: "فعال · {n} آدرس · دی‌ان‌اس {ip}", sniNoDom: "اول دامنه‌ها را در بخش تحریم‌شکن بالای صفحه وارد کنید.", sniOld: "عامل این سرور باید نسخه‌ی {v} یا بالاتر باشد؛ دستور نصب جدید را روی آن اجرا کنید.", sniNoIP: "آی‌پی عمومی این سرور هنوز معلوم نیست.",
-    dtTitle: "تانل‌های اختصاصی", dtHint: "مسیر ثابت و جدا از تانل چرخشی: هرگز عوض نمی‌شود و جایگزین ندارد. اینباندهایی که به آن وصل شوند فقط از همین مسیر می‌روند و اگر قطع شود، قطع می‌مانند.",
-    dtWg: "WireGuard اختصاصی", dtWgD: "Xray WireGuard روی UDP؛ سرور میانی مستقیم به IP این سرور وصل می‌شود. اگر UDP بین دو سرور بسته باشد کار نمی‌کند.", dtBackhaul: "Backhaul", dtBackhaulD: "تانل اختصاصی Backhaul.",
-    dtKcp: "mKCP اختصاصی", dtKcpD: "Xray VLESS روی mKCP (UDP)، تنظیم‌شده برای بازی و رمزشده با seed؛ سرور میانی مستقیم به IP این سرور وصل می‌شود. روی مسیر پراُفت پایدارتر است، ولی ترافیک بیشتری مصرف می‌کند.",
-    dtAskOnKcp: "mKCP اختصاصی برای این سرور میانی روشن شود؟ پورت UDP {p} این سرور باید از سرور میانی باز باشد (فایروال را باز کنید).", peAskKcp: "سرورهای میانیِ دارای تانل mKCP روی پورت جدید {p} دوباره وصل می‌شوند (چند ثانیه قطعی برای اینباندهای وصل‌شده به آن). ادامه؟", dtPortK: "پورت mKCP (UDP)",
-    spTest: "⏱ تست", spTitle: "پینگ و سرعت از همین مسیر بین این سرور و سرور میانی (حداکثر حدود ۴۸ مگابایت ترافیک)", spQueued: "در انتظار سرور میانی…", spRunning: "در حال تست… (حدود ۱۵ ثانیه)", spUpd: "برای تست، ایجنت سرور میانی را به‌روز کنید (نسخه‌ی {v})", spOff: "اول روشنش کنید", spBusy: "تست دیگری روی همین سرور در جریان است",
-    spPing: "پینگ {ms} میلی‌ثانیه (کمینه {min}، بیشینه {max}، نوسان ±{j})", spPingL: "پینگ", spFail: "تست ناموفق: {e}",
-    dtOn: "روشن کن", dtOff: "خاموش کن", dtUp: "وصل", dtDown: "قطع", dtPending: "در حال بررسی…", dtOffline: "سرور میانی آفلاین", dtOffState: "خاموش", dtLastOk: "آخرین اتصال موفق {t}", dtPins: "{n} اینباند", dtNeedAgent: "تانل اختصاصی به ایجنت نسخه‌ی {v} یا جدیدتر نیاز دارد: دستور نصب را یک بار دیگر روی سرور میانی اجرا کنید.",
-    dtAskOn: "WireGuard اختصاصی برای این سرور میانی روشن شود؟ پورت UDP {p} این سرور باید از سرور میانی باز باشد.", dtAskOff: "«{t}» خاموش شود؟ {n} اینباند وصل به آن به تانل چرخشی برمی‌گردند.",
-    dtPort: "پورت WireGuard (UDP)", dtHost: "آدرس این سرور (WireGuard و mKCP)", dtSave: "ذخیره", dtSetHint: "سرور میانی با UDP به این آدرس و پورت‌ها وصل می‌شود. IP مستقیم بدهید، نه دامنه‌ی پشت CDN. پورت باید آزاد باشد (TCP و UDP).",
-    pePort: "پورت", peEdit: "تغییر پورت", peSave: "ذخیره", peCancel: "لغو", tpBadNum: "پورت باید یک عدد بین ۱ تا ۶۵۵۳۵ باشد", peAskUsed: "سرورهای میانی روی «{m}» به پورت جدید {p} می‌روند. پورت قبلی تا ۳۰ دقیقه باز می‌ماند تا تانل قطع نشود؛ ممکن است اتصال کاربران چند ثانیه قطع و وصل شود. ادامه؟", peAskWg: "سرورهای میانیِ دارای تانل WireGuard روی پورت جدید {p} دوباره وصل می‌شوند (چند ثانیه قطعی برای اینباندهای وصل‌شده به آن). ادامه؟", peMoved: "پورت عوض شد. سرورهای میانی تا یک دقیقه به پورت جدید می‌روند؛ پورت قبلی ۳۰ دقیقه باز می‌ماند.",
-    dtPath: "مسیر", dtRot: "چرخشی (پیش‌فرض)", dtPickHint: "مسیر «اختصاصی» ثابت است و جایگزین ندارد: اگر قطع شود این اینباند روی آن سرور قطع می‌ماند.",
-    xuTitle: "هسته‌ی Xray", qXu: "روزی یک بار نسخه‌ی جدید Xray از گیت‌هاب بررسی می‌شود. آپدیت فقط با زدن دکمه انجام می‌شود: اول کانفیگ فعلی با نسخه‌ی جدید تست می‌شود و اگر خطا داشت فقط هشدار می‌دهد.", xuCheck: "بررسی الان", xuCur: "نسخه‌ی این سرور", xuNew: "آخرین نسخه", xuOk: "به‌روز است", xuUpd: "آپدیت به {v}", xuWarn: "تست کانفیگ با نسخه‌ی جدید خطا داد:\n{e}\n\nباز هم آپدیت شود؟", xuMid: "سرورهای میانی با نسخه‌ی قدیمی‌تر", xuMidHint: "برای آپدیت آن‌ها دستور نصب سرور میانی را دوباره روی همان سرور اجرا کنید.",
-    rpTitle: "پورت‌های مسیر برگشت", qRevPorts: "این پورت‌ها روی سرور میانی باز می‌شوند و این سرور در مسیر برگشت به آن‌ها وصل می‌شود. به‌طور پیش‌فرض همان پورت‌های تونل این سرور هستند (اگر روی سرور میانی آزاد باشند).", rpAuto: "خودکار", rpManual: "دستی", rpAutoBtn: "مثل این سرور",
-    tnStart: "روش شروع", qStart: "فقط برای اولین اتصال است. بعد از وصل شدن سرور میانی، بقیه‌ی روش‌ها هم وارد چرخش می‌شوند. اگر WS و XHTTP و REALITY فیلتر باشند، WireGuard یا mKCP (روی UDP) یا GRE را انتخاب کنید. FRP و Backhaul و SSH بعد از اتصال اضافه می‌شوند.",
-    tnPubIP: "IP عمومی سرور میانی", qPubIP: "GRE دو IP عمومی را مستقیم به هم وصل می‌کند، پس IP سرور میانی از همان اول لازم است. اگر در فیلد SSH یک IP نوشته باشید، از همان استفاده می‌شود.",
-  },
-  en: {
-    loginHint: "Sign in to manage the Xray core.", user: "Username", pass: "Password", signIn: "Sign in",
-    overview: "Overview", inbounds: "Inbounds", settings: "Settings", logout: "Log out",
-    liveTitle: "Live server traffic", dailyTitle: "Daily traffic", d7: "7 days", dMonthLbl: "Month", dlLbl: "Download", ulLbl: "Upload", dSince: "Counting since", ibCount: "inbounds",
-    coreStatus: "Core status", coreVersion: "Core version", clients: "Clients", traffic: "Total traffic",
-    coreTitle: "Xray core", restart: "Restart", enableApi: "Enable traffic stats",
-    install: "Install Xray", update: "Update to latest", updateTo: "Install this version",
-    notInstalled: "Not installed", running: "Running", stopped: "Stopped",
-    hintMissing: "No core found on this server. It installs with the official XTLS script, keeping standard paths and service.",
-    hintOk: "Updating only swaps the binary; your config is untouched.",
-    apiOn: "Traffic stats on", apiOff: "Traffic stats off",
-    addInbound: "New inbound", addClient: "New client", del: "Delete", save: "Save", cancel: "Cancel", create: "Create",
-    protocol: "Protocol", port: "Port", tag: "Tag (optional)", network: "Network", security: "Security",
-    path: "Path", serviceName: "serviceName", serverName: "SNI / serverName", dest: "REALITY dest",
-    certFile: "Certificate file", keyFile: "Key file", pickCert: "Certificate on this server",
-    name: "Name (email)", expiryDays: "Valid for (days, 0 = forever)", limitGB: "Traffic (GB, 0 = unlimited)",
-    unlimited: "Unlimited", never: "No expiry", daysLeft: "days left", expired: "Expired", overLimit: "Out of traffic",
-    paused: "Paused", link: "Link", sub: "Subscription", copy: "Copy", copied: "Copied",
-    resetTraffic: "Reset traffic", enable: "Re-enable", details: "Details",
-    noInbounds: "No inbounds yet.", noClients: "No clients.", system: "system", unmanaged: "no clients",
-    confirmDelInbound: "Delete this inbound and all its clients?", confirmDelClient: "Delete this client?",
-    confirmApi: "This adds an API inbound on 127.0.0.1 and its routing rule to the config. Continue?",
-    confirmRestore: "Replace the current config with this backup? (the current one is backed up too)",
-    linksTitle: "Link address", publicHost: "Server domain or IP for links", subBase: "Subscription base URL (optional)",
-    sslHint: "Panel and subscription SSL are set in the SSH menu: run xray-one, option 4.",
-    qBackups: "Before every change the previous Xray config is saved here (last 40). Restore tests it first and only brings back the Xray config; panel users and settings are not touched.", qRaw: "The current Xray config file as it is on the server; view only, edit through this panel.", themeT: "Dark / Light", backups: "Backups", restore: "Restore", rawConfig: "Raw config (read-only)", show: "Show",
-    saved: "Saved", done: "Done", jobRunning: "Running…", jobOk: "Finished successfully", jobFail: "Failed",
-    up: "Up", down: "Down", edit: "Edit", setExpiry: "Change validity", setLimit: "Change traffic",
-    allSub: "Subscription with every config", newLink: "New link", confirmNewLink: "The current subscription link stops working and a new one is made. Continue?",
-    quick: "Quick setup", quickTitle: "Create configs automatically", quickHint: "Every type you tick gets its own free port and one shared client, so that client's subscription carries them all.",
-    gReality: "REALITY (no domain or certificate needed)", gTls: "TLS (uses your domain certificate)", gPlain: "No TLS (for relays or CDN over HTTP)",
-    needCert: "Set SSL in the SSH menu first", exists: "have it", all: "All", none: "None", clientName: "Shared client name",
-    createN: "Create", relay: "Alt address", addRelay: "Add alt address", relaySel: "Alt address for selected", relayAddr: "Alternative IP or domain",
-    relayPort: "Port (empty = inbound port)", relayName: "Name (optional)", relayHint: "Every client gets an extra link with this address (also in QR and subscription). SNI, keys and other settings stay the same. The panel does not build the route; this address must already reach this server.",
-    relayEx: "Examples: a second subdomain pointing to this IP (if the first gets blocked) · a Cloudflare subdomain or clean IP for WS/XHTTP+TLS inbounds · the IP of a server you forward here yourself with iptables/HAProxy.",
-    relayBefore: "Current link", relayAfter: "Extra link with this address", relayNoClient: "This inbound has no client yet to preview a link.",
-    delSel: "Delete", selAll: "Select all", selNone: "Select none", editInbound: "Edit inbound", editIbNote: "Protocol, tag and clients stay. Changing the port or settings changes links and the subscription; users must update their sub.", rsCheck: "Check", rCommas: "comma separated", rNew: "Regenerate", rNewKeys: "New keys", rClear: "Clear", rsFind: "Find", rsTitle: "REALITY target scanner", rsHint: "Checks from this server which sites work as a REALITY target (TLS 1.3, h2, X25519, valid certificate). Leave empty for common sites, or enter a domain, an IP or a range like 1.2.3.0/24.",
-    rsPh: "domain, IP or range — empty = common sites", rsScan: "Scan", rsStatus: "Status", rsCert: "Certificate", rsLatency: "Latency", rsOk: "Feasible", rsNo: "Not usable", rsUse: "Use", rsWait: "Scanning… (up to a minute)", rsCount: "{a} usable of {b}", close: "Close", tunSel: "⇄ Tunnel", tbTitle: "Bulk tunnel", tbHint: "Selected inbounds open on the middle server on their own port. Ports busy there are skipped and shown here.",
-    tbAdd: "Tunnel", tbRemove: "Remove from this server", tbSkipped: "Skipped", tbDone: "{n} inbounds done", tbProgress: "{a} of {b} ready on the middle server", tbSlow: "The middle server did not answer. Check it is online in the Tunnels tab.",
-    stOk: "open", stBusy: "busy on middle server", stDown: "not listening", stOffline: "middle server offline", stUnknown: "old agent; rerun the install command", stPending: "checking…", confirmDelSel: "Delete {n} selected inbounds? Their clients go too.",
-    usersTab: "Clients", addUser: "New client", usersHint: "A client is one name that sits on several inbounds, with one traffic/time limit and one subscription link for all of them.",
-    noUsers: "No clients yet.", pickInbounds: "Inbounds of this client", editUser: "Edit", noInboundsYet: "no inbound", confirmDelUser: "Remove this client from every inbound?",
-    tunnels: "Tunnel", addTunnel: "New middle server", tnName: "Name", tnHost: "Middle server IP or domain (for SSH)", tnSshPort: "SSH port", tnSshUser: "SSH user",
-    tnMethod: "Method", tpWs: "WS port", tpXh: "XHTTP port", tpRt: "REALITY port", tpRtT: "REALITY site", mReality: "Xray REALITY", mRealityD: "No domain or cert needed; looks like a visit to a real site.", tpAuto: "auto", tpSave: "Save ports", tpHint: "Each port is checked as free (TCP and UDP) before saving. If a server is connected with that method, switch its method first, then change the port.", mWss: "Xray WS", mWssD: "WebSocket + TLS. Simple and stable.", mXhttp: "Xray XHTTP", mXhttpD: "HTTP/2 + TLS, looks like normal HTTPS; WS successor.",
-    mGrefrp: "GRE + FRP", mGrefrpD: "FRP over a GRE link.", mBackhaul: "Backhaul", mBackhaulD: "This server dials the middle server with Backhaul; VLESS inside.", mFrpssh: "FRP over SSH", mFrpsshD: "When only SSH gets through.",
-    mSoon: "Soon", mActive: "Active", mTrying: "Trying…", mAsk: "Switch this middle server to \"{m}\"? If it can't connect within 90 s it goes back by itself.",
-    mBack: "The new method did not connect and went back: {x}", mNeedAgent: "To switch methods, run the install command on the middle server once more (version {v} or newer).", tnDeploy: "Deploy over SSH", tnPass: "SSH password (used once, never stored)", tnPassKey: "Panel key installed; no password needed",
-    tnOnline: "Connected", tnOffline: "Down", tnNever: "not connected yet", tnAgo: "ago", tnQuick: "Quick install without a password: run this on the middle server as root. Valid 24 h, void after it connects.",
-    qSingle: "This inbound (SOCKS or HTTP) has no client list, just one username and password, so everyone uses this one link. Link form: http://user:pass@server:port (for SOCKS, user:pass is base64). Works in any app with a proxy setting, or v2rayN/NekoBox. Not encrypted.", qDomain: "Optional. If the middle server cannot reach this server, this server dials the middle server itself (reverse path). Without a domain only REALITY is tried; with a domain and SSL, WS and XHTTP too. Not used in user links.", qRtT: "The site the REALITY tunnel looks like a visit to, on this server and, on the reverse path, on the middle server. It can differ from your inbounds' sites. Needs TLS 1.3, h2 and X25519: Check tests it from this server and the middle servers.", rcCheck: "Check", rcHere: "This server", rcWait: "Checking…", rcOld: "update the middle server", rcOff: "offline", rcNoAns: "no answer",
-    mGre: "GRE", mGreD: "A GRE link between the two servers' IPs (protocol 47) with VLESS inside. Light and fast; no encryption of its own, and no NAT.", mFrp: "FRP", mFrpD: "This server dials the middle server with FRP (like the reverse path); VLESS inside.", mSsh: "SSH", mSshD: "Built-in SSH tunnel; on the wire it is just an SSH connection. No extra program.", cProto: "Protocol", cFrag: "TLS fragment", qFrag: "The first TLS message goes out in small pieces; some filters only block when they see the site name in one whole packet. One switch for WS and XHTTP on every middle server.", cOverGre: "Over GRE", cOverGreHint: "This server dials the middle server inside the GRE link (GRE must work between the servers).", cMid: "Middle server", cMain: "This server", mNoGre: "Not ready: GRE needs both servers' public IPs", mNoSshKey: "Waiting for the middle server's SSH key…", qCPort: "This port opens on the middle servers and this server dials it; open it in their firewall if they have one (UDP for kcp and quic).", qGre: "GRE is protocol 47, not TCP or UDP; if a firewall or the datacenter blocks it, rotation moves on to the next method.",
-    tnNewCmd: "New install command", mWg: "WireGuard", mWgD: "Over UDP, straight to this server's IP. If UDP is blocked between the servers, rotation moves on to the next method.", mKcp: "mKCP", mKcpD: "VLESS over mKCP (UDP), encrypted; steadier on lossy links, but uses more traffic.", poolIn: "In rotation", poolHint: "Untick to keep the middle server from searching or rotating to this method. The active method is always in.", mNoUdp: "Not ready: set the UDP address", mNoKcp: "Not ready: this server needs Xray {v} or newer", mOldMid: "Update the middle server (run the install command again)", udpTitle: "WireGuard and mKCP", udpHost: "This server's address for UDP", udpHint: "Middle servers connect to this address over UDP: a direct IP, not a domain behind a CDN.", tnCreating: "Creating… (a few seconds)", tnNoSrv: "No middle server yet.", tnInfo: "The middle server connects to {domain}; pick each server's method on its cards (WS on port {port}{x}). User → middle server → this server → internet.",
-    tnNeedSSL: "The WSS tunnel needs this server's domain and SSL: set them in the SSH menu first.", tnUse: "Tunnel", tnPick: "Which middle servers should this inbound use? Each one gets its own link.",
-    tnTest: "Test connection", tnTesting: "Testing…", tnTestOk: "Connected · {ms} ms", tnTestBad: "No answer from the middle server",
-    tnLastFail: "Last drop", tnFails: "{n} failed attempts", rvFwd: "Direct path: middle → main", rvRev: "Reverse path: main → middle", rvVia: "Direct path on fallback method {m} (found by searching)", rvRevVia: "Reverse path: main → middle ({m})", rvSearch: "Main is searching for the middle server: way {m}", rvCool: "Every way tried; resting until {t}, then starting over", rvReady: "Two-way search ready (middle ports: {p})", rvOld: "For two-way reconnect and a domain, run the install command on the middle server once more (version {v} or newer).", dmLabel: "Middle server domain", dmSave: "Save", dmHint: "Add an A record to {ip} (gray cloud in Cloudflare), then save. The middle server gets SSL itself; its port 80 must be free.", dmOk: "✓ SSL confirmed, valid until {d}", dmBusy: "Getting SSL…", dmWait: "Waiting for the middle server…", dmErr: "SSL failed",
-    tnSshOpt: "Deploy over SSH (optional)", tnPortHere: "Port on middle server", tnBusy: "busy on middle server",
-    tnRemove: "Remove the relay from the middle server (run there):", tnCmdTitle: "Middle server install command",
-    tnInbounds: "Inbounds", tnDeploying: "Installing on the middle server… (a few minutes)", tnConfirmDel: "Remove this middle server? Inbounds stop using it.", tnXrayErr: "Relay error",
-    selectAll: "Select all", wgTitle: "WireGuard file", wgHint: "For the official WireGuard app: download the file and tap + then Import from file, or scan the QR with Create from QR code.", wgFile: "Download .conf", ports: "Ports", portsTitle: "Used ports", portsHint: "Every inbound port, comma separated, for building relays and tunnels.", gSS: "Shadowsocks", gProxy: "Plain proxies (SOCKS / HTTP, own user and password)", relayLinks: "Relay links", singleUser: "single user", confirmDelRelay: "Remove this relay?",
-    sniTab: "Unblocker", sniIntro: "With no VPN, a user sets their device's DNS to an entry server's IP. Only the listed domains go through the server; the rest of the internet stays direct.", sniS1: "Domains", sniS2: "Entry servers (DNS address)", sniS2h: "Each ticked server runs the DNS and the 80/443 entry. If the main server is filtered in Iran, pick a middle server.", sniS3: "Active addresses", sniS3h: "Addresses that pressed Activate on a subscription page. Removing one stops it until it activates again.", sniS4: "Names asked", sniS4h: "Names active devices asked the DNS for. If a game fails, add the new names that showed up while you opened it.", sniOnlyNew: "Only names not in the list", sniMainSrv: "Main server", sniNoAct: "Nobody has activated yet.", sniNoSeen: "Nothing asked yet.", sniUntil: "Until", sniUser: "User", sniEntry: "Entry", sniName: "Name", sniCount: "Times", sniLast: "Last", sniAdd: "Add", sniOnlyThis: "+ only this", sniAddAll: "The whole domain with all its subdomains", sniAddOne: "Only this name and its subdomains", sniRemove: "Remove", sniInList: "in list", sniOff: "off", sniSeenOld: "To see this server's addresses and names, its agent must be {v}.", sniOffline: "server offline", sniNeedDom: "Save the domains in part 1 first.", sniRemoved: "Removed", sniAdded: "Added: {d}", sniTitle: "Game unblocker", qSni: "For games and sites that refuse Iranian addresses, with no VPN. A user sets their phone's or console's DNS to an entry server's IP; only the domains in this list pass through that server, the rest of the internet stays direct. Only addresses of users who pressed Activate on their subscription page can use it. Ports 53, 80 and 443 must be free on that server. It does not get around filtering and the site name is visible.", sniDoms: "Domains (one per line; subdomains are included)", sniPre: "Add a ready list:", sniMain: "The main server is an entry too", sniHours: "Each activation lasts (hours)", sniSave: "Save", sniHint: "Ready lists are a starting point and need a test with the real game; add missing names from part 4.", sniOnSrv: "Game unblocker on this server", sniActive: "On · {n} addresses · DNS {ip}", sniNoDom: "Enter the domains in the Game unblocker box at the top first.", sniOld: "This server's agent must be {v} or newer: run a new install command on it.", sniNoIP: "This server's public IP is not known yet.",
-    dtTitle: "Dedicated tunnels", dtHint: "A fixed path, separate from the rotating tunnel: it never switches and has no fallback. Inbounds pinned to it go only this way, and stay down if it drops.",
-    dtWg: "Dedicated WireGuard", dtWgD: "Xray WireGuard over UDP; the middle server dials this server's IP directly. Won't work if UDP is blocked between the servers.", dtBackhaul: "Backhaul", dtBackhaulD: "Dedicated Backhaul tunnel.",
-    dtKcp: "Dedicated mKCP", dtKcpD: "Xray VLESS over mKCP (UDP), tuned for gaming and encrypted with a seed; the middle server dials this server's IP directly. Steadier on lossy links, but uses more traffic.",
-    dtAskOnKcp: "Turn on dedicated mKCP for this middle server? UDP port {p} on this server must be reachable from it (open it in the firewall).", peAskKcp: "Middle servers with the mKCP tunnel reconnect on the new port {p} (a few seconds of drop for inbounds pinned to it). Continue?", dtPortK: "mKCP port (UDP)",
-    spTest: "⏱ Test", spTitle: "Ping and speed through this exact path between this server and the middle server (about 48 MB of traffic at most)", spQueued: "Waiting for the middle server…", spRunning: "Testing… (about 15 s)", spUpd: "To test, update the middle server's agent (version {v})", spOff: "Turn it on first", spBusy: "Another test is running on this server",
-    spPing: "ping {ms} ms (min {min}, max {max}, jitter ±{j})", spPingL: "ping", spFail: "Test failed: {e}",
-    dtOn: "Turn on", dtOff: "Turn off", dtUp: "Up", dtDown: "Down", dtPending: "Checking…", dtOffline: "Middle server offline", dtOffState: "Off", dtLastOk: "last good check {t}", dtPins: "{n} inbounds", dtNeedAgent: "Dedicated tunnels need agent {v} or newer: run the install command on the middle server once more.",
-    dtAskOn: "Turn on dedicated WireGuard for this middle server? UDP port {p} on this server must be reachable from it.", dtAskOff: "Turn off \"{t}\"? {n} inbounds pinned to it go back to the rotating tunnel.",
-    dtPort: "WireGuard port (UDP)", dtHost: "This server's address (WireGuard and mKCP)", dtSave: "Save", dtSetHint: "Middle servers dial this address and these ports over UDP. Use the direct IP, not a domain behind a CDN. The port must be free (TCP and UDP).",
-    pePort: "Port", peEdit: "Change port", peSave: "Save", peCancel: "Cancel", tpBadNum: "The port must be a number from 1 to 65535", peAskUsed: "Middle servers on \"{m}\" move to the new port {p}. The old port stays open for 30 minutes so the tunnel does not drop; users may see a few seconds of reconnect. Continue?", peAskWg: "Middle servers with the WireGuard tunnel reconnect on the new port {p} (a few seconds of drop for inbounds pinned to it). Continue?", peMoved: "Port changed. Middle servers move to it within a minute; the old port stays open for 30 minutes.",
-    dtPath: "Path", dtRot: "Rotating (default)", dtPickHint: "A dedicated path is fixed with no fallback: if it drops, this inbound stays down on that server.",
-    xuTitle: "Xray core", qXu: "Checks GitHub for a new Xray once a day. It updates only when you press the button: the current config is tested with the new version first, and a failed test only warns.", xuCheck: "Check now", xuCur: "This server", xuNew: "Latest", xuOk: "up to date", xuUpd: "Update to {v}", xuWarn: "The config test with the new version failed:\n{e}\n\nUpdate anyway?", xuMid: "Middle servers on an older version", xuMidHint: "To update them, run the middle server install command on that server again.",
-    rpTitle: "Reverse path ports", qRevPorts: "These ports open on the middle server and this server dials them on the reverse path. By default they match this server's tunnel ports (when free on the middle server).", rpAuto: "auto", rpManual: "manual", rpAutoBtn: "Same as this server",
-    tnStart: "Starting method", qStart: "Only for the first connection. Once the middle server is connected, the other methods join the rotation too. If WS, XHTTP and REALITY are blocked, pick WireGuard or mKCP (over UDP) or GRE. FRP, Backhaul and SSH join after it connects.",
-    tnPubIP: "Middle server public IP", qPubIP: "GRE links two public IPs directly, so the middle server's IP is needed from the start. If the SSH field holds an IP, that one is used.",
-  },
-};
-let lang = localStorage.getItem("xo_lang") || "fa";
+let lang = localStorage.getItem("xo_lang") || "en";
+if (!T[lang]) lang = "en";
+const langMeta = (c) => XO_LANGS.find((l) => l[0] === c) || XO_LANGS[0];
+const locale = () => ({ fa: "fa-IR", en: "en-GB", zh: "zh-CN" }[lang] || lang);
+const sep = () => t("listSep");
 const t = (k) => (T[lang] && T[lang][k]) || T.en[k] || k;
 const $ = (s, el = document) => el.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -160,11 +12,11 @@ let state = { status: null, inbounds: [], host: "", job: null, view: "overview",
 
 function applyLang() {
   document.documentElement.lang = lang;
-  document.documentElement.dir = lang === "fa" ? "rtl" : "ltr";
+  document.documentElement.dir = langMeta(lang)[3] ? "rtl" : "ltr";
   document.querySelectorAll("[data-t]").forEach((el) => (el.textContent = t(el.dataset.t)));
   document.querySelectorAll("[data-qm]").forEach((el) => (el.innerHTML = qm(el.dataset.qm)));
   $("#themeBtn").title = t("themeT");
-  $("#langBtn").textContent = lang === "fa" ? "EN" : "فا";
+  langPickers.forEach((p) => p.set(lang, t("langT"), t("langQ")));
   render();
 }
 
@@ -209,7 +61,7 @@ $("#loginForm").addEventListener("submit", async (e) => {
 });
 $("#logoutBtn").onclick = guard(async () => { await api("POST", "api/logout"); showLogin(); });
 $("#themeBtn").onclick = () => { const d = document.documentElement, cur = d.dataset.theme || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"); d.dataset.theme = cur === "dark" ? "light" : "dark"; localStorage.setItem("xo_theme", d.dataset.theme); };
-$("#langBtn").onclick = () => { lang = lang === "fa" ? "en" : "fa"; localStorage.setItem("xo_lang", lang); applyLang(); };
+const langPickers = [...document.querySelectorAll(".lang-slot")].map((slot) => XOLang.mount(slot, XO_LANGS, lang, (l) => { lang = l; localStorage.setItem("xo_lang", l); applyLang(); }, t("langT")));
 
 // ---------- navigation ----------
 // the open tab lives in the address (#tunnels), so a refresh stays on it
@@ -977,7 +829,7 @@ async function loadXray(now) {
   $("#xuBox").innerHTML = `<p>${t("xuCur")}: <b class="mono">${esc(x.current || "?")}</b> · ${t("xuNew")}: <b class="mono">${esc(x.latest || "?")}</b> ${newer ? "" : x.latest ? `<span class="muted">(${t("xuOk")})</span>` : ""}</p>
     ${x.err ? `<p class="err">${esc(x.err)}</p>` : ""}
     ${newer ? `<button class="btn primary small" id="xuUpd">${esc(t("xuUpd").replace("{v}", x.latest))}</button>` : ""}
-    ${mids.length ? `<p class="muted small">${t("xuMid")}: ${mids.map((s) => esc(s.name) + " (" + esc(s.xrayVer) + ")").join("، ")}<br>${t("xuMidHint")}</p>` : ""}`;
+    ${mids.length ? `<p class="muted small">${t("xuMid")}: ${mids.map((s) => esc(s.name) + " (" + esc(s.xrayVer) + ")").join(sep())}<br>${t("xuMidHint")}</p>` : ""}`;
   document.querySelector('nav [data-view="settings"]')?.classList.toggle("badge", !!newer);
   const u = $("#xuUpd");
   if (u) u.onclick = guard(async () => {
@@ -996,7 +848,7 @@ function bkTime(n) {
   const m = /config-(\d{4})(\d\d)(\d\d)-(\d\d)(\d\d)(\d\d)/.exec(n);
   if (!m) return esc(n);
   const d = new Date(Date.UTC(+m[1], m[2] - 1, +m[3], +m[4], +m[5], +m[6]));
-  return esc(d.toLocaleString(lang === "fa" ? "fa-IR" : "en-GB", { dateStyle: "medium", timeStyle: "medium" }));
+  return esc(d.toLocaleString(locale(), { dateStyle: "medium", timeStyle: "medium" }));
 }
 async function loadSettings() {
   const s = state.status.settings, f = $("#settingsForm");
@@ -1161,7 +1013,7 @@ function sniBase(n) {
   const two = /^(co|com|net|org|gov|ac|edu)$/.test(p[p.length - 2] || "") && p.length > 2;
   return p.slice(two ? -3 : -2).join(".");
 }
-function sniTime(ts) { return new Date(ts * 1000).toLocaleString(lang === "fa" ? "fa-IR" : undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }); }
+function sniTime(ts) { return new Date(ts * 1000).toLocaleString(locale(), { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }); }
 function renderSni() {
   const d = sniData; if (!d) return;
   const f = $("#sniForm");
@@ -1231,7 +1083,7 @@ function revBlock(s, i) {
   const mn = (m) => ({ wss: "WS", xhttp: "XHTTP", reality: "REALITY" })[m] || m || "REALITY";
   let rv = "";
   if (s.revPort) {
-    const ports = [s.revPort, s.domain && s.certOk ? s.revPortW : 0, s.domain && s.certOk ? s.revPortX : 0].filter(Boolean).join("، ");
+    const ports = [s.revPort, s.domain && s.certOk ? s.revPortW : 0, s.domain && s.certOk ? s.revPortX : 0].filter(Boolean).join(sep());
     if (s.search === "search") rv = t("rvSearch").replace("{m}", s.searchN.split(" ").map((x, k) => k ? x : mn(x)).join(" "));
     else if (s.search === "cool") rv = t("rvCool").replace("{t}", new Date(s.searchAt * 1000).toLocaleTimeString());
     else if (s.mode === "rev") rv = t("rvRevVia").replace("{m}", mn(s.bridgeVia));

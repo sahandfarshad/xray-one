@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="{{.Lang}}" dir="{{.Dir}}">
+<html lang="en" dir="ltr">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -68,71 +68,90 @@ h2{font-size:13px;font-weight:600;color:var(--mut);margin:22px 4px 8px;letter-sp
 <body>
 <div class="wrap">
   <div class="top">
-    <div class="who"><span class="eyebrow">{{.T.title}}</span><h1>{{.Name}}</h1></div>
-    <div class="tools"><a class="ic" href="?lang={{.OtherLang}}">{{.T.lang}}</a><button class="ic" id="theme" title="{{.T.theme}}" aria-label="{{.T.theme}}">◐</button></div>
+    <div class="who"><span class="eyebrow" data-t="title">{{.T.title}}</span><h1>{{.Name}}</h1></div>
+    <div class="tools"><span class="lang-slot"></span><button class="ic" id="theme" title="{{.T.theme}}" aria-label="{{.T.theme}}" data-ta="theme">◐</button></div>
   </div>
 
   <div class="card">
-    <span class="pill {{.State}}">{{.StateText}}</span>
+    <span class="pill {{.State}}" data-t="{{.StateKey}}">{{index .T .StateKey}}</span>
     <div class="usage"><div class="big">{{.Used}}{{if not .Unlimited}} <small>/ {{.Total}}</small>{{end}}</div></div>
     {{if not .Unlimited}}<div class="bar"><i class="{{if ge .Pct 85}}hot{{end}}" style="width:{{.Pct}}%"></i></div>{{end}}
-    <div class="under"><span>{{if .Unlimited}}{{.T.unlimited}}{{else}}<b>{{.Left}}</b> {{.T.left}}{{end}}</span>{{if not .Unlimited}}<span>{{.Pct}}%</span>{{end}}</div>
+    <div class="under"><span>{{if .Unlimited}}<span data-t="unlimited">{{.T.unlimited}}</span>{{else}}<b>{{.Left}}</b> <span data-t="left">{{.T.left}}</span>{{end}}</span>{{if not .Unlimited}}<span>{{.Pct}}%</span>{{end}}</div>
     <div class="grid">
-      <div class="stat"><span>{{.T.up}}</span><b>{{.Up}}</b></div>
-      <div class="stat"><span>{{.T.down}}</span><b>{{.Dn}}</b></div>
-      <div class="stat"><span>{{.T.expiry}}</span><b class="nb">{{if .Never}}∞{{else if .DaysLeft}}{{.DaysLeft}}{{else}}—{{end}}</b></div>
+      <div class="stat"><span><span data-t="up">{{.T.up}}</span></span><b>{{.Up}}</b></div>
+      <div class="stat"><span><span data-t="down">{{.T.down}}</span></span><b>{{.Dn}}</b></div>
+      <div class="stat"><span><span data-t="expiry">{{.T.expiry}}</span></span><b class="nb">{{if .Never}}∞{{else if .DaysN}}<span dir="ltr">{{.DaysN}}</span> <span data-t="days">{{.T.days}}</span>{{else if .Today}}<span data-t="today">{{.T.today}}</span>{{else}}—{{end}}</b></div>
     </div>
-    <p class="muted" style="margin:10px 2px 0">{{if .Never}}{{.T.never}}{{else}}{{.T.expiry}}: <span dir="ltr">{{.Expiry}}</span>{{end}}</p>
+    <p class="muted" style="margin:10px 2px 0">{{if .Never}}<span data-t="never">{{.T.never}}</span>{{else}}<span data-t="expiry">{{.T.expiry}}</span>: <span dir="ltr">{{.Expiry}}</span>{{end}}</p>
   </div>
 
   {{if .Configs}}
-  <h2>{{.T.sub}}</h2>
+  <h2><span data-t="sub">{{.T.sub}}</span></h2>
   <div class="card">
-    <p class="muted">{{.T.subHint}}</p>
-    <div class="row"><div class="url">{{.SubURL}}</div><button class="btn pri" data-copy="{{.SubURL}}">{{.T.copy}}</button></div>
-    <div class="btns"><button class="btn" data-qr="subqr">{{.T.qr}}</button></div>
+    <p class="muted"><span data-t="subHint">{{.T.subHint}}</span></p>
+    <div class="row"><div class="url">{{.SubURL}}</div><button class="btn pri" data-copy="{{.SubURL}}"><span data-t="copy">{{.T.copy}}</span></button></div>
+    <div class="btns"><button class="btn" data-qr="subqr"><span data-t="qr">{{.T.qr}}</span></button></div>
     <img class="qr" id="subqr" alt="QR" src="{{safeURL .SubQR}}">
   </div>
 
   {{end}}
 
   {{if .Apps}}
-  <h2>{{.T.apps}}</h2>
+  <h2><span data-t="apps">{{.T.apps}}</span></h2>
   <div class="card">
-    {{range .Apps}}<div class="app"><div class="lg">{{slice .Name 0 1}}</div><div class="meta"><b>{{.Name}}</b><span>{{.Platforms}}</span></div><div class="acts">{{if .Import}}<a class="btn pri" href="{{safeURL .Import}}">{{$.T.add}}</a>{{end}}<a class="btn" href="{{.Download}}" target="_blank" rel="noopener">{{$.T.download}}</a>{{range .Store}}<a class="btn" href="{{.URL}}" target="_blank" rel="noopener">{{.Label}}</a>{{end}}</div></div>
+    {{range .Apps}}<div class="app"><div class="lg">{{slice .Name 0 1}}</div><div class="meta"><b>{{.Name}}</b><span>{{.Platforms}}</span></div><div class="acts">{{if .Import}}<a class="btn pri" href="{{safeURL .Import}}"><span data-t="add">{{$.T.add}}</span></a>{{end}}<a class="btn" href="{{.Download}}" target="_blank" rel="noopener"><span data-t="download">{{$.T.download}}</span></a>{{range .Store}}<a class="btn" href="{{.URL}}" target="_blank" rel="noopener">{{.Label}}</a>{{end}}</div></div>
     {{end}}
   </div>
   {{end}}
 
   {{if .WG}}
-  <h2>{{.T.wg}}</h2>
+  <h2><span data-t="wg">{{.T.wg}}</span></h2>
   <div class="card items">
-    <p class="muted">{{.T.wgHint}}</p>
-    {{range $i, $w := .WG}}<div class="item"><span class="nm">{{$w.Name}}</span><button class="btn pri" data-wg="wg{{$i}}" data-file="{{$w.File}}">{{$.T.wgFile}}</button><button class="btn" data-qr="wq{{$i}}">{{$.T.qr}}</button><textarea hidden id="wg{{$i}}">{{$w.Conf}}</textarea><div class="qwrap"><img class="qr" id="wq{{$i}}" alt="QR" src="{{safeURL $w.QR}}"></div></div>
+    <p class="muted"><span data-t="wgHint">{{.T.wgHint}}</span></p>
+    {{range $i, $w := .WG}}<div class="item"><span class="nm">{{$w.Name}}</span><button class="btn pri" data-wg="wg{{$i}}" data-file="{{$w.File}}"><span data-t="wgFile">{{$.T.wgFile}}</span></button><button class="btn" data-qr="wq{{$i}}"><span data-t="qr">{{$.T.qr}}</span></button><textarea hidden id="wg{{$i}}">{{$w.Conf}}</textarea><div class="qwrap"><img class="qr" id="wq{{$i}}" alt="QR" src="{{safeURL $w.QR}}"></div></div>
     {{end}}
   </div>
   {{end}}
 
   {{if .Sni}}
-  <h2>{{.T.sni}}</h2>
+  <h2><span data-t="sni">{{.T.sni}}</span></h2>
   <div class="card items">
-    <p class="muted">{{.T.sniHint}}</p>
-    {{range .Sni}}<div class="item"><span class="nm">{{if .Name}}{{.Name}} · {{end}}{{$.T.sniDNS}} <span dir="ltr">{{.IP}}</span></span><button class="btn" data-copy="{{.IP}}">{{$.T.copy}}</button><a class="btn pri" href="{{safeURL .Link}}" target="_blank" rel="noopener">{{$.T.sniAct}}</a></div>
+    <p class="muted"><span data-t="sniHint">{{.T.sniHint}}</span></p>
+    {{range .Sni}}<div class="item"><span class="nm">{{if .Name}}{{.Name}} · {{end}}<span data-t="sniDNS">{{$.T.sniDNS}}</span> <span dir="ltr">{{.IP}}</span></span><button class="btn" data-copy="{{.IP}}"><span data-t="copy">{{$.T.copy}}</span></button><a class="btn pri" href="{{safeURL .Link}}" target="_blank" rel="noopener"><span data-t="sniAct">{{$.T.sniAct}}</span></a></div>
     {{end}}
   </div>
   {{end}}
 
   {{if .Configs}}
-  <h2>{{.T.configs}}</h2>
+  <h2><span data-t="configs">{{.T.configs}}</span></h2>
   <div class="card items">
-    {{range $i, $c := .Configs}}<div class="item"><span class="nm">{{$c.Name}}</span><button class="btn" data-copy="{{$c.Link}}">{{$.T.copy}}</button><button class="btn" data-qr="cq{{$i}}">{{$.T.qr}}</button><div class="qwrap"><img class="qr" id="cq{{$i}}" alt="QR" src="{{safeURL $c.QR}}"></div></div>
+    {{range $i, $c := .Configs}}<div class="item"><span class="nm">{{$c.Name}}</span><button class="btn" data-copy="{{$c.Link}}"><span data-t="copy">{{$.T.copy}}</span></button><button class="btn" data-qr="cq{{$i}}"><span data-t="qr">{{$.T.qr}}</span></button><div class="qwrap"><img class="qr" id="cq{{$i}}" alt="QR" src="{{safeURL $c.QR}}"></div></div>
     {{end}}
   </div>
   {{end}}
 
-  {{if not (or .Configs .WG)}}<div class="card"><p class="empty">{{.T.none}}</p></div>{{end}}
+  {{if not (or .Configs .WG)}}<div class="card"><p class="empty"><span data-t="none">{{.T.none}}</span></p></div>{{end}}
 </div>
-<div class="toast" id="toast">{{.T.copied}}</div>
+<div class="toast" id="toast" data-t="copied">{{.T.copied}}</div>
+<script nonce="{{.Nonce}}">{{.PickJS}}</script>
+<script nonce="{{.Nonce}}">
+(function(){
+  var L={{.LangsJS}},T={{.I18NJS}},name={{.Name}},k2="xo_sub_lang",cur="en";
+  try{cur=localStorage.getItem(k2)||new URLSearchParams(location.search).get("lang")||"en"}catch(e){}
+  if(!T[cur])cur="en";
+  function tr(k){return(T[cur]&&T[cur][k])||T.en[k]||k}
+  var pick;
+  function apply(){
+    var m=L.filter(function(l){return l[0]===cur})[0]||L[0],r=document.documentElement;
+    r.lang=cur;r.dir=m[3]?"rtl":"ltr";document.title=tr("title")+" · "+name;
+    document.querySelectorAll("[data-t]").forEach(function(e){e.textContent=tr(e.dataset.t)});
+    document.querySelectorAll("[data-ta]").forEach(function(e){e.title=tr(e.dataset.ta);e.setAttribute("aria-label",tr(e.dataset.ta))});
+    if(pick)pick.set(cur,tr("langT"),tr("langQ"));
+  }
+  pick=XOLang.mount(document.querySelector(".lang-slot"),L,cur,function(l){cur=l;try{localStorage.setItem(k2,l)}catch(e){}apply()},tr("langT"));
+  apply();
+})();
+</script>
 <script nonce="{{.Nonce}}">
 (function(){
   var r=document.documentElement,k="xo_sub_theme";

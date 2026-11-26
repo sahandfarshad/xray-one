@@ -298,3 +298,10 @@ input[type=checkbox],input[type=radio]{width:16px;height:16px;padding:0;margin:0
 .mcard .mopt select{margin-inline-start:auto}
 .mcard .mfoot{display:flex;flex-direction:column;align-items:flex-start;gap:.2rem;padding-top:.4rem}
 .snitbl .sadd{display:inline-flex;gap:.3rem}
+
+/* ---- language picker (langpick.js) ---- */
+.login-head{display:flex;align-items:center;justify-content:space-between;gap:.6rem}
+.top-actions{align-items:center}
+.top-actions .xl-btn{height:32px}
+.xl{--xl-soft:var(--soft);--xl-acc:var(--accent)}
+@media (max-width:640px){.top-actions .xl-btn{height:28px;padding:0 9px 0 8px}.top-actions .xl-cur{max-width:72px;overflow:hidden;text-overflow:ellipsis}}

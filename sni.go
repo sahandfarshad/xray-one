@@ -780,18 +780,30 @@ func (s *sniService) activate(c net.Conn, src, key string) {
 		s.saveLocked()
 	}
 	s.mu.Unlock()
-	code, title, msg := "200 OK", "فعال شد", fmt.Sprintf("این اینترنت برای %d ساعت فعال شد. دی‌ان‌اس گوشی یا کنسول را روی این آدرس بگذارید:", hours)
+	// English by default; the visitor's saved language (picker) switches it in the browser.
+	E := actText["en"]
+	code, title, msg := "200 OK", "okTitle", "okMsg"
 	if !ok {
-		code, title, msg = "404 Not Found", "لینک معتبر نیست", "این لینک فعال‌سازی معتبر نیست یا اشتراک شما فعال نیست."
+		code, title, msg = "404 Not Found", "badTitle", "badMsg"
 	}
-	body := `<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>` + title + `</title>` +
-		`<style>body{font-family:system-ui,Tahoma,sans-serif;background:#111;color:#eee;display:grid;place-items:center;min-height:90vh;margin:0}` +
+	h := strconv.Itoa(hours)
+	body := `<!doctype html><html lang="en" dir="ltr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>` + html.EscapeString(E[title]) + `</title>` +
+		`<style>:root{--card:#1a1a1d;--ink:#eee;--line:#333;--soft:#26262a;--bg:#111;--accent:#5fb39a}` +
+		`body{font-family:system-ui,Tahoma,sans-serif;background:#111;color:#eee;display:grid;place-items:center;min-height:90vh;margin:0}` +
+		`.top{position:fixed;top:12px;inset-inline-end:12px}` +
 		`.c{max-width:420px;padding:24px;border:1px solid #333;border-radius:16px;text-align:center;line-height:1.9}b{font-size:1.4em;direction:ltr;display:block;margin:10px 0}` +
-		`small{color:#999}</style></head><body><div class="c"><h2>` + title + `</h2><p>` + html.EscapeString(msg) + `</p>`
+		`small{color:#999}</style></head><body><div class="top"><span class="lang-slot"></span></div><div class="c"><h2 data-t="` + title + `">` + html.EscapeString(E[title]) + `</h2>` +
+		`<p data-t="` + msg + `" data-h="` + h + `">` + html.EscapeString(strings.ReplaceAll(E[msg], "{h}", h)) + `</p>`
 	if ok {
-		body += `<b>` + html.EscapeString(ip) + `</b><small>هر وقت اینترنت یا سیم‌کارت عوض شد، یا زمانش تمام شد، دوباره همین لینک را باز کنید.</small>`
+		body += `<b>` + html.EscapeString(ip) + `</b><small data-t="okHint">` + html.EscapeString(E["okHint"]) + `</small>`
 	}
-	body += `</div></body></html>`
+	body += `</div><script>` + langPickJS + `</script><script>(function(){var L=` + i18nLangs + `,T=` + i18nAct + `,k="xo_act_lang",cur="en";` +
+		`try{cur=localStorage.getItem(k)||"en"}catch(e){}if(!T[cur])cur="en";` +
+		`function tr(x){return(T[cur]&&T[cur][x])||T.en[x]||x}var p;` +
+		`function apply(){var m=L.filter(function(l){return l[0]===cur})[0]||L[0],r=document.documentElement;r.lang=cur;r.dir=m[3]?"rtl":"ltr";` +
+		`document.querySelectorAll("[data-t]").forEach(function(e){var s=tr(e.dataset.t);if(e.dataset.h)s=s.split("{h}").join(e.dataset.h);e.textContent=s});` +
+		`document.title=tr("` + title + `");if(p)p.set(cur,tr("langT"),tr("langQ"))}` +
+		`p=XOLang.mount(document.querySelector(".lang-slot"),L,cur,function(l){cur=l;try{localStorage.setItem(k,l)}catch(e){}apply()},tr("langT"));apply()})()</script></body></html>`
 	_, _ = fmt.Fprintf(c, "HTTP/1.1 %s\r\nContent-Type: text/html; charset=utf-8\r\nCache-Control: no-store\r\nConnection: close\r\nContent-Length: %d\r\n\r\n%s", code, len(body), body)
 }
 

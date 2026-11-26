@@ -41,6 +41,11 @@ A light, minimal panel that sits **beside** a headless Xray core. It never repla
 
 ۰.۹.۱: چرخش با ترافیک واقعی قضاوت می‌کند نه فقط با پینگ (هر ۵ دقیقه یک دانلود ۲۵۶ کیلوبایتی)؛ گزینه‌ی «تکه‌تکه کردن TLS» برای WS و XHTTP؛ سرور میانی روی مسیر برگشت هر ۱۰ دقیقه مسیر مستقیم را دوباره امتحان می‌کند و عوض کردن روش آنجا هم ممکن است.
 
+## v0.14.0
+- The panel, the subscription page and the unblocker activation page now open in English and have a language picker (globe button) with 15 languages: English, فارسی, العربية, اردو, Türkçe, Türkmençe, Русский, Беларуская, 中文, 조선어, မြန်မာ, Tiếng Việt, Español, አማርኛ, ትግርኛ. The choice is saved in the browser; Persian, Arabic and Urdu are right to left. The SSH menu stays English.
+- پنل، صفحه‌ی اشتراک و صفحه‌ی فعال‌سازی تحریم‌شکن حالا پیش‌فرض انگلیسی‌اند و دکمه‌ی انتخاب زبان (۱۵ زبان) دارند؛ انتخاب در مرورگر ذخیره می‌شود.
+- Translations live in `i18n/<code>.json`; run `python3 i18n/build.py` after editing them (it writes `web/i18n.js` and `i18n_gen.go`).
+
 ## v0.13.1
 
 - Unblocker names: next to "+ domain" there is "+ only this" to add just that name (for example challenges.cloudflare.com, not all of cloudflare.com).
