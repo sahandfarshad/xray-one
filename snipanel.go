@@ -91,6 +91,7 @@ var sniMainErr string
 
 // sniLoop runs the entry on the main server while it is switched on.
 func (a *App) sniLoop() {
+	sniApp = a
 	sniSvc = newSniService(filepath.Join(a.store.dir, "sni-allow.json"), func(h string, p int) (net.Conn, error) {
 		return net.DialTimeout("tcp", net.JoinHostPort(h, strconv.Itoa(p)), 10*time.Second)
 	})
@@ -500,3 +501,25 @@ func (a *App) handleSniAdd(w http.ResponseWriter, r *http.Request) {
 	time.Sleep(300 * time.Millisecond)
 	writeJSONResp(w, 200, map[string]any{"ok": true, "domains": doms})
 }
+
+// sniCountUse adds unblocker bytes (per activation key) to the subscription
+// they belong to, so every address activated with one subscription uses up
+// that subscription's data.
+func sniCountUse(use map[string][2]int64) {
+	if len(use) == 0 || sniApp == nil {
+		return
+	}
+	byKey := map[string]string{}
+	for _, m := range sniApp.store.All() {
+		if m.SubToken != "" {
+			byKey[sniKey(m.SubToken)] = m.Email
+		}
+	}
+	for k, v := range use {
+		if email, ok := byKey[k]; ok && v[0]+v[1] > 0 {
+			sniApp.store.Update(email, func(m *ClientMeta) { m.Up += v[0]; m.Down += v[1] })
+		}
+	}
+}
+
+var sniApp *App

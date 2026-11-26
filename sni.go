@@ -143,6 +143,7 @@ type sniService struct {
 	ln80    net.Listener
 	errs    []string
 	seen    map[string]*sniSeen // name -> last asked
+	use     map[string][2]int64 // activation key -> bytes [up, down] not yet counted
 }
 
 // sniSvc: the entry this process runs, if any (the panel on the main server,
@@ -443,10 +444,77 @@ func hostOf(a net.Addr) string {
 }
 
 func (s *sniService) allowed(ip string) bool {
+	return s.keyOf(ip) != ""
+}
+
+// keyOf: the activation key (so the subscription) an address is active
+// with, or "" when it is not allowed.
+func (s *sniService) keyOf(ip string) string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	a, ok := s.allow[ip]
-	return ok && a.Until >= time.Now().Unix() && s.keys[a.Key]
+	if ok && a.Until >= time.Now().Unix() && s.keys[a.Key] {
+		return a.Key
+	}
+	return ""
+}
+
+// addUse counts relayed bytes against a subscription.
+func (s *sniService) addUse(key string, up, down int64) {
+	if key == "" || up+down == 0 {
+		return
+	}
+	s.mu.Lock()
+	if s.use == nil {
+		s.use = map[string][2]int64{}
+	}
+	u := s.use[key]
+	u[0] += up
+	u[1] += down
+	s.use[key] = u
+	s.mu.Unlock()
+}
+
+// TakeUsage returns the bytes relayed per activation key since the last call.
+func (s *sniService) TakeUsage() map[string][2]int64 {
+	if s == nil {
+		return nil
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	u := s.use
+	s.use = nil
+	return u
+}
+
+func sniAddUse(a, b map[string][2]int64) map[string][2]int64 {
+	for k, v := range b {
+		if a == nil {
+			a = map[string][2]int64{}
+		}
+		x := a[k]
+		x[0] += v[0]
+		x[1] += v[1]
+		a[k] = x
+	}
+	return a
+}
+
+// sniCounter counts bytes as they pass, so long downloads are counted
+// while they run and not only when the connection closes.
+type sniCounter struct {
+	s    *sniService
+	key  string
+	down bool
+}
+
+func (w sniCounter) Write(p []byte) (int, error) {
+	if w.down {
+		w.s.addUse(w.key, 0, int64(len(p)))
+	} else {
+		w.s.addUse(w.key, int64(len(p)), 0)
+	}
+	return len(p), nil
 }
 
 func (s *sniService) listed(host string) bool {
@@ -607,7 +675,8 @@ func dnsForward(q []byte, tcp bool) []byte {
 
 func (s *sniService) serveTLS(c net.Conn) {
 	defer c.Close()
-	if !s.allowed(hostOf(c.RemoteAddr())) {
+	key := s.keyOf(hostOf(c.RemoteAddr()))
+	if key == "" {
 		return
 	}
 	_ = c.SetReadDeadline(time.Now().Add(15 * time.Second))
@@ -616,10 +685,10 @@ func (s *sniService) serveTLS(c net.Conn) {
 		return
 	}
 	_ = c.SetReadDeadline(time.Time{})
-	s.relay(c, hello, host, 443)
+	s.relay(c, hello, host, 443, key)
 }
 
-func (s *sniService) relay(c net.Conn, first []byte, host string, port int) {
+func (s *sniService) relay(c net.Conn, first []byte, host string, port int, key string) {
 	up, err := s.dial(host, port)
 	if err != nil {
 		return
@@ -628,9 +697,10 @@ func (s *sniService) relay(c net.Conn, first []byte, host string, port int) {
 	if _, err := up.Write(first); err != nil {
 		return
 	}
+	s.addUse(key, int64(len(first)), 0)
 	done := make(chan struct{}, 2)
 	cp := func(dst, src net.Conn) {
-		_, _ = io.Copy(dst, src)
+		_, _ = io.Copy(io.MultiWriter(dst, sniCounter{s, key, dst == c}), src)
 		if tc, ok := dst.(interface{ CloseWrite() error }); ok {
 			_ = tc.CloseWrite()
 		}
@@ -761,11 +831,12 @@ func (s *sniService) serveHTTP(c net.Conn) {
 	if h, _, err := net.SplitHostPort(host); err == nil {
 		host = h
 	}
-	if host == "" || !s.allowed(src) || !s.listed(host) {
+	key := s.keyOf(src)
+	if host == "" || key == "" || !s.listed(host) {
 		return
 	}
 	_ = c.SetReadDeadline(time.Time{})
-	s.relay(c, buf, host, 80)
+	s.relay(c, buf, host, 80, key)
 }
 
 func (s *sniService) activate(c net.Conn, src, key string) {

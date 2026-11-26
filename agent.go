@@ -332,6 +332,8 @@ func agentRun() {
 				XrayVer: xrayVer}
 			req.SniErr, req.SniList, req.SniSeen = sniSvc.Report()
 			req.SniN = len(req.SniList)
+			sniUsePend = sniAddUse(sniUsePend, sniSvc.TakeUsage())
+			req.SniUse = sniUsePend
 			if mode == "rev" {
 				req.Via = ""
 			}
@@ -354,6 +356,9 @@ func agentRun() {
 				}
 			}
 			br, reached, ferr = sendBeat(c, st, mkReq(st.Mode, fails == 0 && !probeDirect))
+			if br != nil {
+				sniUsePend = nil // the main server has counted it
+			}
 			probeDirect = false
 		}
 		// the heartbeat got through; does real traffic? (see dataprobe.go)
@@ -383,6 +388,7 @@ func agentRun() {
 		// opened is here, that path wins
 		if br == nil && !reached && !probeBad && st.Mode != "rev" && st.PendingAt == 0 && wantHasRev() {
 			if b2, _, _ := sendBeat(rvShort, st, mkReq("rev", false)); b2 != nil {
+				sniUsePend = nil
 				fmt.Println("the main server reached us (reverse path); using it")
 				st.Mode, st.Via, st.ModeAt = "rev", "", time.Now().Unix()
 				_ = saveAgent(st)
@@ -1147,3 +1153,7 @@ func portUnit(p int) string {
 	}
 	return ""
 }
+
+// sniUsePend: unblocker bytes not yet confirmed by the main server; they
+// ride on every heartbeat until one gets through.
+var sniUsePend map[string][2]int64

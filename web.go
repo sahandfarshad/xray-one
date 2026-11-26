@@ -779,6 +779,7 @@ func (a *App) Enforce() {
 					}
 				}
 			}
+			sniCountUse(sniSvc.TakeUsage()) // the unblocker on this server
 			now := time.Now().Unix()
 			for _, m := range a.store.All() {
 				if m.Disabled {

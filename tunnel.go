@@ -1299,6 +1299,7 @@ type beatReq struct {
 	SniN      int                  `json:"sniN,omitempty"`      // addresses active on it
 	SniList   []sniActive          `json:"sniList,omitempty"`   // addresses active on it (0.12.1+)
 	SniSeen   []sniSeen            `json:"sniSeen,omitempty"`   // names they asked for lately (0.12.1+)
+	SniUse    map[string][2]int64  `json:"sniUse,omitempty"`    // unblocker bytes per activation key since the last beat, [up, down] (0.14.1+)
 }
 
 type beatResp struct {
@@ -1361,6 +1362,7 @@ func (a *App) handleBeat(w http.ResponseWriter, r *http.Request) {
 		s.Mode, s.Via = req.Mode, req.Via
 		s.SniErr, s.SniN = trimTo(req.SniErr, 300), req.SniN
 		sniRemoteSet(s.ID, req.SniList, req.SniSeen)
+		sniCountUse(req.SniUse)
 		if req.CState != nil {
 			for k, v := range req.CState {
 				req.CState[k] = trimTo(v, 300)
