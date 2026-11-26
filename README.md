@@ -41,6 +41,11 @@ A light, minimal panel that sits **beside** a headless Xray core. It never repla
 
 ۰.۹.۱: چرخش با ترافیک واقعی قضاوت می‌کند نه فقط با پینگ (هر ۵ دقیقه یک دانلود ۲۵۶ کیلوبایتی)؛ گزینه‌ی «تکه‌تکه کردن TLS» برای WS و XHTTP؛ سرور میانی روی مسیر برگشت هر ۱۰ دقیقه مسیر مستقیم را دوباره امتحان می‌کند و عوض کردن روش آنجا هم ممکن است.
 
+## v0.15.4
+
+- New app icon (X1) as the panel favicon, beside the panel name, and on the subscription page.
+- آیکون تازهٔ برنامه (X1) به‌عنوان نشانک مرورگر، کنار نام پنل و در صفحهٔ اشتراک.
+
 ## v0.15.3
 
 - The Xray update card (current version, newest version, "Check now", and the update button that appears only when a newer one exists) moved from Settings to the bottom of the Overview page.

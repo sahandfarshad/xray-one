@@ -5,12 +5,13 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#f6f5f2">
 <title>XRay One</title>
-<link rel="stylesheet" href="style.css?v=0.14.0">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="stylesheet" href="style.css?v=0.15.4">
 </head>
 <body>
 <div id="login" class="login hidden">
   <form id="loginForm" class="card login-card">
-    <div class="login-head"><div class="brand"><span class="dot"></span>XRay One</div><span class="lang-slot"></span></div>
+    <div class="login-head"><div class="brand"><img class="logo" src="icon.svg" alt=""><span class="dot"></span>XRay One</div><span class="lang-slot"></span></div>
     <p class="muted" data-t="loginHint"></p>
     <label><span data-t="user"></span><input name="user" autocomplete="username" required></label>
     <label><span data-t="pass"></span><input name="pass" type="password" autocomplete="current-password" required></label>
@@ -21,7 +22,7 @@
 
 <div id="app" class="hidden">
   <header class="top">
-    <div class="brand"><span class="dot" id="coreDot"></span>XRay One <span id="panelVer" class="ver"></span></div>
+    <div class="brand"><img class="logo" src="icon.svg" alt=""><span class="dot" id="coreDot"></span>XRay One <span id="panelVer" class="ver"></span></div>
     <nav id="tabs">
       <button data-view="overview" data-t="overview"></button>
       <button data-view="inbounds" data-t="inbounds"></button>

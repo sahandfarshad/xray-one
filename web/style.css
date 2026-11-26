@@ -112,6 +112,7 @@ label.selall{flex-direction:row;align-items:center;gap:.4rem;color:var(--ink);fo
 label.selall input{width:16px;height:16px;padding:0;accent-color:var(--accent)}
 
 textarea.ports { width: 100%; box-sizing: border-box; resize: vertical; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line, #ddd); background: var(--soft); color: var(--ink); font-size: 13px; line-height: 1.6; direction: ltr; }
+.brand .logo{width:22px;height:22px;border-radius:5px;display:block}
 .brand .ver{font-size:12px;font-weight:500;color:var(--muted);margin-inline-start:4px;direction:ltr}
 .dot.bad{background:#c0392b;box-shadow:0 0 0 4px rgba(192,57,43,.15)}
 .chip.tun{background:var(--soft);color:var(--accent)}
