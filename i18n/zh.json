@@ -456,5 +456,10 @@
  "panel.confirmDelFolder": "删除此文件夹？其中内容将保留，不再属于任何文件夹。",
  "panel.moveSel": "移到文件夹",
  "panel.followFolder": "整个文件夹，包括以后加入的",
- "panel.folderEmpty": "空"
+ "panel.folderEmpty": "空",
+ "panel.liveIn": "各入站实时速度",
+ "panel.liveCl": "各客户端实时速度",
+ "panel.liveIdle": "当前没有流量。",
+ "panel.liveOptT": "按入站和客户端显示实时速度",
+ "panel.liveOptH": "关闭后面板不会读取这些计数器；概览中只保留服务器总流量。"
 }

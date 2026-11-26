@@ -456,5 +456,10 @@
  "panel.confirmDelFolder": "Bu bukja pozulsynmy? Içindäkiler bukjasyz galar.",
  "panel.moveSel": "Bukja geçir",
  "panel.followFolder": "tutuş bukja, soňkylar hem",
- "panel.folderEmpty": "Boş"
+ "panel.folderEmpty": "Boş",
+ "panel.liveIn": "Her girişiň janly tizligi",
+ "panel.liveCl": "Her müşderiniň janly tizligi",
+ "panel.liveIdle": "Häzir hereket ýok.",
+ "panel.liveOptT": "Her giriş we müşderi üçin janly tizlik",
+ "panel.liveOptH": "Öçük bolanda panel bu sanaýjylary hiç okamaýar; diňe serweriň jemi Umumy synda galýar."
 }

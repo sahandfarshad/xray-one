@@ -191,6 +191,7 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("GET /api/backups", a.api(func(w http.ResponseWriter, r *http.Request) { writeJSONResp(w, 200, a.cfg.Backups()) }))
 	mux.HandleFunc("POST /api/backups/restore", a.api(a.handleRestore))
 	mux.HandleFunc("POST /api/settings", a.api(a.handleSettings))
+	mux.HandleFunc("POST /api/settings/live", a.api(a.handleLiveSetting))
 	mux.HandleFunc("GET /api/freeport", a.api(func(w http.ResponseWriter, r *http.Request) {
 		writeJSONResp(w, 200, map[string]int{"port": suggestPort()})
 	}))
@@ -288,7 +289,7 @@ func (a *App) handleStatus(w http.ResponseWriter, r *http.Request) {
 	cfg := a.store.Cfg
 	writeJSONResp(w, 200, map[string]any{
 		"core": DetectCore(), "version": version, "job": a.job.Snapshot(),
-		"settings": map[string]string{"publicHost": cfg.PublicHost, "subBase": cfg.SubBase, "domain": cfg.Domain, "listen": cfg.Listen, "panelURL": a.PanelURL()},
+		"settings": map[string]string{"publicHost": cfg.PublicHost, "subBase": cfg.SubBase, "liveDetail": strconv.FormatBool(!cfg.LiveOff), "domain": cfg.Domain, "listen": cfg.Listen, "panelURL": a.PanelURL()},
 	})
 }
 
@@ -630,6 +631,21 @@ func (a *App) handleSettings(w http.ResponseWriter, r *http.Request) {
 	writeJSONResp(w, 200, map[string]bool{"ok": true})
 }
 
+// POST /api/settings/live {on}: live speed per inbound and client on/off.
+// Off means the panel never reads those counters for the live view.
+func (a *App) handleLiveSetting(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		On bool `json:"on"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&body)
+	a.store.Cfg.LiveOff = !body.On
+	if err := a.store.SaveCfg(); err != nil {
+		fail(w, 500, err)
+		return
+	}
+	writeJSONResp(w, 200, map[string]bool{"ok": true})
+}
+
 // handleSub serves a client's subscription: every inbound the name is on.
 func (a *App) handleSub(w http.ResponseWriter, r *http.Request) {
 	tok := r.PathValue("token")
@@ -719,7 +735,7 @@ func (a *App) disableClient(email, reason string) {
 }
 
 func (a *App) Enforce() {
-	var apiTried time.Time
+	var apiTried, inTried time.Time
 	for {
 		func() {
 			core := DetectCore()
@@ -735,6 +751,15 @@ func (a *App) Enforce() {
 				} else {
 					log.Printf("traffic stats turned on")
 					core = DetectCore()
+				}
+			}
+			if core.APIAddr != "" && !a.store.Cfg.LiveOff && time.Since(inTried) > 30*time.Minute {
+				// live speed per inbound needs per-inbound counters (one core restart, once)
+				inTried = time.Now()
+				if root, _, err := a.cfg.Load(); err == nil && !hasInboundStats(root) {
+					if err := a.cfg.Mutate(EnableInboundStats); err != nil {
+						log.Printf("could not turn on inbound stats: %v", err)
+					}
 				}
 			}
 			if core.APIAddr != "" {

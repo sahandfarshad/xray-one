@@ -12,7 +12,7 @@ import (
 	"golang.org/x/term"
 )
 
-var version = "0.15.4"
+var version = "0.16.0"
 
 func main() {
 	dir := os.Getenv("XRAY_ONE_DIR")

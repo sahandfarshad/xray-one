@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#f6f5f2">
 <title>XRay One</title>
 <link rel="icon" type="image/svg+xml" href="icon.svg">
-<link rel="stylesheet" href="style.css?v=0.15.4">
+<link rel="stylesheet" href="style.css?v=0.16.0">
 </head>
 <body>
 <div id="login" class="login hidden">
@@ -50,6 +50,13 @@
       <div class="card">
         <div class="row-between"><h3 data-t="liveTitle"></h3><span class="live-nums"><span class="dl">↓ <span data-t="dlLbl"></span> <b id="liveRx">—</b></span><span class="ul">↑ <span data-t="ulLbl"></span> <b id="liveTx">—</b></span></span></div>
         <canvas id="liveChart" class="livechart"></canvas>
+      </div>
+
+      <div class="card hidden" id="liveDet">
+        <div class="livedet">
+          <div><h3 data-t="liveIn"></h3><div id="liveIn"></div></div>
+          <div><h3 data-t="liveCl"></h3><div id="liveCl"></div></div>
+        </div>
       </div>
 
       <div class="card">
@@ -141,6 +148,10 @@
           <button class="btn primary" data-t="save"></button>
         </form>
         <p class="muted" data-t="sslHint"></p>
+      </div>
+      <div class="card">
+        <label class="inrow"><input type="checkbox" id="liveOpt"> <span data-t="liveOptT"></span></label>
+        <p class="muted" data-t="liveOptH"></p>
       </div>
       <div class="card">
         <h3><span data-t="backups"></span> <span data-qm="qBackups"></span></h3>

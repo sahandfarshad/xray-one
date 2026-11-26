@@ -456,5 +456,10 @@
  "panel.confirmDelFolder": "ဤဖိုင်တွဲကို ဖျက်မလား။ အတွင်းရှိအရာများ ဖိုင်တွဲမရှိဘဲ ကျန်ပါမည်။",
  "panel.moveSel": "ဖိုင်တွဲသို့ ရွှေ့",
  "panel.followFolder": "ဖိုင်တွဲတစ်ခုလုံး၊ နောက်ထပ်များပါ",
- "panel.folderEmpty": "ဗလာ"
+ "panel.folderEmpty": "ဗလာ",
+ "panel.liveIn": "inbound တစ်ခုချင်းစီ၏ တိုက်ရိုက်အမြန်နှုန်း",
+ "panel.liveCl": "client တစ်ခုချင်းစီ၏ တိုက်ရိုက်အမြန်နှုန်း",
+ "panel.liveIdle": "ယခု traffic မရှိပါ။",
+ "panel.liveOptT": "inbound နှင့် client အလိုက် တိုက်ရိုက်အမြန်နှုန်း",
+ "panel.liveOptH": "ပိတ်ထားလျှင် panel သည် ဤကောင်တာများကို ဘယ်တော့မှ မဖတ်ပါ၊ ခြုံငုံသုံးသပ်ချက်တွင် ဆာဗာစုစုပေါင်းသာ ကျန်ပါမည်။"
 }

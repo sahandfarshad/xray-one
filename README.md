@@ -41,6 +41,13 @@ A light, minimal panel that sits **beside** a headless Xray core. It never repla
 
 ۰.۹.۱: چرخش با ترافیک واقعی قضاوت می‌کند نه فقط با پینگ (هر ۵ دقیقه یک دانلود ۲۵۶ کیلوبایتی)؛ گزینه‌ی «تکه‌تکه کردن TLS» برای WS و XHTTP؛ سرور میانی روی مسیر برگشت هر ۱۰ دقیقه مسیر مستقیم را دوباره امتحان می‌کند و عوض کردن روش آنجا هم ممکن است.
 
+## v0.16.0
+
+- Live speed per inbound and per client on Overview (download and upload, every 2 s, busiest first, idle hidden). It runs only while Overview is open. Per-inbound counters are turned on in Xray once (one core restart).
+- Settings has a switch to turn it off; when off, the panel never reads these counters.
+- سرعت زندهٔ هر اینباند و هر کلاینت در صفحهٔ اول (دانلود و آپلود، هر ۲ ثانیه، پرمصرف‌ترین بالا). فقط وقتی صفحهٔ اول باز است کار می‌کند. شمارنده‌های اینباند یک بار در اکس‌ری روشن می‌شوند (یک بار ری‌استارت هسته).
+- در تنظیمات کلید خاموش کردنش هست؛ وقتی خاموش است پنل این شمارنده‌ها را اصلاً نمی‌خواند.
+
 ## v0.15.4
 
 - New app icon (X1) as the panel favicon, beside the panel name, and on the subscription page.

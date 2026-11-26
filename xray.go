@@ -921,6 +921,56 @@ func orDefault(s, d string) string {
 	return s
 }
 
+// statsRaw reads every Xray counter (name -> bytes) without resetting it.
+func statsRaw(core Core, addr string) (map[string]int64, error) {
+	out, err := run(5*time.Second, core.Bin, "api", "statsquery", "--server="+addr)
+	if err != nil {
+		return nil, fmt.Errorf("statsquery: %s", out)
+	}
+	var res struct {
+		Stat []struct {
+			Name  string `json:"name"`
+			Value any    `json:"value"`
+		} `json:"stat"`
+	}
+	if err := json.Unmarshal([]byte(out), &res); err != nil {
+		return nil, err
+	}
+	m := map[string]int64{}
+	for _, s := range res.Stat {
+		switch t := s.Value.(type) {
+		case float64:
+			m[s.Name] = int64(t)
+		case string:
+			m[s.Name], _ = strconv.ParseInt(t, 10, 64)
+		}
+	}
+	return m, nil
+}
+
+// hasInboundStats: per-inbound counters are on (policy.system).
+func hasInboundStats(root *OMap) bool {
+	sys := asMap(path(root, "policy", "system"))
+	return sys != nil && sys.Get("statsInboundUplink") == true && sys.Get("statsInboundDownlink") == true
+}
+
+// EnableInboundStats turns on per-inbound counters for the live speed list.
+func EnableInboundStats(root *OMap) error {
+	pol := asMap(root.Get("policy"))
+	if pol == nil {
+		pol = NewOMap()
+		root.Set("policy", pol)
+	}
+	sys := asMap(pol.Get("system"))
+	if sys == nil {
+		sys = NewOMap()
+		pol.Set("system", sys)
+	}
+	sys.Set("statsInboundUplink", true)
+	sys.Set("statsInboundDownlink", true)
+	return nil
+}
+
 // statsQuery reads per-user traffic through `xray api statsquery` and resets
 // the counters, so XRay One can accumulate totals across core restarts.
 func statsQuery(core Core, addr string) (map[string][2]int64, error) {

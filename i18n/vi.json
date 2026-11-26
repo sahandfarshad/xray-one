@@ -456,5 +456,10 @@
  "panel.confirmDelFolder": "Xóa thư mục này? Nội dung bên trong vẫn giữ, không thuộc thư mục.",
  "panel.moveSel": "Chuyển vào thư mục",
  "panel.followFolder": "cả thư mục, kể cả mục sau này",
- "panel.folderEmpty": "Trống"
+ "panel.folderEmpty": "Trống",
+ "panel.liveIn": "Tốc độ trực tiếp theo inbound",
+ "panel.liveCl": "Tốc độ trực tiếp theo client",
+ "panel.liveIdle": "Hiện không có lưu lượng.",
+ "panel.liveOptT": "Tốc độ trực tiếp theo inbound và client",
+ "panel.liveOptH": "Khi tắt, bảng điều khiển không bao giờ đọc các bộ đếm này; Tổng quan chỉ giữ tổng lưu lượng máy chủ."
 }

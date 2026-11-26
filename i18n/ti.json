@@ -456,5 +456,10 @@
  "panel.confirmDelFolder": "እዚ ፎልደር ይሰረዝ ዶ? ትሕቲኡ ዘሎ ብዘይ ፎልደር ይተርፍ።",
  "panel.moveSel": "ናብ ፎልደር ኣግዕዝ",
  "panel.followFolder": "ምሉእ ፎልደር፣ ዝመጽኡ እውን",
- "panel.folderEmpty": "ባዶ"
+ "panel.folderEmpty": "ባዶ",
+ "panel.liveIn": "ናይ ነፍሲ ወከፍ ኣታዊ ቀጥታ ፍጥነት",
+ "panel.liveCl": "ናይ ነፍሲ ወከፍ ዓሚል ቀጥታ ፍጥነት",
+ "panel.liveIdle": "ሕጂ ትራፊክ የለን።",
+ "panel.liveOptT": "ቀጥታ ፍጥነት ንነፍሲ ወከፍ ኣታዊን ዓሚልን",
+ "panel.liveOptH": "ምስ ዝጠፍእ ፓነል ነዞም ቆጸርቲ ፈጺሙ ኣየንብቦምን፤ ኣብ ሓፈሻዊ ርእይቶ ናይ ሰርቨር ድምር ጥራይ ይተርፍ።"
 }

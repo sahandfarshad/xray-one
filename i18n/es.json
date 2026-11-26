@@ -456,5 +456,10 @@
  "panel.confirmDelFolder": "¿Eliminar esta carpeta? Lo que contiene queda sin carpeta.",
  "panel.moveSel": "Mover a carpeta",
  "panel.followFolder": "toda la carpeta, también las futuras",
- "panel.folderEmpty": "Vacía"
+ "panel.folderEmpty": "Vacía",
+ "panel.liveIn": "Velocidad en vivo por entrada",
+ "panel.liveCl": "Velocidad en vivo por cliente",
+ "panel.liveIdle": "No hay tráfico ahora mismo.",
+ "panel.liveOptT": "Velocidad en vivo por entrada y cliente",
+ "panel.liveOptH": "Si está apagado, el panel nunca lee estos contadores; en Resumen solo queda el total del servidor."
 }

@@ -126,11 +126,20 @@ function liveSync() {
     live.es = new EventSource("api/live");
     live.es.onmessage = (e) => {
       const d = JSON.parse(e.data); live.pts.push(d); if (live.pts.length > 90) live.pts.shift();
-      $("#liveRx").textContent = fmtRate(d.rx); $("#liveTx").textContent = fmtRate(d.tx); drawLive();
+      $("#liveRx").textContent = fmtRate(d.rx); $("#liveTx").textContent = fmtRate(d.tx); drawLive(); liveDetail(d);
     };
   } else if (!liveWanted() && live.es) { live.es.close(); live.es = null; }
 }
 document.addEventListener("visibilitychange", liveSync);
+// per-inbound / per-client speed rows [name, down, up] (off in Settings = none sent)
+function liveDetail(d) {
+  const box = $("#liveDet"); if (!d.in) { box.classList.add("hidden"); return; }
+  box.classList.remove("hidden");
+  const ibName = (tag) => { const ib = (state.inbounds || []).find((x) => x.tag === tag || x.id === tag); return ib && ib.port ? `${tag} · ${ib.port}` : tag; };
+  const tbl = (rows, nm) => rows.length ? `<table class="livetbl"><tbody>${rows.sort((a, b) => b[1] + b[2] - a[1] - a[2]).slice(0, 20).map((r) =>
+    `<tr><td class="nm">${esc(nm(r[0]))}</td><td class="n dl">↓ ${fmtRate(r[1])}</td><td class="n ul">↑ ${fmtRate(r[2])}</td></tr>`).join("")}</tbody></table>` : `<p class="muted">${t("liveIdle")}</p>`;
+  $("#liveIn").innerHTML = tbl(d.in, ibName); $("#liveCl").innerHTML = tbl(d.cl, (x) => x);
+}
 // y-axis scale in KB/MB/GB with round steps (1, 2, 2.5, 5 × 10^n), 4 lines
 function niceScale(max) {
   const units = [["B", 1], ["KB", 1024], ["MB", 1024 ** 2], ["GB", 1024 ** 3], ["TB", 1024 ** 4]];
@@ -950,6 +959,7 @@ function bkTime(n) {
 async function loadSettings() {
   const s = state.status.settings, f = $("#settingsForm");
   f.publicHost.value = s.publicHost || ""; f.subBase.value = s.subBase || "";
+  $("#liveOpt").checked = s.liveDetail !== "false";
   loadXray().catch(() => {});
   const list = await api("GET", "api/backups");
   $("#backupList").innerHTML = list.length ? list.map((n) => `<div class="item"><span title="${esc(n)}">${bkTime(n)}</span><button class="btn small" data-restore="${esc(n)}">${t("restore")}</button></div>`).join("") : `<p class="muted">—</p>`;
@@ -958,6 +968,9 @@ $("#settingsForm").addEventListener("submit", guard(async (e) => {
   e.preventDefault();
   const d = Object.fromEntries(new FormData(e.target));
   await api("POST", "api/settings", d); toast(t("saved")); await refreshStatus(); refreshInbounds();
+}));
+$("#liveOpt").addEventListener("change", guard(async (e) => {
+  await api("POST", "api/settings/live", { on: e.target.checked }); toast(t("saved")); await refreshStatus();
 }));
 $("#backupList").addEventListener("click", guard(async (e) => {
   const b = e.target.closest("[data-restore]"); if (!b) return;

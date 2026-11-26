@@ -456,5 +456,10 @@
  "panel.confirmDelFolder": "یہ فولڈر حذف کریں؟ اندر کی چیزیں بغیر فولڈر رہیں گی۔",
  "panel.moveSel": "فولڈر میں منتقل کریں",
  "panel.followFolder": "پورا فولڈر، بعد والے بھی",
- "panel.folderEmpty": "خالی"
+ "panel.folderEmpty": "خالی",
+ "panel.liveIn": "ہر ان باؤنڈ کی لائیو رفتار",
+ "panel.liveCl": "ہر کلائنٹ کی لائیو رفتار",
+ "panel.liveIdle": "اس وقت کوئی ٹریفک نہیں۔",
+ "panel.liveOptT": "ہر ان باؤنڈ اور کلائنٹ کی لائیو رفتار",
+ "panel.liveOptH": "بند ہونے پر پینل یہ کاؤنٹر کبھی نہیں پڑھتا؛ صرف سرور کا کل جائزہ میں رہتا ہے۔"
 }

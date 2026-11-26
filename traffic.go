@@ -207,6 +207,10 @@ func (a *App) handleLive(w http.ResponseWriter, r *http.Request) {
 	pt := time.Now()
 	tick := time.NewTicker(2 * time.Second)
 	defer tick.Stop()
+	var prev map[string]int64 // xray counters at the last tick (live detail)
+	var core Core
+	var skip string // the stats api's own inbound (our reads would show there)
+	n := 0
 	stop := time.After(30 * time.Minute) // the page reconnects by itself
 	for {
 		select {
@@ -225,7 +229,21 @@ func (a *App) handleLive(w http.ResponseWriter, r *http.Request) {
 				dtx = tx - ptx
 			}
 			prx, ptx, pt = rx, tx, now
-			if _, err := fmt.Fprintf(w, "data: {\"rx\":%d,\"tx\":%d}\n\n", uint64(float64(drx)/sec), uint64(float64(dtx)/sec)); err != nil {
+			msg := map[string]any{"rx": uint64(float64(drx) / sec), "tx": uint64(float64(dtx) / sec)}
+			if !a.store.Cfg.LiveOff {
+				if n%30 == 0 {
+					core = DetectCore()
+					if root, _, err := a.cfg.Load(); err == nil {
+						skip = apiTag(root)
+					}
+				}
+				n++
+				msg["in"], msg["cl"], prev = liveDetail(core, skip, prev, sec)
+			} else {
+				prev = nil
+			}
+			b, _ := json.Marshal(msg)
+			if _, err := fmt.Fprintf(w, "data: %s\n\n", b); err != nil {
 				return
 			}
 			fl.Flush()
@@ -258,4 +276,60 @@ func (a *App) trafficLastDays(w http.ResponseWriter, n int) {
 		}
 	}
 	writeJSONResp(w, 200, map[string]any{"days": days, "rx": sumRx, "tx": sumTx, "since": first, "iface": t.Iface, "today": now.Format("2006-01-02")})
+}
+
+// liveDetail: speed (bytes/s) per inbound tag and per client since the last
+// tick, as [name, down, up] rows, idle ones left out. The per-user counters
+// are reset every minute by the stats loop; a counter that went down counts
+// from zero.
+func liveDetail(core Core, skip string, prev map[string]int64, sec float64) (in, cl [][3]any, cur map[string]int64) {
+	in, cl = [][3]any{}, [][3]any{}
+	if core.APIAddr == "" {
+		return in, cl, nil
+	}
+	cur, err := statsRaw(core, core.APIAddr)
+	if err != nil || prev == nil {
+		return in, cl, cur
+	}
+	type ud struct{ up, down int64 }
+	ins, cls := map[string]*ud{}, map[string]*ud{}
+	for name, v := range cur {
+		p := strings.Split(name, ">>>")
+		if len(p) != 4 || p[2] != "traffic" || (p[0] == "inbound" && p[1] == skip) {
+			continue
+		}
+		d := v
+		if o, ok := prev[name]; ok && v >= o {
+			d = v - o
+		}
+		var m map[string]*ud
+		switch p[0] {
+		case "inbound":
+			m = ins
+		case "user":
+			m = cls
+		default:
+			continue
+		}
+		e := m[p[1]]
+		if e == nil {
+			e = &ud{}
+			m[p[1]] = e
+		}
+		if p[3] == "uplink" {
+			e.up += d
+		} else {
+			e.down += d
+		}
+	}
+	rows := func(m map[string]*ud) [][3]any {
+		r := [][3]any{}
+		for k, e := range m {
+			if e.up > 0 || e.down > 0 {
+				r = append(r, [3]any{k, int64(float64(e.down) / sec), int64(float64(e.up) / sec)})
+			}
+		}
+		return r
+	}
+	return rows(ins), rows(cls), cur
 }

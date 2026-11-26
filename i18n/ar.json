@@ -456,5 +456,10 @@
  "panel.confirmDelFolder": "حذف هذا المجلد؟ يبقى محتواه بدون مجلد.",
  "panel.moveSel": "نقل إلى مجلد",
  "panel.followFolder": "المجلد كله، واللاحقة أيضًا",
- "panel.folderEmpty": "فارغ"
+ "panel.folderEmpty": "فارغ",
+ "panel.liveIn": "السرعة المباشرة لكل مدخل",
+ "panel.liveCl": "السرعة المباشرة لكل عميل",
+ "panel.liveIdle": "لا توجد حركة الآن.",
+ "panel.liveOptT": "السرعة المباشرة لكل مدخل وعميل",
+ "panel.liveOptH": "عند الإيقاف لا تقرأ اللوحة هذه العدادات أبداً؛ يبقى إجمالي الخادم فقط في النظرة العامة."
 }

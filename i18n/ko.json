@@ -456,5 +456,10 @@
  "panel.confirmDelFolder": "이 폴더를 삭제할까요? 안의 항목은 폴더 없이 남습니다.",
  "panel.moveSel": "폴더로 이동",
  "panel.followFolder": "폴더 전체, 나중 항목도",
- "panel.folderEmpty": "비어 있음"
+ "panel.folderEmpty": "비어 있음",
+ "panel.liveIn": "인바운드별 실시간 속도",
+ "panel.liveCl": "클라이언트별 실시간 속도",
+ "panel.liveIdle": "지금은 트래픽이 없습니다.",
+ "panel.liveOptT": "인바운드 및 클라이언트별 실시간 속도",
+ "panel.liveOptH": "끄면 패널이 이 카운터를 전혀 읽지 않으며, 개요에는 서버 전체 트래픽만 남습니다."
 }

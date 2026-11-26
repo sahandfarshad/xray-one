@@ -41,6 +41,7 @@ type PanelConfig struct {
 	KeyFile    string `json:"keyFile"`
 	Managed    bool   `json:"managed"` // certificate issued and renewed by XRay One
 	AcmeEmail  string `json:"acmeEmail"`
+	LiveOff    bool   `json:"liveOff,omitempty"` // no live per-inbound/client speed reads
 }
 
 type Store struct {

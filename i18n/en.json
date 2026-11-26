@@ -456,5 +456,10 @@
  "panel.confirmDelFolder": "Delete this folder? What is inside stays, without a folder.",
  "panel.moveSel": "Move to folder",
  "panel.followFolder": "whole folder, later ones too",
- "panel.folderEmpty": "Empty"
+ "panel.folderEmpty": "Empty",
+ "panel.liveIn": "Live speed by inbound",
+ "panel.liveCl": "Live speed by client",
+ "panel.liveIdle": "Nothing is moving right now.",
+ "panel.liveOptT": "Live speed per inbound and client",
+ "panel.liveOptH": "When off, the panel never reads these counters; only the server total stays on Overview."
 }

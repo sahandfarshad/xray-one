@@ -456,5 +456,10 @@
  "panel.confirmDelFolder": "Bu klasör silinsin mi? İçindekiler klasörsüz kalır.",
  "panel.moveSel": "Klasöre taşı",
  "panel.followFolder": "tüm klasör, sonrakiler de",
- "panel.folderEmpty": "Boş"
+ "panel.folderEmpty": "Boş",
+ "panel.liveIn": "Gelen bağlantıya göre canlı hız",
+ "panel.liveCl": "İstemciye göre canlı hız",
+ "panel.liveIdle": "Şu anda trafik yok.",
+ "panel.liveOptT": "Gelen bağlantı ve istemci başına canlı hız",
+ "panel.liveOptH": "Kapalıyken panel bu sayaçları hiç okumaz; Genel bakışta yalnızca sunucu toplamı kalır."
 }
