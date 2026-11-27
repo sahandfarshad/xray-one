@@ -41,6 +41,11 @@ A light, minimal panel that sits **beside** a headless Xray core. It never repla
 
 ۰.۹.۱: چرخش با ترافیک واقعی قضاوت می‌کند نه فقط با پینگ (هر ۵ دقیقه یک دانلود ۲۵۶ کیلوبایتی)؛ گزینه‌ی «تکه‌تکه کردن TLS» برای WS و XHTTP؛ سرور میانی روی مسیر برگشت هر ۱۰ دقیقه مسیر مستقیم را دوباره امتحان می‌کند و عوض کردن روش آنجا هم ممکن است.
 
+## v0.16.1
+- Installer asks whether to install Xray when it is missing; an Xray already on the server is detected and left as is.
+- SSL from the menu: when port 80 is busy it names the program holding it and offers to pause that service for about a minute, then starts it again. Renewals and middle servers pause web servers (nginx, apache, …) the same way.
+- نصب‌کننده اگر اکس‌ری نصب نباشد می‌پرسد نصب شود یا نه؛ اگر از قبل نصب باشد خبر می‌دهد و دست نمی‌زند. موقع گرفتن گواهی، اگر پورت ۸۰ مشغول باشد نام برنامه را می‌گوید و پیشنهاد می‌دهد برای حدود یک دقیقه متوقفش کند و بعد دوباره روشنش کند.
+
 ## v0.16.0
 
 - Live speed per inbound and per client on Overview (download and upload, every 2 s, busiest first, idle hidden). It runs only while Overview is open. Per-inbound counters are turned on in Xray once (one core restart).

@@ -326,6 +326,16 @@ func (s *sniService) open80Locked() {
 	go s.accept(ln, s.serveHTTP)
 }
 
+// holds80: this process's entry listens on port 80 (ObtainCert lends it).
+func (s *sniService) holds80() bool {
+	if s == nil {
+		return false
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.ln80 != nil
+}
+
 // release80 frees port 80 for a Let's Encrypt challenge; the returned func
 // takes it back. nil when this entry does not hold port 80.
 func (s *sniService) release80() func() {

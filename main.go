@@ -12,7 +12,7 @@ import (
 	"golang.org/x/term"
 )
 
-var version = "0.16.0"
+var version = "0.16.1"
 
 func main() {
 	dir := os.Getenv("XRAY_ONE_DIR")
@@ -37,6 +37,8 @@ func main() {
 	case "detect":
 		c := DetectCore()
 		fmt.Printf("installed=%v version=%s service=%s config=%s api=%s\n", c.Installed, c.Version, c.Active, c.ConfigPath, c.APIAddr)
+	case "install-xray":
+		coreInstallCLI("")
 	case "update":
 		if err := selfUpdate(); err != nil {
 			fmt.Println("Update failed:", err)
@@ -49,7 +51,7 @@ func main() {
 	case "version", "-v", "--version":
 		fmt.Println("XRay One", version)
 	default:
-		fmt.Println("usage: xray-one [menu|serve|update|uninstall|detect|version]")
+		fmt.Println("usage: xray-one [menu|serve|update|install-xray|uninstall|detect|version]")
 	}
 }
 
@@ -98,8 +100,13 @@ func (a *App) renewLoop(dir string) {
 		time.Sleep(time.Minute)
 		cfg := a.store.Cfg
 		if exp, _, err := certExpiry(cfg.CertFile); err == nil && time.Until(exp) < 30*24*time.Hour {
-			if _, _, err := ObtainCert(dir, cfg.Domain, cfg.AcmeEmail, log.Printf); err != nil {
+			if back, err := pauseWeb80(log.Printf); err != nil {
 				log.Printf("certificate renewal failed: %v", err)
+			} else {
+				if _, _, err := ObtainCert(dir, cfg.Domain, cfg.AcmeEmail, log.Printf); err != nil {
+					log.Printf("certificate renewal failed: %v", err)
+				}
+				back()
 			}
 		}
 		time.Sleep(12 * time.Hour)

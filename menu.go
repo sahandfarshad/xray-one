@@ -370,8 +370,12 @@ func sslMenu(dir string, st *Store) {
 			return
 		}
 		email := prompt("Email for Let's Encrypt notices (optional)", st.Cfg.AcmeEmail)
-		// if this panel is on port 80 it must step aside for a moment
+		back, ok := free80Menu()
+		if !ok {
+			return
+		}
 		cf, kf, err := ObtainCert(dir, dom, email, func(f string, a ...any) { fmt.Printf("  "+f+"\n", a...) })
+		back()
 		if err != nil {
 			fmt.Println("Could not get a certificate:", err)
 			return
@@ -400,6 +404,39 @@ func sslMenu(dir string, st *Store) {
 		st.Cfg.CertFile, st.Cfg.KeyFile, st.Cfg.Managed = "", "", false
 		saveAndRestart(st)
 	}
+}
+
+// free80Menu: when port 80 is busy, says who holds it and offers to pause
+// that service for the minute Let's Encrypt needs; the returned func starts
+// it again.
+func free80Menu() (func(), bool) {
+	nop := func() {}
+	if portFree(80) {
+		return nop, true
+	}
+	unit, name := portHolder(80)
+	if unit == "" {
+		fmt.Printf("Port 80 is used by %s, which is not a service that can be paused.\n", name)
+		fmt.Println("Stop it for a minute and choose this option again.")
+		return nop, false
+	}
+	fmt.Printf("Port 80 is used by %s (%s).\n", unit, name)
+	low := strings.ToLower(unit)
+	switch {
+	case unit == "xray-one.service":
+		fmt.Println("That is this panel's game unblocker entry; the panel stops for about a minute.")
+	case strings.Contains(low, "xray") || strings.Contains(low, "x-ui") || strings.Contains(low, "sing-box") || strings.Contains(low, "marzban"):
+		fmt.Println("Warning: this is a proxy core, so its users are cut off for about a minute.")
+	}
+	if !yes("Pause it, get the certificate, and start it again") {
+		return nop, false
+	}
+	back, err := pauseUnit(unit, func(f string, a ...any) { fmt.Printf("  "+f+"\n", a...) })
+	if err != nil {
+		fmt.Println(err)
+		return nop, false
+	}
+	return back, true
 }
 
 func coreInstallCLI(v string) {

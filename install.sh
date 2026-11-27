@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# XRay One installer. Asks nothing: it installs the panel with a free random
-# port, a secret path and a random password, then opens the SSH menu.
-# It never installs, replaces or reconfigures Xray itself.
+# XRay One installer: installs the panel with a free random port, a secret
+# path and a random password, then opens the SSH menu. When Xray is missing
+# it asks whether to install it; an Xray already on the server is left as is.
 set -euo pipefail
 REPO="sahandfarshad/xray-one"
 BIN=/usr/local/bin/xray-one
@@ -43,6 +43,18 @@ systemctl daemon-reload
 systemctl enable xray-one >/dev/null 2>&1
 systemctl restart xray-one
 sleep 1
-if [ -t 0 ] || [ -e /dev/tty ]; then
+if "$BIN" detect 2>/dev/null | grep -q "installed=true"; then
+  echo "Xray is already installed ($("$BIN" detect | sed -n 's/.*version=\([^ ]*\).*/\1/p')); it is left as it is."
+elif { : </dev/tty; } 2>/dev/null; then
+  read -r -p "Xray is not installed. Install the latest Xray now? [Y/n] " ans </dev/tty || ans=n
+  case "$ans" in
+    n|N|no|No|NO) echo "Skipped. Install it later from the menu: 6) Install / update Xray." ;;
+    *) "$BIN" install-xray </dev/tty || echo "Xray install failed; try again from the menu (6)."
+       systemctl restart xray-one ;;
+  esac
+else
+  echo "Xray is not installed. Install it from the menu: 6) Install / update Xray."
+fi
+if { : </dev/tty; } 2>/dev/null; then
   "$BIN" menu </dev/tty || true
 fi

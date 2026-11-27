@@ -1095,34 +1095,62 @@ func setPathRule(cfg []byte, tag string) []byte {
 // When a web server holds port 80, it is stopped for the moment it takes and
 // started again; tunnel programs are never stopped.
 func obtainCertAgent(d string) (string, error) {
-	if !portFree(80) {
-		unit := port80Unit()
-		if unit == "" {
-			return "", errors.New("port 80 is busy and the program holding it is not a service that can be paused; free port 80 for a minute")
-		}
-		low := strings.ToLower(unit)
-		for _, no := range []string{"xray", "muse", "x-ui", "3x-ui", "marzban", "sing-box", "hysteria", "docker", "containerd", "sshd"} {
-			if strings.Contains(low, no) {
-				return "", fmt.Errorf("port 80 is used by %s, which is not paused; free port 80 for a minute", unit)
-			}
-		}
-		fmt.Printf("pausing %s for a moment to get the certificate (port 80)\n", unit)
-		if out, err := run(30*time.Second, "systemctl", "stop", unit); err != nil {
-			return "", fmt.Errorf("could not pause %s: %s", unit, trimTo(out, 200))
-		}
-		defer func() {
-			if out, err := run(30*time.Second, "systemctl", "start", unit); err != nil {
-				fmt.Printf("could not start %s again: %s\n", unit, out)
-			} else {
-				fmt.Println(unit, "started again")
-			}
-		}()
-		for i := 0; i < 20 && !portFree(80); i++ {
-			time.Sleep(250 * time.Millisecond)
-		}
+	back, err := pauseWeb80(func(f string, a ...any) { fmt.Printf(f+"\n", a...) })
+	if err != nil {
+		return "", err
 	}
+	defer back()
 	cf, _, err := ObtainCert(agentDir, d, "", func(string, ...any) {})
 	return cf, err
+}
+
+// noPause: services that are never stopped to free port 80 without asking.
+var noPause = []string{"xray", "muse", "x-ui", "3x-ui", "marzban", "sing-box", "hysteria", "docker", "containerd", "sshd"}
+
+// pauseWeb80 frees port 80 for a certificate when a web server (nginx,
+// apache, caddy …) holds it: the service is stopped for the moment the
+// check takes, and the returned func starts it again. Tunnel and proxy
+// programs are never stopped here.
+func pauseWeb80(logf func(string, ...any)) (func(), error) {
+	nop := func() {}
+	if portFree(80) || sniSvc.holds80() {
+		return nop, nil
+	}
+	unit, name := portHolder(80)
+	if unit == "" {
+		return nop, fmt.Errorf("port 80 is used by %s, which is not a service that can be paused; free port 80 for a minute", name)
+	}
+	low := strings.ToLower(unit)
+	for _, no := range noPause {
+		if strings.Contains(low, no) {
+			return nop, fmt.Errorf("port 80 is used by %s, which is not paused; free port 80 for a minute", unit)
+		}
+	}
+	return pauseUnit(unit, logf)
+}
+
+// pauseUnit stops a systemd service until the returned func starts it again.
+func pauseUnit(unit string, logf func(string, ...any)) (func(), error) {
+	logf("pausing %s for a moment to get the certificate (port 80)", unit)
+	if out, err := run(30*time.Second, "systemctl", "stop", unit); err != nil {
+		return func() {}, fmt.Errorf("could not pause %s: %s", unit, trimTo(out, 200))
+	}
+	back := func() {
+		if out, err := run(30*time.Second, "systemctl", "start", unit); err != nil {
+			logf("could not start %s again: %s", unit, trimTo(out, 200))
+		} else {
+			logf("%s started again", unit)
+		}
+	}
+	for i := 0; i < 40 && !portFree(80); i++ {
+		time.Sleep(250 * time.Millisecond)
+	}
+	if !portFree(80) {
+		back()
+		u, n := portHolder(80)
+		return func() {}, fmt.Errorf("port 80 is still busy after pausing %s (now used by %s)", unit, orDefault(u, n))
+	}
+	return back, nil
 }
 
 // port80Unit: the systemd service listening on port 80, if any.
@@ -1130,28 +1158,42 @@ func port80Unit() string { return portUnit(80) }
 
 // portUnit: the systemd service listening on port p, if any.
 func portUnit(p int) string {
+	u, _ := portHolder(p)
+	return u
+}
+
+// portHolder: the systemd service and the program name listening on port p.
+// The service is empty when the program does not run as one.
+func portHolder(p int) (unit, name string) {
 	inodes := map[string]bool{}
 	for _, l := range scanListeners()[p] {
 		if l.inode != "0" {
 			inodes["socket:["+l.inode+"]"] = true
 		}
 	}
+	name = "another program"
+	if len(inodes) == 0 {
+		return "", name
+	}
 	procs, _ := filepath.Glob("/proc/[0-9]*")
-	for _, p := range procs {
-		fds, _ := os.ReadDir(filepath.Join(p, "fd"))
+	for _, pd := range procs {
+		fds, _ := os.ReadDir(filepath.Join(pd, "fd"))
 		for _, fd := range fds {
-			if l, err := os.Readlink(filepath.Join(p, "fd", fd.Name())); err == nil && inodes[l] {
-				cg, _ := os.ReadFile(filepath.Join(p, "cgroup"))
+			if l, err := os.Readlink(filepath.Join(pd, "fd", fd.Name())); err == nil && inodes[l] {
+				if c, err := os.ReadFile(filepath.Join(pd, "comm")); err == nil && strings.TrimSpace(string(c)) != "" {
+					name = strings.TrimSpace(string(c)) + " (pid " + filepath.Base(pd) + ")"
+				}
+				cg, _ := os.ReadFile(filepath.Join(pd, "cgroup"))
 				for _, part := range strings.Split(strings.TrimSpace(string(cg)), "/") {
 					if strings.HasSuffix(part, ".service") {
-						return part
+						return part, name
 					}
 				}
-				return ""
+				return "", name
 			}
 		}
 	}
-	return ""
+	return "", name
 }
 
 // sniUsePend: unblocker bytes not yet confirmed by the main server; they
