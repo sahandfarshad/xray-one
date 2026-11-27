@@ -440,6 +440,11 @@ func free80Menu() (func(), bool) {
 }
 
 func coreInstallCLI(v string) {
+	if v == "" {
+		if v = latestXrayTag(); v != "" {
+			fmt.Println("Latest Xray:", v)
+		}
+	}
 	line := "curl -fsSL " + installScript + " -o /tmp/xray-install.sh && bash /tmp/xray-install.sh install"
 	if v != "" {
 		line += " --version " + v

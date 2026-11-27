@@ -41,6 +41,10 @@ A light, minimal panel that sits **beside** a headless Xray core. It never repla
 
 ۰.۹.۱: چرخش با ترافیک واقعی قضاوت می‌کند نه فقط با پینگ (هر ۵ دقیقه یک دانلود ۲۵۶ کیلوبایتی)؛ گزینه‌ی «تکه‌تکه کردن TLS» برای WS و XHTTP؛ سرور میانی روی مسیر برگشت هر ۱۰ دقیقه مسیر مستقیم را دوباره امتحان می‌کند و عوض کردن روش آنجا هم ممکن است.
 
+## v0.16.2
+- Installing Xray (installer, menu, panel) no longer fails with "HTTP/2 stream … not closed cleanly / Failed to get release list": the panel finds the newest version itself and gives it to Xray's install script, which then skips GitHub's long release list.
+- نصب اکس‌ری دیگر با خطای «Failed to get release list» شکست نمی‌خورد: پنل خودش آخرین نسخه را پیدا می‌کند و به اسکریپت نصب می‌دهد.
+
 ## v0.16.1
 - Installer asks whether to install Xray when it is missing; an Xray already on the server is detected and left as is.
 - SSL from the menu: when port 80 is busy it names the program holding it and offers to pause that service for about a minute, then starts it again. Renewals and middle servers pause web servers (nginx, apache, …) the same way.

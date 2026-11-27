@@ -241,6 +241,9 @@ func (j *Job) StartCoreJob(action, version string) bool {
 	j.Running, j.Action, j.Log, j.OK = true, action, "", false
 	j.mu.Unlock()
 	go func() {
+		if version == "" {
+			version = latestXrayTag()
+		}
 		cmdline := "set -e; curl -fsSL " + installScript + " -o /tmp/xray-install.sh; bash /tmp/xray-install.sh install"
 		if version != "" {
 			cmdline += " --version " + version

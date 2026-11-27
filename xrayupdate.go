@@ -56,6 +56,20 @@ func xrayCheckNow() {
 	xrayLatest.Ver, xrayLatest.Err = v, ""
 }
 
+// latestXrayTag: the newest Xray release as "vX.Y.Z", or "" when GitHub
+// could not be asked. The install script is given this version so it never
+// downloads GitHub's whole release list (that request breaks on some
+// networks with "HTTP/2 stream was not closed cleanly").
+func latestXrayTag() string {
+	xrayCheckNow()
+	xrayLatest.Lock()
+	defer xrayLatest.Unlock()
+	if xrayLatest.Ver == "" {
+		return ""
+	}
+	return "v" + xrayLatest.Ver
+}
+
 // GET /api/xray/latest
 func (a *App) handleXrayLatest(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Query().Get("now") == "1" {
