@@ -461,5 +461,6 @@
  "panel.liveCl": "各客户端实时速度",
  "panel.liveIdle": "当前没有流量。",
  "panel.liveOptT": "按入站和客户端显示实时速度",
- "panel.liveOptH": "关闭后面板不会读取这些计数器；概览中只保留服务器总流量。"
+ "panel.liveOptH": "关闭后面板不会读取这些计数器；概览中只保留服务器总流量。",
+ "panel.tnFree": "使用空闲端口 {p}"
 }

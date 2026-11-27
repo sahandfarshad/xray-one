@@ -461,5 +461,6 @@
  "panel.liveCl": "Live speed by client",
  "panel.liveIdle": "Nothing is moving right now.",
  "panel.liveOptT": "Live speed per inbound and client",
- "panel.liveOptH": "When off, the panel never reads these counters; only the server total stays on Overview."
+ "panel.liveOptH": "When off, the panel never reads these counters; only the server total stays on Overview.",
+ "panel.tnFree": "use free port {p}"
 }

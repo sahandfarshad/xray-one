@@ -461,5 +461,6 @@
  "panel.liveCl": "Her müşderiniň janly tizligi",
  "panel.liveIdle": "Häzir hereket ýok.",
  "panel.liveOptT": "Her giriş we müşderi üçin janly tizlik",
- "panel.liveOptH": "Öçük bolanda panel bu sanaýjylary hiç okamaýar; diňe serweriň jemi Umumy synda galýar."
+ "panel.liveOptH": "Öçük bolanda panel bu sanaýjylary hiç okamaýar; diňe serweriň jemi Umumy synda galýar.",
+ "panel.tnFree": "boş port {p} ulan"
 }

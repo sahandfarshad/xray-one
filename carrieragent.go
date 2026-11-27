@@ -38,29 +38,29 @@ func agentCarriers(sp *carrierSpec, st agentState) {
 		res := map[string]string{}
 		dir := filepath.Join(agentDir, "carriers")
 		if sp.GRE != nil {
-			res[tunnelMethodGRE] = errText(greLink("xo-gre", sp.GRE.Remote, sp.GRE.Addr, sp.GRE.Peer))
+			res[tunnelMethodGRE] = errText(greLink(instName("xo-gre"), sp.GRE.Remote, sp.GRE.Addr, sp.GRE.Peer))
 		} else {
-			greDrop("xo-gre")
+			greDrop(instName("xo-gre"))
 		}
 		if sp.FRP != nil {
 			bin, err := agentCarrierBin(st, "frps")
 			if err == nil {
 				conf := filepath.Join(dir, "frps.toml")
-				err = ensureUnit("xo-frps", unitFor("xray-one FRP server", bin, conf), conf, frpsConf(sp.FRP))
+				err = ensureUnit(instName("xo-frps"), unitFor("xray-one FRP server", bin, conf), conf, frpsConf(sp.FRP))
 			}
 			res[tunnelMethodFRP] = errText(err)
 		} else {
-			dropUnit("xo-frps", filepath.Join(dir, "frps.toml"))
+			dropUnit(instName("xo-frps"), filepath.Join(dir, "frps.toml"))
 		}
 		if sp.BH != nil {
 			bin, err := agentCarrierBin(st, "backhaul")
 			if err == nil {
 				conf := filepath.Join(dir, "backhaul.toml")
-				err = ensureUnit("xo-bhs", unitFor("xray-one Backhaul server", bin, conf), conf, bhServerConf(sp.BH))
+				err = ensureUnit(instName("xo-bhs"), unitFor("xray-one Backhaul server", bin, conf), conf, bhServerConf(sp.BH))
 			}
 			res[tunnelMethodBH] = errText(err)
 		} else {
-			dropUnit("xo-bhs", filepath.Join(dir, "backhaul.toml"))
+			dropUnit(instName("xo-bhs"), filepath.Join(dir, "backhaul.toml"))
 		}
 		if e := agentSSHSync(sp.SSH); sp.SSH != nil {
 			res[tunnelMethodSSH] = e
@@ -73,7 +73,7 @@ func agentCarriers(sp *carrierSpec, st agentState) {
 
 // agentCarriersRemove: everything the carriers left on this server.
 func agentCarriersRemove() {
-	greDrop("xo-gre")
-	dropUnit("xo-frps", "")
-	dropUnit("xo-bhs", "")
+	greDrop(instName("xo-gre"))
+	dropUnit(instName("xo-frps"), "")
+	dropUnit(instName("xo-bhs"), "")
 }

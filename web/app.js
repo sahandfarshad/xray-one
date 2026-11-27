@@ -932,10 +932,11 @@ async function loadXray(now) {
   const x = await api("GET", "api/xray/latest" + (now ? "?now=1" : ""));
   const newer = x.latest && x.current && versionLess(x.current, x.latest);
   const mids = (tunnelData?.servers || []).filter((s) => s.xrayVer && x.latest && versionLess(s.xrayVer, x.latest));
-  $("#xuBox").innerHTML = `<p>${t("xuCur")}: <b class="mono">${esc(x.current || "?")}</b> · ${t("xuNew")}: <b class="mono">${esc(x.latest || "?")}</b> ${newer ? "" : x.latest ? `<span class="muted">(${t("xuOk")})</span>` : ""}</p>
+  $("#xuBox").innerHTML = `<p>${t("xuCur")}: <b class="mono">${esc(x.current || "?")}</b> · ${t("xuNew")}: <b class="mono">${esc(x.latest || "?")}</b> ${newer || !x.current ? "" : x.latest ? `<span class="muted">(${t("xuOk")})</span>` : ""}</p>
     ${x.err ? `<p class="err">${esc(x.err)}</p>` : ""}
     ${newer ? `<button class="btn primary small" id="xuUpd">${esc(t("xuUpd").replace("{v}", x.latest))}</button>` : ""}
     ${mids.length ? `<p class="muted small">${t("xuMid")}: ${mids.map((s) => esc(s.name) + " (" + esc(s.xrayVer) + ")").join(sep())}<br>${t("xuMidHint")}</p>` : ""}`;
+  $("#xuBox").closest(".card")?.classList.toggle("hidden", !x.current);
   document.querySelector('nav [data-view="overview"]')?.classList.toggle("badge", !!newer);
   const u = $("#xuUpd");
   if (u) u.onclick = guard(async () => {
@@ -1458,6 +1459,16 @@ $("#addTunnelBtn").onclick = () => {
 function openJoin(s) {
   openModal(`<h3>${t("tnCmdTitle")} · ${esc(s.name)}</h3><p class="muted">${t("tnQuick")}</p>${copyRow(s.command)}<div class="actions"><button class="btn" data-close>${t("close")}</button></div>`, true);
 }
+// a free port on a middle server: not busy there, not used by another
+// tunneled inbound, from the range it suggests when it serves several main servers
+function freeMidPort(s, ibId) {
+  const bad = new Set([...(s.busy || []), 53, 80, 443]);
+  (s.inbounds || []).forEach((k) => { if (k !== ibId) bad.add(+((s.ports || {})[k] || (state.inbounds.find((x) => x.id === k) || {}).port)); });
+  let [from, to] = s.portHint || [0, 0];
+  if (!(from > 0 && to >= from)) { from = 20000; to = 29999; }
+  for (let p = from; p <= to; p++) if (!bad.has(p)) return p;
+  return 0;
+}
 async function openTunnelPick(ib) {
   const d = await api("GET", "api/tunnels"); tunnelData = d;
   if (!d.servers.length) { toast(d.ready ? t("tnNoSrv") : t("tnNeedSSL")); return; }
@@ -1479,7 +1490,12 @@ async function openTunnelPick(ib) {
     const inp = el.querySelector(".tnport input");
     const p = +(inp.value || ib.port);
     const mine = s.inbounds.includes(ib.id) && (s.ports[ib.id] || +ib.port) === p;
-    el.querySelector(".tnbusy").textContent = !mine && (s.busy || []).includes(p) ? `${p}: ${t("tnBusy")}` : "";
+    const out = el.querySelector(".tnbusy");
+    if (mine || !(s.busy || []).includes(p)) { out.textContent = ""; return; }
+    const f = freeMidPort(s, ib.id);
+    out.innerHTML = `${p}: ${esc(t("tnBusy"))}` + (f ? ` · <a href="#" class="tnfree">${esc(t("tnFree").replace("{p}", f))}</a>` : "");
+    const a = out.querySelector(".tnfree");
+    if (a) a.onclick = (e) => { e.preventDefault(); inp.value = f; check(el); };
   };
   $("#modalBody").querySelectorAll(".tnrow").forEach((el) => { check(el); el.querySelector(".tnport input").oninput = () => check(el); });
   $("#tpSave").onclick = async () => {

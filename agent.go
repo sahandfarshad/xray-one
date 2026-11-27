@@ -29,11 +29,16 @@ import (
 	"golang.org/x/term"
 )
 
-const (
-	agentDir     = "/etc/xray-one-agent"
-	agentXrayDir = "/usr/local/lib/xray-one-agent"
-	agentRelay   = "xray-one-relay"
-	agentUnit    = "xray-one-agent"
+const agentXrayDir = "/usr/local/lib/xray-one-agent" // shared by every instance
+
+// A middle server can serve more than one main server: each one is an
+// instance with its own folder, services, control port and links. Instance 1
+// keeps the original names, so a server with one main server sees no change.
+var (
+	agentDir   = "/etc/xray-one-agent"
+	agentRelay = "xray-one-relay"
+	agentUnit  = "xray-one-agent"
+	agentInst  = 1
 )
 
 type agentState struct {
@@ -76,9 +81,31 @@ func revertPending(st *agentState, rc *reconciler) {
 }
 
 func agentMain(args []string) {
+	// --inst N picks the instance; --add / --replace answer the install question
+	inst, mode := 0, ""
+	var rest []string
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--inst":
+			if i+1 < len(args) {
+				inst, _ = strconv.Atoi(args[i+1])
+				i++
+			}
+		case "--add":
+			mode = "add"
+		case "--replace":
+			mode = "replace"
+		default:
+			rest = append(rest, args[i])
+		}
+	}
+	args = rest
+	if inst > 0 {
+		setAgentInst(inst)
+	}
 	if len(args) == 0 {
-		fmt.Println("usage: xray-one agent [install <join>|run|status|remove]")
-		os.Exit(2)
+		agentMenu()
+		return
 	}
 	var err error
 	switch args[0] {
@@ -86,21 +113,16 @@ func agentMain(args []string) {
 		if len(args) < 2 {
 			err = errors.New("missing join code")
 		} else {
-			err = agentInstall(args[1])
+			err = agentInstallPick(args[1], mode)
 		}
 	case "run":
 		agentRun()
 	case "status":
 		agentStatus()
+	case "menu":
+		agentMenu()
 	case "remove":
-		agentCarriersRemove()
-		_, _ = run(20*time.Second, "systemctl", "disable", "--now", agentUnit, agentRelay)
-		_ = os.Remove("/etc/systemd/system/" + agentUnit + ".service")
-		_ = os.Remove("/etc/systemd/system/" + agentRelay + ".service")
-		_ = os.RemoveAll(agentDir)
-		_ = os.RemoveAll(agentXrayDir)
-		_, _ = run(20*time.Second, "systemctl", "daemon-reload")
-		fmt.Println("Tunnel agent removed.")
+		agentRemove()
 	default:
 		err = errors.New("unknown agent command")
 	}
@@ -155,9 +177,13 @@ func agentInstall(code string) error {
 		st.Ctl = old.Ctl
 		_, _ = run(20*time.Second, "systemctl", "stop", agentRelay)
 	}
-	if st.Ctl == 0 || !portFree(st.Ctl) {
+	ctlOK := func(p int) bool {
+		c := otherClaims(false)
+		return p > 0 && p < 65535 && portFree(p) && portFree(p+1) && !c[p] && !c[p+1]
+	}
+	if st.Ctl == 0 || !ctlOK(st.Ctl) {
 		st.Ctl = agentCtlPort
-		for i := 0; i < 50 && !portFree(st.Ctl); i++ {
+		for i := 0; i < 50 && !ctlOK(st.Ctl); i++ {
 			st.Ctl = suggestPort()
 		}
 	}
@@ -175,7 +201,7 @@ func agentInstall(code string) error {
 	if j.Method == tunnelMethodGRE && j.GRemote != "" && j.GAddr != "" {
 		// starting on GRE: our end of the link comes up before the relay
 		fmt.Println("      GRE link to", j.GRemote)
-		if err := greLink("xo-gre", j.GRemote, j.GAddr, greMain); err != nil {
+		if err := greLink(instName("xo-gre"), j.GRemote, j.GAddr, greMain); err != nil {
 			return fmt.Errorf("could not bring up the GRE link: %v", err)
 		}
 	}
@@ -185,7 +211,7 @@ func agentInstall(code string) error {
 		agentRelay: "[Unit]\nDescription=XRay One tunnel relay (xray)\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nExecStart=" +
 			agentXray() + " run -config " + agentDir + "/xray.json\nRestart=always\nRestartSec=3\nLimitNOFILE=1048576\n\n[Install]\nWantedBy=multi-user.target\n",
 		agentUnit: "[Unit]\nDescription=XRay One tunnel agent (heartbeat)\nAfter=network-online.target " + agentRelay + ".service\nWants=network-online.target\n\n[Service]\nExecStart=" +
-			self + " agent run\nRestart=always\nRestartSec=5\n\n[Install]\nWantedBy=multi-user.target\n",
+			self + " agent run" + instArg() + "\nRestart=always\nRestartSec=5\n\n[Install]\nWantedBy=multi-user.target\n",
 	}
 	for n, u := range units {
 		if err := os.WriteFile("/etc/systemd/system/"+n+".service", []byte(u), 0o644); err != nil {
@@ -208,6 +234,7 @@ func agentInstall(code string) error {
 				fmt.Println()
 			}
 			step(5, "connected. The tunnel shows green in the panel.")
+			fmt.Println("      Menu on this server (add another main server, ports in use): xray-one")
 			return nil
 		}
 		if tty {
@@ -243,14 +270,26 @@ func loadAgent() (agentState, error) {
 }
 
 func agentStatus() {
-	s, err := loadAgent()
-	if err != nil {
+	insts := agentInsts()
+	if len(insts) == 0 {
 		fmt.Println("Tunnel agent is not installed.")
 		return
 	}
-	relay, _ := run(5*time.Second, "systemctl", "is-active", agentRelay)
-	ag, _ := run(5*time.Second, "systemctl", "is-active", agentUnit)
-	fmt.Printf("main server: %s:%d\nrelay: %s\nagent: %s\njoined: %v\n", s.Join.Domain, s.Join.Port, relay, ag, s.Token != "")
+	cur := agentInst
+	defer setAgentInst(cur)
+	for i, n := range insts {
+		setAgentInst(n)
+		s, _ := loadAgent()
+		relay, _ := run(5*time.Second, "systemctl", "is-active", agentRelay)
+		ag, _ := run(5*time.Second, "systemctl", "is-active", agentUnit)
+		if i > 0 {
+			fmt.Println()
+		}
+		if len(insts) > 1 {
+			fmt.Printf("[main server %d]\n", n)
+		}
+		fmt.Printf("main server: %s:%d\nrelay: %s\nagent: %s\njoined: %v\n", s.Join.Domain, s.Join.Port, relay, ag, s.Token != "")
+	}
 }
 
 func agentRun() {
@@ -329,7 +368,7 @@ func agentRun() {
 			req := beatReq{Version: version, PublicIP: ip, XrayOK: active == "active", XrayErr: lastErr, Applied: st.Hash, CtlPort: st.Ctl, Busy: busy,
 				Wait: wait, Fails: fails, LastFail: lastFail, PortState: pstate, Rejected: st.Rejected, Pending: st.PendingAt > 0,
 				Mode: mode, Via: st.Via, CertDom: st.CertDomain, CertExp: st.CertExp, CertErr: st.CertErr, CertBusy: certBusy, CertFor: st.CertTried, CState: agentCarrierState(), SSHHost: agentHostPub(),
-				XrayVer: xrayVer}
+				XrayVer: xrayVer, PortHint: portHint()}
 			req.SniErr, req.SniList, req.SniSeen = sniSvc.Report()
 			req.SniN = len(req.SniList)
 			sniUsePend = sniAddUse(sniUsePend, sniSvc.TakeUsage())
@@ -978,9 +1017,14 @@ func (r *reconciler) run() (state map[string]string, busy []int, errMsg string) 
 		want, _ = os.ReadFile(filepath.Join(agentDir, "xray.json"))
 	}
 	pv := newPortView()
+	writeClaims(want)
+	// a port another main server's instance on this server claims is not
+	// ours even while it is not listening; between two claims the lower
+	// instance wins
+	lower := otherClaims(true)
 	drop := map[int]bool{}
 	for _, p := range fwdPorts(want) {
-		if pv.foreign(p) {
+		if pv.foreign(p) || lower[p] {
 			drop[p] = true
 		}
 	}
@@ -1011,7 +1055,27 @@ func (r *reconciler) run() (state map[string]string, busy []int, errMsg string) 
 			state[strconv.Itoa(p)] = "down"
 		}
 	}
-	return state, pv.busy(), errMsg
+	busy = pv.busy()
+	if oc := otherClaims(false); len(oc) > 0 {
+		// ports we hold ourselves (and win) are not busy for our main server
+		seen := map[int]bool{}
+		for _, p := range busy {
+			seen[p] = true
+		}
+		st, _ := loadAgent()
+		for _, p := range claimedPorts(want, orInt(st.Ctl, agentCtlPort)) {
+			if !lower[p] {
+				seen[p] = true
+			}
+		}
+		for p := range oc {
+			if !seen[p] {
+				busy = append(busy, p)
+			}
+		}
+		sort.Ints(busy)
+	}
+	return state, busy, errMsg
 }
 
 type certResult struct {

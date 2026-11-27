@@ -6,13 +6,14 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"golang.org/x/term"
 )
 
-var version = "0.16.2"
+var version = "0.17.0"
 
 func main() {
 	dir := os.Getenv("XRAY_ONE_DIR")
@@ -31,6 +32,11 @@ func main() {
 	case "", "menu", "setup":
 		if cmd == "" && !term.IsTerminal(int(os.Stdin.Fd())) {
 			serve(dir)
+			return
+		}
+		// a middle server has no panel: its own menu
+		if _, err := os.Stat(filepath.Join(dir, "panel.json")); err != nil && len(agentInsts()) > 0 {
+			agentMenu()
 			return
 		}
 		runMenu(dir)

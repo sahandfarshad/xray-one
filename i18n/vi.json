@@ -461,5 +461,6 @@
  "panel.liveCl": "Tốc độ trực tiếp theo client",
  "panel.liveIdle": "Hiện không có lưu lượng.",
  "panel.liveOptT": "Tốc độ trực tiếp theo inbound và client",
- "panel.liveOptH": "Khi tắt, bảng điều khiển không bao giờ đọc các bộ đếm này; Tổng quan chỉ giữ tổng lưu lượng máy chủ."
+ "panel.liveOptH": "Khi tắt, bảng điều khiển không bao giờ đọc các bộ đếm này; Tổng quan chỉ giữ tổng lưu lượng máy chủ.",
+ "panel.tnFree": "dùng cổng trống {p}"
 }

@@ -223,7 +223,7 @@ func runMenu(dir string) {
 			st.Cfg.PublicHost = prompt("  Domain or IP used in client links", orDefault(st.Cfg.PublicHost, publicIP()))
 			saveAndRestart(st)
 		case "6":
-			v := prompt("Version (empty = latest)", "")
+			v := asciiDigits(prompt("Version (empty = latest)", ""))
 			if v != "" && !strings.HasPrefix(v, "v") {
 				v = "v" + v
 			}
@@ -437,6 +437,22 @@ func free80Menu() (func(), bool) {
 		return nop, false
 	}
 	return back, true
+}
+
+// asciiDigits turns Persian and Arabic digits (and the Arabic decimal
+// separator) into plain ones, so "۲۶.۱۱.۹" works as a version.
+func asciiDigits(s string) string {
+	return strings.Map(func(r rune) rune {
+		switch {
+		case r >= '۰' && r <= '۹':
+			return '0' + (r - '۰')
+		case r >= '٠' && r <= '٩':
+			return '0' + (r - '٠')
+		case r == '٫':
+			return '.'
+		}
+		return r
+	}, s)
 }
 
 func coreInstallCLI(v string) {

@@ -41,6 +41,17 @@ A light, minimal panel that sits **beside** a headless Xray core. It never repla
 
 ۰.۹.۱: چرخش با ترافیک واقعی قضاوت می‌کند نه فقط با پینگ (هر ۵ دقیقه یک دانلود ۲۵۶ کیلوبایتی)؛ گزینه‌ی «تکه‌تکه کردن TLS» برای WS و XHTTP؛ سرور میانی روی مسیر برگشت هر ۱۰ دقیقه مسیر مستقیم را دوباره امتحان می‌کند و عوض کردن روش آنجا هم ممکن است.
 
+## v0.17.0
+- One middle server can serve several main servers. Run the second main server's install command on the middle server and choose "Add"; the first one keeps working unchanged. Each main server gets its own services, control port and links on the middle server.
+- The middle server reports every port in use (by other programs and by the other main servers' tunnels, even ones not listening right now) to each panel, which never puts a tunnel on them. When an inbound's own port is taken there, the panel picks a free one, from a suggested range per main server (20000-29999 for the first, 30000-39999 for the second); nothing is forced, and existing ports stay as they are.
+- `xray-one` on a middle server opens its own menu: main servers connected, add or remove one, ports in use, restart, log.
+- Also includes v0.16.3 (Persian digits in the Xray version box; Xray update card hidden until Xray is installed).
+- یک سرور میانی می‌تواند به چند سرور اصلی وصل باشد. دستور نصب سرور اصلی دوم را روی سرور میانی اجرا کنید و «Add» را بزنید؛ اولی بدون تغییر کار می‌کند. سرور میانی همهٔ پورت‌های اشغال را به هر پنل خبر می‌دهد و پنل تانل را روی آن‌ها نمی‌گذارد؛ بازهٔ پورت فقط پیشنهاد است. دستور `xray-one` روی سرور میانی منوی خودش را باز می‌کند.
+
+## v0.16.3
+- The Xray version box accepts Persian and Arabic digits. The Xray update card on Overview is hidden until Xray is installed (it said "up to date" with no core).
+- کادر نسخهٔ اکس‌ری اعداد فارسی را هم می‌پذیرد. کارت به‌روزرسانی اکس‌ری تا وقتی هسته نصب نشده نمایش داده نمی‌شود.
+
 ## v0.16.2
 - Installing Xray (installer, menu, panel) no longer fails with "HTTP/2 stream … not closed cleanly / Failed to get release list": the panel finds the newest version itself and gives it to Xray's install script, which then skips GitHub's long release list.
 - نصب اکس‌ری دیگر با خطای «Failed to get release list» شکست نمی‌خورد: پنل خودش آخرین نسخه را پیدا می‌کند و به اسکریپت نصب می‌دهد.

@@ -556,6 +556,7 @@ func (a *App) handleQR(w http.ResponseWriter, r *http.Request) {
 func (a *App) handleInstall(w http.ResponseWriter, r *http.Request) {
 	var body struct{ Action, Version string }
 	_ = json.NewDecoder(r.Body).Decode(&body)
+	body.Version = asciiDigits(strings.TrimSpace(body.Version))
 	if body.Version != "" && !strings.HasPrefix(body.Version, "v") {
 		body.Version = "v" + body.Version
 	}

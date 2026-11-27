@@ -99,10 +99,11 @@ type TunnelServer struct {
 	SentHash   string            `json:"sentHash,omitempty"`
 	SentMethod string            `json:"sentMethod,omitempty"`
 	MethodErr  string            `json:"methodErr,omitempty"`
-	Applied    string            `json:"applied,omitempty"` // config hash the agent runs
-	CtlPort    int               `json:"ctlPort,omitempty"` // agent's local control port
-	Busy       []int             `json:"busy,omitempty"`    // ports already taken on the middle server
-	Fails      int               `json:"fails,omitempty"`   // heartbeats that failed before the last one got through
+	Applied    string            `json:"applied,omitempty"`  // config hash the agent runs
+	CtlPort    int               `json:"ctlPort,omitempty"`  // agent's local control port
+	Busy       []int             `json:"busy,omitempty"`     // ports already taken on the middle server
+	PortHint   [2]int            `json:"portHint,omitempty"` // suggested range when the middle server serves several main servers
+	Fails      int               `json:"fails,omitempty"`    // heartbeats that failed before the last one got through
 	LastFail   string            `json:"lastFail,omitempty"`
 	FailAt     int64             `json:"failAt,omitempty"`
 	PortState  map[string]string `json:"portState,omitempty"`
@@ -1114,6 +1115,37 @@ func (a *App) handleTunnelAssign(w http.ResponseWriter, r *http.Request) {
 	writeJSONResp(w, 200, map[string]bool{"ok": true})
 }
 
+// freeMiddlePortLocked: a port on srv that is neither busy there nor used
+// by another tunneled inbound, from its suggested range when it has one.
+func (s *Store) freeMiddlePortLocked(srv *TunnelServer, id string, ibPorts map[string]int) int {
+	bad := map[int]bool{80: true, 443: true, 53: true}
+	for _, p := range srv.Busy {
+		bad[p] = true
+	}
+	ctl := srv.CtlPort
+	if ctl == 0 {
+		ctl = agentCtlPort
+	}
+	bad[ctl], bad[ctl+1] = true, true
+	for k, us := range s.TunnelUse {
+		for _, x := range us {
+			if k != id && x.Server == srv.ID {
+				bad[x.ListenPort(ibPorts[k])] = true
+			}
+		}
+	}
+	from, to := srv.PortHint[0], srv.PortHint[1]
+	if from <= 0 || to < from || to > 65535 {
+		from, to = 20000, 29999
+	}
+	for p := from; p <= to; p++ {
+		if !bad[p] {
+			return p
+		}
+	}
+	return 0
+}
+
 // checkUsesLocked validates an inbound's middle servers and ports
 // (store lock held).
 func (s *Store) checkUsesLocked(id string, uses []TunnelUse, ibPort int, ibPorts map[string]int) ([]TunnelUse, error) {
@@ -1147,12 +1179,18 @@ func (s *Store) checkUsesLocked(id string, uses []TunnelUse, ibPort int, ibPorts
 				}
 			}
 		}
-		if !mine {
-			for _, bp := range srv.Busy {
-				if bp == lp {
-					return nil, fmt.Errorf("port %d is busy on %s; pick another port", lp, srv.Name)
-				}
+		if !mine && containsInt(srv.Busy, lp) {
+			// left on the inbound's own port, which is taken there: take a
+			// free one, from the range the middle server suggests when it
+			// serves several main servers
+			if u.Port != 0 {
+				return nil, fmt.Errorf("port %d is busy on %s; pick another port", lp, srv.Name)
 			}
+			p := s.freeMiddlePortLocked(srv, id, ibPorts)
+			if p == 0 {
+				return nil, fmt.Errorf("port %d is busy on %s; pick another port", lp, srv.Name)
+			}
+			u.Port = p
 		}
 		ok = append(ok, u)
 	}
@@ -1300,6 +1338,7 @@ type beatReq struct {
 	SniList   []sniActive          `json:"sniList,omitempty"`   // addresses active on it (0.12.1+)
 	SniSeen   []sniSeen            `json:"sniSeen,omitempty"`   // names they asked for lately (0.12.1+)
 	SniUse    map[string][2]int64  `json:"sniUse,omitempty"`    // unblocker bytes per activation key since the last beat, [up, down] (0.14.1+)
+	PortHint  [2]int               `json:"portHint,omitempty"`  // port range suggested for this main server when the middle server serves several (0.17.0+)
 }
 
 type beatResp struct {
@@ -1355,6 +1394,7 @@ func (a *App) handleBeat(w http.ResponseWriter, r *http.Request) {
 			req.Busy = req.Busy[:2000]
 		}
 		s.Busy = req.Busy
+		s.PortHint = req.PortHint
 		s.PortState = req.PortState
 		if req.Fails > 0 {
 			s.Fails, s.LastFail, s.FailAt = req.Fails, trimTo(req.LastFail, 300), time.Now().Unix()

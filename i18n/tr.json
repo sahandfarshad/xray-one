@@ -461,5 +461,6 @@
  "panel.liveCl": "İstemciye göre canlı hız",
  "panel.liveIdle": "Şu anda trafik yok.",
  "panel.liveOptT": "Gelen bağlantı ve istemci başına canlı hız",
- "panel.liveOptH": "Kapalıyken panel bu sayaçları hiç okumaz; Genel bakışta yalnızca sunucu toplamı kalır."
+ "panel.liveOptH": "Kapalıyken panel bu sayaçları hiç okumaz; Genel bakışta yalnızca sunucu toplamı kalır.",
+ "panel.tnFree": "boş port {p} kullan"
 }
