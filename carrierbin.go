@@ -170,7 +170,11 @@ func agentCarrierBin(st agentState, name string) (string, error) {
 	if ctl == 0 {
 		ctl = agentCtlPort
 	}
-	for _, port := range []int{ctl, ctl + 1} {
+	ports := []int{ctl, ctl + 1}
+	if st.Token == "" {
+		ports = nil // never reached the main server: GitHub only
+	}
+	for _, port := range ports {
 		pu, _ := url.Parse(fmt.Sprintf("socks5://127.0.0.1:%d", port))
 		c := &http.Client{Timeout: 5 * time.Minute, Transport: &http.Transport{Proxy: http.ProxyURL(pu),
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}} // inside the tunnel, to 127.0.0.1

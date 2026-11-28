@@ -1229,13 +1229,15 @@ function versionLess(a, b) {
   return false;
 }
 const cap = (m) => (m === "wss" ? "Wss" : m.charAt(0).toUpperCase() + m.slice(1));
-const methodPort = { wss: "port", xhttp: "xport", reality: "rport", wg: "wgport", kcp: "kport", frp: "frpport", backhaul: "bhport", ssh: "sshport" };
+const methodPort = { wss: "port", xhttp: "xport", reality: "rport", direct: "dport", wg: "wgport", kcp: "kport", frp: "frpport", backhaul: "bhport", ssh: "sshport" };
 const carrierKeys = { frp: ["frpproto", "frpgre"], backhaul: ["bhproto", "bhgre"] };
 // why a method cannot run between this server and middle server s ("" = it can)
 function methodBlock(s, m) {
   const d = tunnelData;
   if (m === "wg" && !d.wgOn) return t("mNoUdp");
   if (m === "kcp" && !d.kOn) return d.wghost ? t("mNoKcp").replace("{v}", d.kcpXray) : t("mNoUdp");
+  if (m === "direct" && !d.dOn) return d.wghost ? t("mNoKcp").replace("{v}", d.kcpXray) : t("mNoUdp");
+  if (m === "gre" && s.greBusy) return t("mGreBusy");
   if (["gre", "frp", "backhaul", "ssh"].includes(m) && !d.wgOn) return t("mNoUdp");
   if (m === "gre" && (!d.greIP || (s.lastSeen && !s.publicIP))) return t("mNoGre");
   if (s.capable && s.capable[m] === false && s.lastSeen) return t("mOldMid");
@@ -1275,6 +1277,7 @@ function methodCards(s, i) {
         const opts = [
           m.protos ? carrierOpts(m, i) : "",
           (m.id === "wss" || m.id === "xhttp") && m.ready ? `<label class="mopt"><input type="checkbox" data-copt="frag" data-i="${i}" ${tunnelData.frag ? "checked" : ""}><span>${t("cFrag")}</span>${qm("qFrag")}</label>` : "",
+          (m.id === "wss" || m.id === "direct") && m.ready ? `<label class="mopt"><input type="checkbox" data-copt="mux" data-i="${i}" ${tunnelData.mux ? "checked" : ""}><span>${t("cMux")}</span>${qm("qMux")}</label>` : "",
           m.ready ? `<label class="mopt"><input type="checkbox" data-pool="${m.id}" data-i="${i}" ${inPool || on ? "checked" : ""} ${on || trying ? "disabled" : ""}><span>${t("poolIn")}</span>${qm("poolHint")}</label>` : "",
         ].join("");
         return `<div class="mbottom">${port}${opts ? `<div class="mopts">${opts}</div>` : ""}`;
@@ -1321,9 +1324,10 @@ async function savePort(i, k) {
   if (k === "frpport" || k === "bhport" || k === "sshport") {
     await api("POST", "api/tunnels/csettings", { [k]: n });
     toast(t("done"));
-  } else if (k === "wgport" || k === "kport") {
-    const m = k === "wgport" ? "wg" : "kcp";
-    if (d.servers.some((x) => x.method === m || x.prevMethod === m) && !confirm(t(m === "wg" ? "peAskWg" : "peAskKcp").replace("{p}", n))) return;
+  } else if (k === "wgport" || k === "kport" || k === "dport") {
+    const m = k === "wgport" ? "wg" : k === "kport" ? "kcp" : "direct";
+    const ask = t(m === "direct" ? "peAskDr" : m === "wg" ? "peAskWg" : "peAskKcp");
+    if (d.servers.some((x) => x.method === m || x.prevMethod === m) && !confirm(ask.replace("{p}", n))) return;
     await api("POST", "api/tunnels/dtsettings", { [k]: n });
     toast(t("done"));
   } else {
@@ -1415,7 +1419,7 @@ $("#addTunnelBtn").onclick = () => {
   openModal(`<h3>${t("addTunnel")}</h3>
   <form id="tnForm" class="form">
     <label>${t("tnName")}<input name="name" placeholder="iran-1"></label>
-    <label><span>${t("tnStart")} ${qm("qStart")}</span><select name="method"><option value="wss">Xray WS (WebSocket + TLS)</option><option value="xhttp">Xray XHTTP (HTTP/2 + TLS)</option><option value="reality">Xray REALITY</option><option value="wg">WireGuard (UDP)</option><option value="kcp">mKCP (UDP)</option><option value="gre">GRE</option></select></label>
+    <label><span>${t("tnStart")} ${qm("qStart")}</span><select name="method"><option value="wss">Xray WS (WebSocket + TLS)</option><option value="xhttp">Xray XHTTP (HTTP/2 + TLS)</option><option value="reality">Xray REALITY</option><option value="direct">${t("mDirect")} (TCP)</option><option value="wg">WireGuard (UDP)</option><option value="kcp">mKCP (UDP)</option><option value="gre">GRE</option><option value="frp">FRP</option><option value="backhaul">Backhaul</option><option value="ssh">SSH</option></select></label>
     <label id="tnIPRow" class="hidden"><span>${t("tnPubIP")} ${qm("qPubIP")}</span><input name="ip" placeholder="1.2.3.4" inputmode="decimal"></label>
     <details><summary>${t("tnSshOpt")}</summary>
     <label>${t("tnHost")}<input name="host" placeholder="1.2.3.4"></label>
@@ -1427,13 +1431,14 @@ $("#addTunnelBtn").onclick = () => {
   <div class="actions"><button class="btn primary" id="tnSave">${t("create")}</button><button class="btn" data-close>${t("cancel")}</button></div>`);
   $("#tnForm").addEventListener("submit", (e) => { e.preventDefault(); $("#tnSave").click(); });
   const tf = $("#tnForm"), isIP = (v) => /^\d{1,3}(\.\d{1,3}){3}$/.test(v.trim());
-  const ipRow = () => $("#tnIPRow").classList.toggle("hidden", tf.method.value !== "gre");
+  const needIP = (m) => ["gre", "frp", "backhaul", "ssh"].includes(m);
+  const ipRow = () => $("#tnIPRow").classList.toggle("hidden", !needIP(tf.method.value));
   tf.method.onchange = ipRow;
   tf.host.oninput = () => { if (isIP(tf.host.value) && (!tf.ip.value || tf.ip.dataset.auto)) { tf.ip.value = tf.host.value.trim(); tf.ip.dataset.auto = "1"; } };
   tf.ip.oninput = () => { delete tf.ip.dataset.auto; };
   $("#tnSave").onclick = async () => {
     const d = Object.fromEntries(new FormData($("#tnForm"))); d.sshPort = +d.sshPort || 22;
-    if (d.method !== "gre") delete d.ip;
+    if (!needIP(d.method)) delete d.ip;
     const before = new Set((tunnelData?.servers || []).map((x) => x.id));
     const btn = $("#tnSave"); btn.disabled = true; btn.textContent = t("tnCreating"); $("#tnErr").textContent = "";
     let id = "";

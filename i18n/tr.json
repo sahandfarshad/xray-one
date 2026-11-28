@@ -401,7 +401,7 @@
  "panel.rpManual": "elle",
  "panel.rpAutoBtn": "Bu sunucuyla aynı",
  "panel.tnStart": "Başlangıç yöntemi",
- "panel.qStart": "Yalnızca ilk bağlantı için. Ara sunucu bağlandıktan sonra diğer yöntemler de döngüye katılır. WS, XHTTP ve REALITY engelliyse WireGuard veya mKCP (UDP üzerinden) ya da GRE seçin. FRP, Backhaul ve SSH bağlantıdan sonra katılır.",
+ "panel.qStart": "Yalnızca ilk bağlantı için; her yöntemle başlanabilir. WS, XHTTP ve REALITY engelliyse Doğrudan, WireGuard, mKCP veya GRE deneyin. FRP, Backhaul ve SSH ara sunucunun adresine ihtiyaç duyar: bu sunucu ona bağlanır.",
  "panel.tnPubIP": "Ara sunucu genel IP'si",
  "panel.qPubIP": "GRE iki genel IP'yi doğrudan bağlar, bu yüzden ara sunucunun IP'si baştan gerekir. SSH alanında bir IP varsa o kullanılır.",
  "panel.langT": "Dil",
@@ -462,5 +462,11 @@
  "panel.liveIdle": "Şu anda trafik yok.",
  "panel.liveOptT": "Gelen bağlantı ve istemci başına canlı hız",
  "panel.liveOptH": "Kapalıyken panel bu sayaçları hiç okumaz; Genel bakışta yalnızca sunucu toplamı kalır.",
- "panel.tnFree": "boş port {p} kullan"
+ "panel.tnFree": "boş port {p} kullan",
+ "panel.mDirect": "Doğrudan",
+ "panel.mDirectD": "En hafif yöntem: şifreli VLESS, düz TCP üzerinden doğrudan bu sunucunun IP'sine; port yönlendirmeye yakın. En düşük gecikme; yol engellenirse döngü sonrakine geçer.",
+ "panel.mGreBusy": "Hazır değil: bu ara sunucudaki GRE başka bir ana sunucuya ait",
+ "panel.cMux": "Bağlantıları yeniden kullan (mux)",
+ "panel.qMux": "Kullanıcı bağlantıları birkaç tünel bağlantısını paylaşır, böylece yeni bağlantı bu sunucuyla el sıkışmayı tekrarlamaz: testlerde daha düşük ping. Uzun bir bağlantı takılırsa diğerleri de yavaşlayabilir. Tüm ara sunucularda WS ve Doğrudan için.",
+ "panel.peAskDr": "Doğrudan yöntemindeki ara sunucular yeni {p} portuna yeniden bağlanır (birkaç saniye kesinti). Devam edilsin mi?"
 }

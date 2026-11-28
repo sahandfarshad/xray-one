@@ -5,6 +5,9 @@ package main
 // asks in every heartbeat.
 
 import (
+	"encoding/json"
+	"fmt"
+	"os"
 	"path/filepath"
 	"sync"
 	"sync/atomic"
@@ -33,12 +36,25 @@ func agentCarriers(sp *carrierSpec, st agentState) {
 	if sp == nil || !agentCarrierBusy.CompareAndSwap(false, true) {
 		return
 	}
+	// kept for the next start: a carrier may be the only way to the main
+	// server, so it must come up before the first heartbeat
+	if b, err := json.Marshal(sp); err == nil {
+		p := filepath.Join(agentDir, "carriers.json")
+		if cur, _ := os.ReadFile(p); string(cur) != string(b) {
+			_ = os.WriteFile(p, b, 0o600)
+		}
+	}
 	go func() {
 		defer agentCarrierBusy.Store(false)
 		res := map[string]string{}
 		dir := filepath.Join(agentDir, "carriers")
 		if sp.GRE != nil {
-			res[tunnelMethodGRE] = errText(greLink(instName("xo-gre"), sp.GRE.Remote, sp.GRE.Addr, sp.GRE.Peer))
+			if n := greOther(); n != 0 {
+				greDrop(instName("xo-gre"))
+				res[tunnelMethodGRE] = fmt.Sprintf("GRE is used here by main server %d", n)
+			} else {
+				res[tunnelMethodGRE] = errText(greLink(instName("xo-gre"), sp.GRE.Remote, sp.GRE.Addr, sp.GRE.Peer))
+			}
 		} else {
 			greDrop(instName("xo-gre"))
 		}
@@ -76,4 +92,20 @@ func agentCarriersRemove() {
 	greDrop(instName("xo-gre"))
 	dropUnit(instName("xo-frps"), "")
 	dropUnit(instName("xo-bhs"), "")
+}
+
+// agentCarriersBoot brings up what the carriers ran before (or what the join
+// code asks for when this server never reached the main server yet).
+func agentCarriersBoot(st agentState) {
+	var sp *carrierSpec
+	if b, err := os.ReadFile(filepath.Join(agentDir, "carriers.json")); err == nil {
+		var x carrierSpec
+		if json.Unmarshal(b, &x) == nil {
+			sp = &x
+		}
+	}
+	if sp == nil {
+		sp = st.Join.CS
+	}
+	agentCarriers(sp, st)
 }

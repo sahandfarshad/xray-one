@@ -401,7 +401,7 @@
  "panel.rpManual": "manual",
  "panel.rpAutoBtn": "Same as this server",
  "panel.tnStart": "Starting method",
- "panel.qStart": "Only for the first connection. Once the middle server is connected, the other methods join the rotation too. If WS, XHTTP and REALITY are blocked, pick WireGuard or mKCP (over UDP) or GRE. FRP, Backhaul and SSH join after it connects.",
+ "panel.qStart": "Only for the first connection; any method can start it. If WS, XHTTP and REALITY are blocked, try Direct, WireGuard, mKCP or GRE. FRP, Backhaul and SSH need the middle server's address: this server dials it.",
  "panel.tnPubIP": "Middle server public IP",
  "panel.qPubIP": "GRE links two public IPs directly, so the middle server's IP is needed from the start. If the SSH field holds an IP, that one is used.",
  "panel.langT": "Language",
@@ -462,5 +462,11 @@
  "panel.liveIdle": "Nothing is moving right now.",
  "panel.liveOptT": "Live speed per inbound and client",
  "panel.liveOptH": "When off, the panel never reads these counters; only the server total stays on Overview.",
- "panel.tnFree": "use free port {p}"
+ "panel.tnFree": "use free port {p}",
+ "panel.mDirect": "Direct",
+ "panel.mDirectD": "The lightest method: VLESS (encrypted) over plain TCP straight to this server's IP, close to a port forward. Lowest delay; if the route is filtered, rotation moves on.",
+ "panel.mGreBusy": "Not ready: GRE on this middle server already belongs to another main server",
+ "panel.cMux": "Reuse connections (mux)",
+ "panel.qMux": "Many user connections share a few tunnel connections, so a new one skips the handshake with this server: lower ping in tests. One long connection can slow everything if it stalls. For WS and Direct on every middle server.",
+ "panel.peAskDr": "Middle servers on the Direct method reconnect on the new port {p} (a few seconds of drop). Continue?"
 }

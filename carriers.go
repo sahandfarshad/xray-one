@@ -55,7 +55,7 @@ var frpProtos = []string{"tcp", "kcp", "quic", "websocket"}
 var bhProtos = []string{"tcpmux", "tcp", "wsmux", "ws"}
 
 // allMethods: every method of the rotating tunnel, in card order.
-var allMethods = []string{tunnelMethodWS, tunnelMethodXHTTP, tunnelMethodRT, tunnelMethodWG, tunnelMethodKCP,
+var allMethods = []string{tunnelMethodWS, tunnelMethodXHTTP, tunnelMethodRT, tunnelMethodDR, tunnelMethodWG, tunnelMethodKCP,
 	tunnelMethodGRE, tunnelMethodFRP, tunnelMethodBH, tunnelMethodSSH}
 
 func isCarrier(m string) bool {
@@ -119,6 +119,8 @@ type carrierSpec struct {
 	SSH *sshSpec `json:"ssh,omitempty"`
 }
 
+const greBusyMsg = "GRE is already used on this middle server by another main server (one GRE link per middle server); pick another method"
+
 // carrierWanted: which of the four a middle server should have armed now
 // (the active method, and every other in its pool it can run).
 func carrierWanted(s TunnelServer, set TunnelSettings) map[string]bool {
@@ -133,6 +135,11 @@ func carrierWanted(s TunnelServer, set TunnelSettings) map[string]bool {
 		}
 		return w
 	}
+	if s.AgentVer == "" && (s.Method == tunnelMethodFRP || s.Method == tunnelMethodBH || s.Method == tunnelMethodSSH) {
+		// not connected yet and starting on this carrier: arm it alone
+		w[s.Method] = true
+		return w
+	}
 	if s.AgentVer == "" || versionLess(s.AgentVer, agentCarrierVer) {
 		return w
 	}
@@ -141,7 +148,7 @@ func carrierWanted(s TunnelServer, set TunnelSettings) map[string]bool {
 			w[m] = true
 		}
 	}
-	if s.PublicIP == "" || greNum(s) == 0 || mainGREIP(set) == "" {
+	if s.PublicIP == "" || greNum(s) == 0 || mainGREIP(set) == "" || s.GREBusy {
 		delete(w, tunnelMethodGRE)
 	}
 	return w
@@ -590,6 +597,9 @@ func (a *App) carrierSync() {
 			continue
 		}
 		host := s.PublicIP
+		if host == "" {
+			host = s.Host // not connected yet: the address given when it was added
+		}
 		if needsGRE(s, set, w) {
 			if len(wantGRE) == 0 {
 				greHostPrep()
@@ -670,6 +680,7 @@ func (a *App) handleCarrierSettings(w http.ResponseWriter, r *http.Request) {
 		FRPProto string `json:"frpproto"`
 		FRPGre   *bool  `json:"frpgre"`
 		Frag     *bool  `json:"frag"`
+		Mux      *bool  `json:"mux"`
 		BHPort   int    `json:"bhport"`
 		BHProto  string `json:"bhproto"`
 		BHGre    *bool  `json:"bhgre"`
@@ -732,6 +743,9 @@ func (a *App) handleCarrierSettings(w http.ResponseWriter, r *http.Request) {
 		c := &a.store.TunnelCfg
 		if b.Frag != nil {
 			c.Frag = *b.Frag
+		}
+		if b.Mux != nil {
+			c.Mux = *b.Mux
 		}
 		c.FRPPort, c.BHPort, c.SSHPort, c.FRPProto, c.BHProto, c.FRPGre, c.BHGre = n.FRPPort, n.BHPort, n.SSHPort, n.FRPProto, n.BHProto, n.FRPGre, n.BHGre
 		return nil

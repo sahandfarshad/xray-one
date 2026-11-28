@@ -49,7 +49,7 @@ const (
 )
 
 func isTunnelTag(t string) bool {
-	return t == tunnelTag || t == tunnelTagXH || t == tunnelTagRT || t == tunnelTagWG || t == tunnelTagWGV || t == tunnelTagKCP ||
+	return t == tunnelTag || t == tunnelTagXH || t == tunnelTagRT || t == tunnelTagWG || t == tunnelTagWGV || t == tunnelTagKCP || t == tunnelTagDR ||
 		t == oldTagWG || t == oldTagKCP || t == tunnelTagGRE || isGraceTag(t)
 }
 
@@ -62,6 +62,7 @@ var tunnelMethods = []map[string]any{
 	{"id": tunnelMethodWS, "ready": true},
 	{"id": tunnelMethodXHTTP, "ready": true},
 	{"id": tunnelMethodRT, "ready": true},
+	{"id": tunnelMethodDR, "ready": true, "ver": agentDRVer},
 	{"id": tunnelMethodWG, "ready": true, "udp": true, "ver": agentWGVer},
 	{"id": tunnelMethodKCP, "ready": true, "udp": true, "ver": agentKCPVer},
 	{"id": tunnelMethodGRE, "ready": true, "carrier": true, "ver": agentCarrierVer},
@@ -77,36 +78,40 @@ const agentMethodVer = "0.6.1"
 const agentRevLeaveVer = "0.9.1"
 
 type TunnelServer struct {
-	ID         string            `json:"id"`
-	Name       string            `json:"name"`
-	Method     string            `json:"method"`
-	Host       string            `json:"host,omitempty"` // SSH address / public address
-	SSHPort    int               `json:"sshPort,omitempty"`
-	SSHUser    string            `json:"sshUser,omitempty"`
-	HostKey    string            `json:"hostKey,omitempty"` // TOFU, "ssh-ed25519 AAAA..."
-	KeyOK      bool              `json:"keyInstalled,omitempty"`
-	UUID       string            `json:"uuid"`
-	Token      string            `json:"token,omitempty"`
-	Join       string            `json:"join,omitempty"`
-	JoinExp    int64             `json:"joinExp,omitempty"`
-	LastSeen   int64             `json:"lastSeen,omitempty"`
-	PublicIP   string            `json:"publicIP,omitempty"`
-	AgentVer   string            `json:"agentVer,omitempty"`
-	XrayVer    string            `json:"xrayVer,omitempty"` // Xray on the middle server (agent 0.7.0+)
-	XrayOK     bool              `json:"xrayOk,omitempty"`
-	XrayErr    string            `json:"xrayErr,omitempty"`
-	PrevMethod string            `json:"prevMethod,omitempty"` // set while a switch is being tried
-	SentHash   string            `json:"sentHash,omitempty"`
-	SentMethod string            `json:"sentMethod,omitempty"`
-	MethodErr  string            `json:"methodErr,omitempty"`
-	Applied    string            `json:"applied,omitempty"`  // config hash the agent runs
-	CtlPort    int               `json:"ctlPort,omitempty"`  // agent's local control port
-	Busy       []int             `json:"busy,omitempty"`     // ports already taken on the middle server
-	PortHint   [2]int            `json:"portHint,omitempty"` // suggested range when the middle server serves several main servers
-	Fails      int               `json:"fails,omitempty"`    // heartbeats that failed before the last one got through
-	LastFail   string            `json:"lastFail,omitempty"`
-	FailAt     int64             `json:"failAt,omitempty"`
-	PortState  map[string]string `json:"portState,omitempty"`
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	Method   string `json:"method"`
+	Host     string `json:"host,omitempty"` // SSH address / public address
+	SSHPort  int    `json:"sshPort,omitempty"`
+	SSHUser  string `json:"sshUser,omitempty"`
+	HostKey  string `json:"hostKey,omitempty"` // TOFU, "ssh-ed25519 AAAA..."
+	KeyOK    bool   `json:"keyInstalled,omitempty"`
+	UUID     string `json:"uuid"`
+	Token    string `json:"token,omitempty"`
+	Join     string `json:"join,omitempty"`
+	JoinExp  int64  `json:"joinExp,omitempty"`
+	LastSeen int64  `json:"lastSeen,omitempty"`
+	PublicIP string `json:"publicIP,omitempty"`
+	GREBusy  bool   `json:"greBusy,omitempty"` // another main server's GRE link runs on this middle server
+	// starting on SSH: the middle server's host key, made here (it rides in
+	// the install command)
+	SSHKeyStart string            `json:"sshKeyStart,omitempty"`
+	AgentVer    string            `json:"agentVer,omitempty"`
+	XrayVer     string            `json:"xrayVer,omitempty"` // Xray on the middle server (agent 0.7.0+)
+	XrayOK      bool              `json:"xrayOk,omitempty"`
+	XrayErr     string            `json:"xrayErr,omitempty"`
+	PrevMethod  string            `json:"prevMethod,omitempty"` // set while a switch is being tried
+	SentHash    string            `json:"sentHash,omitempty"`
+	SentMethod  string            `json:"sentMethod,omitempty"`
+	MethodErr   string            `json:"methodErr,omitempty"`
+	Applied     string            `json:"applied,omitempty"`  // config hash the agent runs
+	CtlPort     int               `json:"ctlPort,omitempty"`  // agent's local control port
+	Busy        []int             `json:"busy,omitempty"`     // ports already taken on the middle server
+	PortHint    [2]int            `json:"portHint,omitempty"` // suggested range when the middle server serves several main servers
+	Fails       int               `json:"fails,omitempty"`    // heartbeats that failed before the last one got through
+	LastFail    string            `json:"lastFail,omitempty"`
+	FailAt      int64             `json:"failAt,omitempty"`
+	PortState   map[string]string `json:"portState,omitempty"`
 	// two-way reconnect (agent 0.6.4+)
 	RevPort   int    `json:"revPort,omitempty"` // REALITY listener on the middle server
 	RevUUID   string `json:"revUUID,omitempty"`
@@ -250,6 +255,10 @@ type TunnelSettings struct {
 	// public IP without TLS)
 	KDec string `json:"kdec,omitempty"`
 	KEnc string `json:"kenc,omitempty"`
+	// direct method: plain TCP with the mKCP keys (udpmethods.go)
+	DPort int  `json:"dport,omitempty"`
+	DOn   bool `json:"dOn,omitempty"`
+	Mux   bool `json:"mux,omitempty"` // WS and direct: Xray mux on the middle servers
 	// carrier methods (carriers.go): their ports on the middle servers
 	FRPPort  int    `json:"frpport,omitempty"`
 	FRPProto string `json:"frpproto,omitempty"`
@@ -675,6 +684,7 @@ type joinInfo struct {
 	// WireGuard and mKCP (never in an install command)
 	UHost  string `json:"uhost,omitempty"` // this server's address for UDP
 	KPort  int    `json:"kport,omitempty"`
+	DPort  int    `json:"dport,omitempty"` // direct method
 	KSeed  string `json:"kseed,omitempty"`
 	KEnc   string `json:"kenc,omitempty"`
 	WPort  int    `json:"wport,omitempty"`
@@ -690,6 +700,11 @@ type joinInfo struct {
 	GRemote string `json:"gremote,omitempty"`
 	GAddr   string `json:"gaddr,omitempty"`
 	Frag    bool   `json:"frag,omitempty"` // WS/XHTTP: fragment the TLS hello
+	Mux     bool   `json:"mux,omitempty"`  // WS and direct: reuse connections (Xray mux)
+	// FRP, Backhaul, SSH as the first method: what the middle server runs
+	// before it ever reached us, and its SSH host key (made here)
+	CS     *carrierSpec `json:"cs,omitempty"`
+	SSHKey string       `json:"sshkey,omitempty"`
 }
 
 func (a *App) panelLocalURL() string {
@@ -727,8 +742,18 @@ func methodOutbounds(j joinInfo, tag string) []any {
 	if isCarrier(j.Method) {
 		return carrierOutbound(j, tag)
 	}
+	if j.Method == tunnelMethodDR {
+		outs := drOutbound(j, tag)
+		if j.Mux {
+			asMap(outs[0]).Set("mux", muxSettings())
+		}
+		return outs
+	}
 	o := mainOutbound(j)
 	o.Set("tag", tag)
+	if j.Mux && orDefault(j.Method, tunnelMethodWS) == tunnelMethodWS {
+		o.Set("mux", muxSettings())
+	}
 	if j.Frag && j.Method != tunnelMethodRT {
 		// the TLS hello goes out in small pieces with short gaps: some
 		// filters only look for the site name in one whole packet
@@ -738,6 +763,12 @@ func methodOutbounds(j joinInfo, tag string) []any {
 			"settings", om("fragment", om("packets", "tlshello", "length", "100-200", "interval", "10-20")))}
 	}
 	return []any{o}
+}
+
+// muxSettings: many user connections share a few tunnel connections, so a
+// new one skips the TLS handshake to this server (lower first-byte delay).
+func muxSettings() *OMap {
+	return om("enabled", true, "concurrency", 8, "xudpConcurrency", 16, "xudpProxyUDP443", "allow")
 }
 
 // mainOutbound: how a middle server dials this server with j's TCP method.
@@ -777,14 +808,14 @@ func (a *App) joinFor(s TunnelServer) joinInfo { return a.joinWith(s, false) }
 func (a *App) joinWith(s TunnelServer, test bool) joinInfo {
 	_, set, _ := a.store.TunnelsCopy()
 	j := joinInfo{V: 1, ID: s.ID, Join: s.Join, Domain: a.store.Cfg.Domain, Port: set.Port, Path: set.Path,
-		UUID: s.UUID, Panel: a.panelLocalURL(), Frag: set.Frag}
+		UUID: s.UUID, Panel: a.panelLocalURL(), Frag: set.Frag, Mux: set.Mux}
 	switch s.Method {
 	case tunnelMethodXHTTP:
 		j.Method, j.XPort, j.XPath = s.Method, set.XPort, set.XPath
 	case tunnelMethodRT:
 		host, _, _ := strings.Cut(set.RTarget, ":")
 		j.Method, j.RPort, j.RSNI, j.RPub, j.RSID = s.Method, set.RPort, host, set.RPub, set.RSID
-	case tunnelMethodWG, tunnelMethodKCP:
+	case tunnelMethodWG, tunnelMethodKCP, tunnelMethodDR:
 		j.Method = s.Method
 		if !a.udpJoin(&j, s, set, test) {
 			j = joinInfo{V: j.V, ID: j.ID, Join: j.Join, Domain: j.Domain, Port: j.Port, Path: j.Path, UUID: j.UUID, Panel: j.Panel}
@@ -887,13 +918,13 @@ func (a *App) handleTunnels(w http.ResponseWriter, r *http.Request) {
 			v.Capable[m] = methodCapable(s, m)
 		}
 		v.CMain = carrierStatusOf(s.ID)
-		v.WGKey, v.WGPub, v.WGTKey, v.WGTPub, v.Ded = "", "", "", "", nil
+		v.WGKey, v.WGPub, v.WGTKey, v.WGTPub, v.Ded, v.SSHKeyStart = "", "", "", "", nil, ""
 		v.Speed = speeds.view(s.ID)
 		out = append(out, v)
 	}
 	writeJSONResp(w, 200, map[string]any{"servers": out, "port": set.Port, "domain": a.store.Cfg.Domain,
 		"ready": a.store.Cfg.Domain != "" && a.store.Cfg.CertFile != "", "methods": tunnelMethods, "xport": set.XPort, "rport": set.RPort, "rtarget": set.RTarget, "methodVer": agentMethodVer, "revVer": agentRevVer,
-		"wgport": set.WGPort, "wghost": set.WGHost, "kport": set.KPort, "wgOn": set.WGOn, "kOn": set.KOn,
+		"wgport": set.WGPort, "wghost": set.WGHost, "kport": set.KPort, "wgOn": set.WGOn, "kOn": set.KOn, "dport": set.DPort, "dOn": set.DOn, "mux": set.Mux,
 		"testVer": agentTestVer, "wgTestVer": agentWGTestVer, "kcpXray": minKCPXray, "wgVer": agentWGVer, "kcpVer": agentKCPVer,
 		"frpport": set.FRPPort, "frpproto": set.FRPProto, "frpgre": set.FRPGre, "frag": set.Frag, "bhport": set.BHPort, "bhproto": set.BHProto, "bhgre": set.BHGre,
 		"sshport": set.SSHPort, "carrierVer": agentCarrierVer, "greIP": mainGREIP(set), "sni": a.sniView(), "sniVer": agentSniVer})
@@ -938,6 +969,29 @@ func (a *App) handleAddTunnel(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	sshKey, sshPub := "", ""
+	switch b.Method {
+	case tunnelMethodFRP, tunnelMethodBH, tunnelMethodSSH:
+		// this server dials the middle server first, so it needs its address
+		if b.IP == "" && b.Host == "" {
+			fail(w, 400, errors.New("starting on FRP, Backhaul or SSH needs the middle server's address (this server dials it)"))
+			return
+		}
+		if b.Host == "" {
+			b.Host = b.IP
+		}
+		if ip := net.ParseIP(b.IP); ip != nil && ip.To4() != nil {
+			pubIP = ip.String()
+		}
+		if b.Method == tunnelMethodSSH {
+			k, p, err := newSSHHostKey()
+			if err != nil {
+				fail(w, 500, err)
+				return
+			}
+			sshKey, sshPub = k, p
+		}
+	}
 	if b.SSHPort == 0 {
 		b.SSHPort = 22
 	}
@@ -949,7 +1003,8 @@ func (a *App) handleAddTunnel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s := &TunnelServer{ID: randHex(4), Name: b.Name, Method: b.Method, Host: b.Host, SSHPort: b.SSHPort, SSHUser: b.SSHUser,
-		UUID: newUUID(), Join: randHex(16), JoinExp: time.Now().Add(joinTTL).Unix(), Pending: true, PublicIP: pubIP}
+		UUID: newUUID(), Join: randHex(16), JoinExp: time.Now().Add(joinTTL).Unix(), Pending: true, PublicIP: pubIP,
+		SSHKeyStart: sshKey, SSHHost: sshPub}
 	err := a.cfg.Mutate(func(root *OMap) error {
 		if err := a.ensureTunnelSettings(root); err != nil {
 			return err
@@ -993,6 +1048,10 @@ func startNotReady(m string) string {
 		return "mKCP is not ready on this server (it needs this server's public address and Xray 26.6.1 or newer); start on another method"
 	case tunnelMethodGRE:
 		return "GRE is not ready on this server (it needs this server's public IPv4 address); start on another method"
+	case tunnelMethodDR:
+		return "the direct method is not ready on this server (it needs this server's public address and Xray 26.6.1 or newer); start on another method"
+	case tunnelMethodFRP, tunnelMethodBH, tunnelMethodSSH:
+		return "this method is not ready on this server (it needs this server's public address in the Tunnels tab); start on another method"
 	}
 	return "this method is not ready on this server (it needs this server's public address for UDP); start on another method"
 }
@@ -1316,6 +1375,7 @@ type beatReq struct {
 	Applied   string               `json:"applied"`
 	CtlPort   int                  `json:"ctlPort"`
 	Busy      []int                `json:"busy"`
+	GREBusy   bool                 `json:"greBusy,omitempty"`   // 0.18.0+: GRE belongs to another main server here
 	Wait      bool                 `json:"wait"`                // agent accepts a held (long-poll) reply
 	Fails     int                  `json:"fails"`               // failed heartbeats since the last good one
 	LastFail  string               `json:"lastFail"`            // why the last one failed
@@ -1408,6 +1468,10 @@ func (a *App) handleBeat(w http.ResponseWriter, r *http.Request) {
 				req.CState[k] = trimTo(v, 300)
 			}
 			s.CState = req.CState
+		}
+		if s.GREBusy != req.GREBusy {
+			s.GREBusy = req.GREBusy
+			defer pokeCarriers()
 		}
 		if req.SSHHost != "" && s.SSHHost != req.SSHHost {
 			s.SSHHost = req.SSHHost
@@ -1703,7 +1767,13 @@ func (a *App) handleTunnelMethod(w http.ResponseWriter, r *http.Request) {
 		if s.LastSeen == 0 || versionLess(s.AgentVer, agentMethodVer) {
 			return fmt.Errorf("update the middle server first (agent %s or newer): run the install command again there", agentMethodVer)
 		}
+		if b.Method == tunnelMethodGRE && s.GREBusy {
+			return errors.New(greBusyMsg)
+		}
 		if !methodCapable(*s, b.Method) {
+			if b.Method == tunnelMethodDR {
+				return fmt.Errorf("the direct method needs agent %s and Xray %s or newer on %s: run the install command there again", agentDRVer, minKCPXray, s.Name)
+			}
 			if b.Method == tunnelMethodKCP {
 				return fmt.Errorf("mKCP needs agent %s and Xray %s or newer on %s (it has Xray %s): run the install command there again", agentKCPVer, minKCPXray, s.Name, orDefault(s.XrayVer, "unknown"))
 			}
@@ -1723,6 +1793,9 @@ func (a *App) handleTunnelMethod(w http.ResponseWriter, r *http.Request) {
 			if b.Method == tunnelMethodSSH && s.SSHHost == "" {
 				return errors.New("the middle server has not sent its SSH key yet: wait a few seconds")
 			}
+		}
+		if b.Method == tunnelMethodDR && !a.store.TunnelCfg.DOn {
+			return fmt.Errorf("the direct method is not ready on this server: it needs Xray %s or newer here (update Xray in Settings) and the UDP address in the Tunnels tab", minKCPXray)
 		}
 		if set := a.store.TunnelCfg; (b.Method == tunnelMethodWG && !set.WGOn) || (b.Method == tunnelMethodKCP && !set.KOn) {
 			if b.Method == tunnelMethodKCP {
@@ -1831,6 +1904,9 @@ func (a *App) handleTunnelSettings(w http.ResponseWriter, r *http.Request) {
 		}
 		if cur.KPort != 0 && p == cur.KPort {
 			return fmt.Errorf("%s port %d is used by the dedicated mKCP tunnel", name, p)
+		}
+		if cur.DPort != 0 && p == cur.DPort {
+			return fmt.Errorf("%s port %d is used by the direct method", name, p)
 		}
 		if p == cur.Port || p == cur.XPort || p == cur.RPort {
 			return fmt.Errorf("%s port %d is used by another tunnel method", name, p)

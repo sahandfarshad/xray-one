@@ -134,6 +134,32 @@ func writeClaims(want []byte) {
 	}
 }
 
+// greLinkName: the GRE link of instance n on this server.
+func greLinkName(n int) string {
+	if n < 2 {
+		return "xo-gre"
+	}
+	return "xo-gre" + strconv.Itoa(n)
+}
+
+// greOther: another instance whose GRE link is up here (0 = none). One GRE
+// link per middle server: both main servers would use the same addresses
+// inside it. The first one keeps it; when two are up at once the lower
+// number wins.
+func greOther() int {
+	up := map[string]bool{}
+	for _, l := range greLinks("xo-gre") {
+		up[l] = true
+	}
+	own := up[greLinkName(agentInst)]
+	for _, n := range agentInsts() {
+		if n != agentInst && up[greLinkName(n)] && (!own || n < agentInst) {
+			return n
+		}
+	}
+	return 0
+}
+
 // otherClaims: ports the other instances claim (only lower-numbered ones
 // when lowerOnly: they win a port both want).
 func otherClaims(lowerOnly bool) map[int]bool {

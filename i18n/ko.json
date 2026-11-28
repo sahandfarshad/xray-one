@@ -401,7 +401,7 @@
  "panel.rpManual": "수동",
  "panel.rpAutoBtn": "이 서버와 동일",
  "panel.tnStart": "시작 방식",
- "panel.qStart": "첫 연결에만 사용됩니다. 중계 서버가 연결되면 다른 방식도 순환에 포함됩니다. WS, XHTTP, REALITY가 차단된 경우 WireGuard나 mKCP(UDP 기반) 또는 GRE를 선택하세요. FRP, Backhaul, SSH는 연결 후에 포함됩니다.",
+ "panel.qStart": "첫 연결에만 사용; 어떤 방식으로도 시작할 수 있습니다. WS, XHTTP, REALITY가 막히면 직접, WireGuard, mKCP 또는 GRE를 시도하세요. FRP, Backhaul, SSH는 이 서버가 중간 서버에 접속하므로 그 주소가 필요합니다.",
  "panel.tnPubIP": "중계 서버 공인 IP",
  "panel.qPubIP": "GRE는 두 공인 IP를 직접 연결하므로 처음부터 중계 서버의 IP가 필요합니다. SSH 필드에 IP가 있으면 그 IP를 사용합니다.",
  "panel.langT": "언어",
@@ -462,5 +462,11 @@
  "panel.liveIdle": "지금은 트래픽이 없습니다.",
  "panel.liveOptT": "인바운드 및 클라이언트별 실시간 속도",
  "panel.liveOptH": "끄면 패널이 이 카운터를 전혀 읽지 않으며, 개요에는 서버 전체 트래픽만 남습니다.",
- "panel.tnFree": "빈 포트 {p} 사용"
+ "panel.tnFree": "빈 포트 {p} 사용",
+ "panel.mDirect": "직접",
+ "panel.mDirectD": "가장 가벼운 방식: 암호화된 VLESS를 일반 TCP로 이 서버 IP에 바로 연결, 포트 포워딩에 가깝습니다. 지연이 가장 낮고, 경로가 차단되면 순환이 다음으로 넘어갑니다.",
+ "panel.mGreBusy": "준비되지 않음: 이 중간 서버의 GRE는 이미 다른 메인 서버가 사용 중입니다",
+ "panel.cMux": "연결 재사용 (mux)",
+ "panel.qMux": "사용자 연결이 몇 개의 터널 연결을 공유하므로 새 연결이 이 서버와 핸드셰이크를 반복하지 않습니다: 테스트 ping이 낮아집니다. 긴 연결 하나가 멈추면 나머지도 느려질 수 있습니다. 모든 중간 서버의 WS와 직접에 적용.",
+ "panel.peAskDr": "직접 방식의 중간 서버는 새 포트 {p}로 다시 연결됩니다(몇 초 끊김). 계속할까요?"
 }

@@ -401,7 +401,7 @@
  "panel.rpManual": "thủ công",
  "panel.rpAutoBtn": "Giống máy chủ này",
  "panel.tnStart": "Phương thức khởi đầu",
- "panel.qStart": "Chỉ dùng cho lần kết nối đầu tiên. Khi máy chủ trung gian đã kết nối, các phương thức khác cũng tham gia vòng xoay. Nếu WS, XHTTP và REALITY bị chặn, hãy chọn WireGuard hoặc mKCP (qua UDP) hoặc GRE. FRP, Backhaul và SSH tham gia sau khi đã kết nối.",
+ "panel.qStart": "Chỉ cho lần kết nối đầu; có thể bắt đầu bằng bất kỳ cách nào. Nếu WS, XHTTP và REALITY bị chặn, hãy thử Trực tiếp, WireGuard, mKCP hoặc GRE. FRP, Backhaul và SSH cần địa chỉ máy chủ trung gian: máy chủ này kết nối tới nó.",
  "panel.tnPubIP": "IP công khai của máy chủ trung gian",
  "panel.qPubIP": "GRE nối trực tiếp hai IP công khai, nên cần IP của máy chủ trung gian ngay từ đầu. Nếu ô SSH chứa một IP thì IP đó sẽ được dùng.",
  "panel.langT": "Ngôn ngữ",
@@ -462,5 +462,11 @@
  "panel.liveIdle": "Hiện không có lưu lượng.",
  "panel.liveOptT": "Tốc độ trực tiếp theo inbound và client",
  "panel.liveOptH": "Khi tắt, bảng điều khiển không bao giờ đọc các bộ đếm này; Tổng quan chỉ giữ tổng lưu lượng máy chủ.",
- "panel.tnFree": "dùng cổng trống {p}"
+ "panel.tnFree": "dùng cổng trống {p}",
+ "panel.mDirect": "Trực tiếp",
+ "panel.mDirectD": "Cách nhẹ nhất: VLESS mã hóa qua TCP thường, thẳng tới IP máy chủ này, gần giống chuyển tiếp cổng. Độ trễ thấp nhất; nếu đường bị chặn, vòng xoay chuyển sang cách kế tiếp.",
+ "panel.mGreBusy": "Chưa sẵn sàng: GRE trên máy chủ trung gian này đã thuộc máy chủ chính khác",
+ "panel.cMux": "Dùng lại kết nối (mux)",
+ "panel.qMux": "Các kết nối người dùng dùng chung vài kết nối đường hầm, nên kết nối mới không phải bắt tay lại với máy chủ này: ping thấp hơn khi kiểm tra. Nếu một kết nối dài bị kẹt, các kết nối khác cũng có thể chậm. Cho WS và Trực tiếp trên mọi máy chủ trung gian.",
+ "panel.peAskDr": "Các máy chủ trung gian dùng Trực tiếp sẽ kết nối lại ở cổng mới {p} (gián đoạn vài giây). Tiếp tục?"
 }

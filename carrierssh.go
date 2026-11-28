@@ -157,6 +157,24 @@ func sshOnce(ctx context.Context, dir, id string, w sshWant) error {
 
 // ---------- middle server: the SSH server ----------
 
+// newSSHHostKey: a middle server's host key made on this server (starting on
+// SSH), as the agent stores it, and its public line.
+func newSSHHostKey() (string, string, error) {
+	_, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		return "", "", err
+	}
+	blk, err := ssh.MarshalPrivateKey(priv, "xray-one-agent")
+	if err != nil {
+		return "", "", err
+	}
+	sg, err := ssh.NewSignerFromKey(priv)
+	if err != nil {
+		return "", "", err
+	}
+	return string(pem.EncodeToMemory(blk)), strings.TrimSpace(string(ssh.MarshalAuthorizedKey(sg.PublicKey()))), nil
+}
+
 // agentKeyDir: where the agent keeps its SSH host key (a var for tests).
 var agentKeyDir = agentDir
 

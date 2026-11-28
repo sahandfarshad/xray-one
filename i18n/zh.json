@@ -401,7 +401,7 @@
  "panel.rpManual": "手动",
  "panel.rpAutoBtn": "与本服务器相同",
  "panel.tnStart": "初始方式",
- "panel.qStart": "仅用于首次连接。中转服务器连接后，其他方式也会加入轮换。如果 WS、XHTTP 和 REALITY 被屏蔽，请选择 WireGuard 或 mKCP（基于 UDP）或 GRE。FRP、Backhaul 和 SSH 会在连接后加入。",
+ "panel.qStart": "仅用于首次连接；任何方式都可以开始。若 WS、XHTTP 和 REALITY 被封，可试直连、WireGuard、mKCP 或 GRE。FRP、Backhaul 和 SSH 需要中转服务器的地址：由本服务器去连接它。",
  "panel.tnPubIP": "中转服务器公网 IP",
  "panel.qPubIP": "GRE 直接连接两个公网 IP，因此从一开始就需要中转服务器的 IP。如果 SSH 字段中填写的是 IP，则使用该 IP。",
  "panel.langT": "语言",
@@ -462,5 +462,11 @@
  "panel.liveIdle": "当前没有流量。",
  "panel.liveOptT": "按入站和客户端显示实时速度",
  "panel.liveOptH": "关闭后面板不会读取这些计数器；概览中只保留服务器总流量。",
- "panel.tnFree": "使用空闲端口 {p}"
+ "panel.tnFree": "使用空闲端口 {p}",
+ "panel.mDirect": "直连",
+ "panel.mDirectD": "最轻量的方式：加密的 VLESS 通过普通 TCP 直接连到本服务器 IP，接近端口转发。延迟最低；若线路被封，轮换会切到下一个。",
+ "panel.mGreBusy": "未就绪：此中转服务器上的 GRE 已被另一台主服务器使用",
+ "panel.cMux": "复用连接 (mux)",
+ "panel.qMux": "用户连接共享少量隧道连接，新连接无需再与本服务器握手：测试中 ping 更低。若某条长连接卡住，其他连接也可能变慢。适用于所有中转服务器上的 WS 和直连。",
+ "panel.peAskDr": "使用直连的中转服务器将重新连接到新端口 {p}（中断几秒）。继续？"
 }

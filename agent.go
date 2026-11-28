@@ -154,6 +154,11 @@ func agentInstall(code string) error {
 	if os.Geteuid() != 0 {
 		return errors.New("run as root")
 	}
+	if j.Method == tunnelMethodGRE && j.GRemote != "" {
+		if n := greOther(); n != 0 {
+			return fmt.Errorf("GRE is already used on this server by main server %d (one GRE link per middle server). In this main server's panel, add the middle server again with another starting method", n)
+		}
+	}
 	step := func(n int, s string) { fmt.Printf("[%d/5] %s\n", n, s) }
 	step(1, "Xray core")
 	if _, err := os.Stat(agentXray()); err != nil {
@@ -171,6 +176,16 @@ func agentInstall(code string) error {
 	step(2, "relay config")
 	if err := os.MkdirAll(agentDir, 0o700); err != nil {
 		return err
+	}
+	_ = os.Remove(filepath.Join(agentDir, "carriers.json")) // the join code decides again
+	if j.SSHKey != "" {
+		// starting on SSH: the main server already knows this host key
+		if err := os.WriteFile(filepath.Join(agentKeyDir, "ssh_host_ed25519"), []byte(j.SSHKey), 0o600); err != nil {
+			return err
+		}
+	}
+	if j.CS != nil {
+		fmt.Println("      first method:", j.Method, "(the main server dials this server)")
 	}
 	st := agentState{Join: j}
 	if old, err := loadAgent(); err == nil && old.Ctl > 0 {
@@ -326,6 +341,7 @@ func agentRun() {
 	certCh := make(chan certResult, 1)
 	certBusy := false
 	xrayVer := agentXrayVersion(agentXray())
+	agentCarriersBoot(st)
 	for {
 		select {
 		case c := <-certCh:
@@ -367,7 +383,7 @@ func agentRun() {
 		mkReq := func(mode string, wait bool) []byte {
 			req := beatReq{Version: version, PublicIP: ip, XrayOK: active == "active", XrayErr: lastErr, Applied: st.Hash, CtlPort: st.Ctl, Busy: busy,
 				Wait: wait, Fails: fails, LastFail: lastFail, PortState: pstate, Rejected: st.Rejected, Pending: st.PendingAt > 0,
-				Mode: mode, Via: st.Via, CertDom: st.CertDomain, CertExp: st.CertExp, CertErr: st.CertErr, CertBusy: certBusy, CertFor: st.CertTried, CState: agentCarrierState(), SSHHost: agentHostPub(),
+				Mode: mode, Via: st.Via, CertDom: st.CertDomain, CertExp: st.CertExp, CertErr: st.CertErr, CertBusy: certBusy, CertFor: st.CertTried, CState: agentCarrierState(), SSHHost: agentHostPub(), GREBusy: greOther() != 0,
 				XrayVer: xrayVer, PortHint: portHint()}
 			req.SniErr, req.SniList, req.SniSeen = sniSvc.Report()
 			req.SniN = len(req.SniList)

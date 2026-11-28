@@ -401,7 +401,7 @@
  "panel.rpManual": "manual",
  "panel.rpAutoBtn": "Igual que este servidor",
  "panel.tnStart": "Método inicial",
- "panel.qStart": "Solo para la primera conexión. Una vez conectado el servidor intermedio, los demás métodos también entran en la rotación. Si WS, XHTTP y REALITY están bloqueados, elija WireGuard o mKCP (por UDP) o GRE. FRP, Backhaul y SSH se suman tras la conexión.",
+ "panel.qStart": "Solo para la primera conexión; se puede empezar con cualquier método. Si WS, XHTTP y REALITY están bloqueados, prueba Directo, WireGuard, mKCP o GRE. FRP, Backhaul y SSH necesitan la dirección del servidor intermedio: este servidor se conecta a él.",
  "panel.tnPubIP": "IP pública del servidor intermedio",
  "panel.qPubIP": "GRE une directamente dos IP públicas, por lo que la IP del servidor intermedio se necesita desde el principio. Si el campo SSH contiene una IP, se usa esa.",
  "panel.langT": "Idioma",
@@ -462,5 +462,11 @@
  "panel.liveIdle": "No hay tráfico ahora mismo.",
  "panel.liveOptT": "Velocidad en vivo por entrada y cliente",
  "panel.liveOptH": "Si está apagado, el panel nunca lee estos contadores; en Resumen solo queda el total del servidor.",
- "panel.tnFree": "usar el puerto libre {p}"
+ "panel.tnFree": "usar el puerto libre {p}",
+ "panel.mDirect": "Directo",
+ "panel.mDirectD": "El método más ligero: VLESS cifrado sobre TCP simple, directo a la IP de este servidor, casi como un reenvío de puertos. Menor latencia; si la ruta se filtra, la rotación pasa al siguiente.",
+ "panel.mGreBusy": "No está listo: el GRE de este servidor intermedio ya pertenece a otro servidor principal",
+ "panel.cMux": "Reutilizar conexiones (mux)",
+ "panel.qMux": "Las conexiones de los usuarios comparten unas pocas conexiones del túnel, así que una nueva no repite el saludo con este servidor: ping más bajo en las pruebas. Si una conexión larga se atasca, las demás pueden ir más lentas. Para WS y Directo en todos los servidores intermedios.",
+ "panel.peAskDr": "Los servidores intermedios en Directo se reconectan en el nuevo puerto {p} (unos segundos de corte). ¿Continuar?"
 }

@@ -34,8 +34,13 @@ const (
 	tunnelTagWG     = "xo-tunnel-wg"  // WireGuard inbound (UDP)
 	tunnelTagWGV    = "xo-tunnel-wgv" // VLESS on 127.0.0.1, reached through WireGuard
 	tunnelTagKCP    = "xo-tunnel-kcp" // VLESS + mKCP inbound (UDP)
-	wgFreeOut       = "xo-dt-wgv"     // freedom: WireGuard traffic -> 127.0.0.1:V only
-	dedOutPrefix    = "xo-dt-"        // our freedom outbounds (dropped and rebuilt on every apply)
+	// direct: VLESS (with VLESS Encryption) over plain TCP to this server's IP,
+	// nothing else around it: the lightest method, closest to a port forward
+	tunnelMethodDR  = "direct"
+	tunnelTagDR     = "xo-tunnel-dr"
+	agentDRVer      = "0.18.0"
+	wgFreeOut       = "xo-dt-wgv" // freedom: WireGuard traffic -> 127.0.0.1:V only
+	dedOutPrefix    = "xo-dt-"    // our freedom outbounds (dropped and rebuilt on every apply)
 	wgRuleTag       = "xo-tunnel-dt-wg"
 	wgVirt          = "10.77.1.1" // the address the middle server dials inside WireGuard
 	wgPeerNet       = "10.77.0."  // middle servers' WireGuard addresses (.2 …)
@@ -125,7 +130,11 @@ func methodCapable(s TunnelServer, m string) bool {
 		return s.AgentVer != "" && !versionLess(s.AgentVer, agentWGVer)
 	case tunnelMethodKCP:
 		return s.AgentVer != "" && !versionLess(s.AgentVer, agentKCPVer) && s.XrayVer != "" && !versionLess(s.XrayVer, minKCPXray)
-	case tunnelMethodGRE, tunnelMethodFRP, tunnelMethodBH, tunnelMethodSSH:
+	case tunnelMethodDR:
+		return s.AgentVer != "" && !versionLess(s.AgentVer, agentDRVer) && s.XrayVer != "" && !versionLess(s.XrayVer, minKCPXray)
+	case tunnelMethodGRE:
+		return s.AgentVer != "" && !versionLess(s.AgentVer, agentCarrierVer) && !s.GREBusy
+	case tunnelMethodFRP, tunnelMethodBH, tunnelMethodSSH:
 		return s.AgentVer != "" && !versionLess(s.AgentVer, agentCarrierVer)
 	}
 	return true
@@ -186,6 +195,12 @@ func (a *App) dedPortBad(root *OMap, p int, set TunnelSettings, tag string) stri
 	}
 	if tag == tunnelTagKCP && set.WGPort != 0 && p == set.WGPort {
 		return fmt.Sprintf("port %d is used by the WireGuard method", p)
+	}
+	if tag != tunnelTagDR && set.DPort != 0 && p == set.DPort {
+		return fmt.Sprintf("port %d is used by the direct method", p)
+	}
+	if tag == tunnelTagDR && ((set.WGPort != 0 && p == set.WGPort) || (set.KPort != 0 && p == set.KPort)) {
+		return fmt.Sprintf("port %d is used by the WireGuard or mKCP method", p)
 	}
 	ib, _ := findInbound(root, tag)
 	if ib != nil && asStr(ib.Get("port")) == strconv.Itoa(p) {
@@ -314,7 +329,11 @@ func (a *App) applyUDPMethods(root *OMap, servers []TunnelServer) (in, rules, on
 		removeInboundTag(root, tunnelTagWG)
 		removeInboundTag(root, tunnelTagWGV)
 		removeInboundTag(root, tunnelTagKCP)
-		_ = a.store.EditTunnels(func() error { a.store.TunnelCfg.WGOn, a.store.TunnelCfg.KOn = false, false; return nil })
+		removeInboundTag(root, tunnelTagDR)
+		_ = a.store.EditTunnels(func() error {
+			a.store.TunnelCfg.WGOn, a.store.TunnelCfg.KOn, a.store.TunnelCfg.DOn = false, false, false
+			return nil
+		})
 	}
 	if len(servers) == 0 {
 		clear()
@@ -368,6 +387,22 @@ func (a *App) applyUDPMethods(root *OMap, servers []TunnelServer) (in, rules, on
 	} else {
 		removeInboundTag(root, tunnelTagKCP)
 	}
+	// direct: plain TCP with the same VLESS Encryption keys (same Xray need)
+	dOn := false
+	if kOn {
+		port, err := a.dedPort(root, set, tunnelTagDR, "direct", set.DPort, 0, func(p int) { a.store.TunnelCfg.DPort = p })
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		set.DPort = port
+		ib := armInbound(root, tunnelTagDR, port)
+		ib.Set("listen", "0.0.0.0")
+		ib.Set("settings", om("clients", clients, "decryption", set.KDec))
+		ib.Set("streamSettings", om("network", "raw", "security", "none"))
+		in, dOn = append(in, tunnelTagDR), true
+	} else {
+		removeInboundTag(root, tunnelTagDR)
+	}
 
 	// WireGuard: the UDP inbound, the local VLESS inbound behind it, and the
 	// one-way door between them
@@ -412,7 +447,10 @@ func (a *App) applyUDPMethods(root *OMap, servers []TunnelServer) (in, rules, on
 			"finalRules", []any{om("action", "allow", "network", "tcp", "ip", []any{"127.0.0.1"}, "port", strconv.Itoa(vport)), om("action", "block")}))))
 	rules = append(rules, om("type", "field", "ruleTag", wgRuleTag, "inboundTag", []any{tunnelTagWG}, "network", "tcp", "outboundTag", wgFreeOut))
 	in = append(in, tunnelTagWGV)
-	_ = a.store.EditTunnels(func() error { a.store.TunnelCfg.WGOn, a.store.TunnelCfg.KOn = true, kOn; return nil })
+	_ = a.store.EditTunnels(func() error {
+		a.store.TunnelCfg.WGOn, a.store.TunnelCfg.KOn, a.store.TunnelCfg.DOn = true, kOn, dOn
+		return nil
+	})
 	return in, rules, []any{tunnelTagWG}, nil
 }
 
@@ -431,6 +469,11 @@ func (a *App) udpJoin(j *joinInfo, s TunnelServer, set TunnelSettings, test bool
 			return false
 		}
 		j.KPort, j.KSeed, j.KEnc = set.KPort, set.KSeed, set.KEnc
+	case tunnelMethodDR:
+		if !set.DOn || set.DPort == 0 || set.KEnc == "" {
+			return false
+		}
+		j.DPort, j.KEnc = set.DPort, set.KEnc
 	case tunnelMethodWG:
 		if !set.WGOn || set.WGPort == 0 || set.WGVPort == 0 || set.WGPub == "" || s.WGKey == "" || s.WGAddr == "" {
 			return false
@@ -445,6 +488,14 @@ func (a *App) udpJoin(j *joinInfo, s TunnelServer, set TunnelSettings, test bool
 		return false
 	}
 	return true
+}
+
+// drOutbound: the direct method, VLESS Encryption over plain TCP.
+func drOutbound(j joinInfo, tag string) []any {
+	return []any{om("tag", tag, "protocol", "vless",
+		"settings", om("vnext", []any{om("address", j.UHost, "port", j.DPort,
+			"users", []any{om("id", j.UUID, "encryption", j.KEnc)})}),
+		"streamSettings", om("network", "raw", "security", "none"))}
 }
 
 // udpOutbounds: how a middle server dials this server over a UDP method,
@@ -557,6 +608,7 @@ func (a *App) handleDedSettings(w http.ResponseWriter, r *http.Request) {
 	var b struct {
 		WGPort int    `json:"wgport"`
 		KPort  int    `json:"kport"`
+		DPort  int    `json:"dport"`
 		WGHost string `json:"wghost"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&b); err != nil {
@@ -569,7 +621,7 @@ func (a *App) handleDedSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	servers, cur, _ := a.store.TunnelsCopy()
-	np, nk, nh := cur.WGPort, cur.KPort, cur.WGHost
+	np, nk, nd, nh := cur.WGPort, cur.KPort, cur.DPort, cur.WGHost
 	if b.WGPort != 0 && b.WGPort != cur.WGPort {
 		if why := a.dedPortBad(root, b.WGPort, cur, tunnelTagWG); why != "" {
 			fail(w, 400, errors.New("WireGuard "+why))
@@ -586,6 +638,15 @@ func (a *App) handleDedSettings(w http.ResponseWriter, r *http.Request) {
 		}
 		nk = b.KPort
 	}
+	if b.DPort != 0 && b.DPort != cur.DPort {
+		c := cur
+		c.WGPort, c.KPort = np, nk
+		if why := a.dedPortBad(root, b.DPort, c, tunnelTagDR); why != "" {
+			fail(w, 400, errors.New("direct "+why))
+			return
+		}
+		nd = b.DPort
+	}
 	if h := strings.TrimSpace(b.WGHost); h != "" && h != cur.WGHost {
 		if net.ParseIP(h) == nil && !hostRe.MatchString(strings.ToLower(h)) {
 			fail(w, 400, errors.New("the UDP address must be an IP or a domain that points straight at this server"))
@@ -593,17 +654,17 @@ func (a *App) handleDedSettings(w http.ResponseWriter, r *http.Request) {
 		}
 		nh = h
 	}
-	if np == cur.WGPort && nk == cur.KPort && nh == cur.WGHost {
+	if np == cur.WGPort && nk == cur.KPort && nd == cur.DPort && nh == cur.WGHost {
 		writeJSONResp(w, 200, map[string]bool{"ok": true})
 		return
 	}
-	set := func(p, k int, h string) {
+	set := func(p, k, d int, h string) {
 		_ = a.store.EditTunnels(func() error {
-			a.store.TunnelCfg.WGPort, a.store.TunnelCfg.KPort, a.store.TunnelCfg.WGHost = p, k, h
+			a.store.TunnelCfg.WGPort, a.store.TunnelCfg.KPort, a.store.TunnelCfg.DPort, a.store.TunnelCfg.WGHost = p, k, d, h
 			return nil
 		})
 	}
-	set(np, nk, nh)
+	set(np, nk, nd, nh)
 	if len(servers) > 0 {
 		if err := a.cfg.Mutate(func(root *OMap) error {
 			if err := a.ensureTunnelSettings(root); err != nil {
@@ -611,7 +672,7 @@ func (a *App) handleDedSettings(w http.ResponseWriter, r *http.Request) {
 			}
 			return a.applyTunnelConfig(root)
 		}); err != nil {
-			set(cur.WGPort, cur.KPort, cur.WGHost)
+			set(cur.WGPort, cur.KPort, cur.DPort, cur.WGHost)
 			fail(w, 400, err)
 			return
 		}

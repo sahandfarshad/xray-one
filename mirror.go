@@ -80,12 +80,19 @@ func (a *App) startJoin(s TunnelServer) joinInfo {
 		s.Method = tunnelMethodWS
 		j = a.joinFor(s)
 	}
+	switch j.Method {
+	case tunnelMethodFRP, tunnelMethodBH, tunnelMethodSSH:
+		// the middle server runs its end before it ever reached us
+		j.CS = a.carrierSpecFor(s)
+		if j.Method == tunnelMethodSSH {
+			j.SSHKey = s.SSHKeyStart
+		}
+	}
 	return j
 }
 
 func isStartMethod(m string) bool {
-	return m == tunnelMethodWS || m == tunnelMethodXHTTP || m == tunnelMethodRT ||
-		m == tunnelMethodWG || m == tunnelMethodKCP || m == tunnelMethodGRE
+	return inList(allMethods, m) // every method can start (0.18.0)
 }
 
 func (a *App) mirrorOK(tok string) bool {

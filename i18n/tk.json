@@ -401,7 +401,7 @@
  "panel.rpManual": "el bilen",
  "panel.rpAutoBtn": "Bu serwerdäki ýaly",
  "panel.tnStart": "Başlangyç usul",
- "panel.qStart": "Diňe ilkinji birikme üçin. Aralyk serwer birikenden soň, beýleki usullar hem aýlanyşa goşulýar. WS, XHTTP we REALITY petiklenen bolsa, WireGuard ýa-da mKCP (UDP arkaly) ýa-da GRE saýlaň. FRP, Backhaul we SSH ol birikenden soň goşulýar.",
+ "panel.qStart": "Diňe ilkinji birikme üçin; islendik usul bilen başlap bolýar. WS, XHTTP we REALITY petiklenen bolsa, Göni, WireGuard, mKCP ýa-da GRE synap görüň. FRP, Backhaul we SSH aralyk serweriň salgysyny talap edýär: bu serwer oňa birikýär.",
  "panel.tnPubIP": "Aralyk serweriň jemgyýetçilik IP-si",
  "panel.qPubIP": "GRE iki jemgyýetçilik IP-ni göni baglanyşdyrýar, şonuň üçin aralyk serweriň IP-si başdan gerek. SSH meýdançasynda IP bar bolsa, şol ulanylýar.",
  "panel.langT": "Dil",
@@ -462,5 +462,11 @@
  "panel.liveIdle": "Häzir hereket ýok.",
  "panel.liveOptT": "Her giriş we müşderi üçin janly tizlik",
  "panel.liveOptH": "Öçük bolanda panel bu sanaýjylary hiç okamaýar; diňe serweriň jemi Umumy synda galýar.",
- "panel.tnFree": "boş port {p} ulan"
+ "panel.tnFree": "boş port {p} ulan",
+ "panel.mDirect": "Göni",
+ "panel.mDirectD": "Iň ýeňil usul: şifrlenen VLESS ýönekeý TCP arkaly bu serweriň IP-sine göni; port geçirmä ýakyn. Iň az gijikme; ýol petiklense aýlaw indikisine geçýär.",
+ "panel.mGreBusy": "Taýýar däl: bu aralyk serwerdäki GRE başga esasy serwere degişli",
+ "panel.cMux": "Birikmeleri gaýtadan ulan (mux)",
+ "panel.qMux": "Ulanyjy birikmeleri birnäçe tunel birikmesini paýlaşýar, täze birikme bu serwer bilen salamlaşmany gaýtalamaýar: synagda pes ping. Bir uzyn birikme saklansa beýlekiler hem haýallap biler. Ähli aralyk serwerlerde WS we Göni üçin.",
+ "panel.peAskDr": "Göni usuldaky aralyk serwerler täze {p} portuna gaýtadan birikýär (birnäçe sekunt kesilme). Dowam etmelimi?"
 }

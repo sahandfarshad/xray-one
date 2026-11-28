@@ -41,6 +41,14 @@ A light, minimal panel that sits **beside** a headless Xray core. It never repla
 
 ۰.۹.۱: چرخش با ترافیک واقعی قضاوت می‌کند نه فقط با پینگ (هر ۵ دقیقه یک دانلود ۲۵۶ کیلوبایتی)؛ گزینه‌ی «تکه‌تکه کردن TLS» برای WS و XHTTP؛ سرور میانی روی مسیر برگشت هر ۱۰ دقیقه مسیر مستقیم را دوباره امتحان می‌کند و عوض کردن روش آنجا هم ممکن است.
 
+## v0.18.0
+- New tunnel method "Direct": VLESS (with VLESS Encryption) over plain TCP straight to the main server's IP, nothing else around it. The lightest and lowest-delay method, close to a port forward; it joins the rotation like the others. It needs Xray 26.6.1 or newer on both servers and the main server's public address (the same as mKCP); open its TCP port on the main server's firewall.
+- "Reuse connections (mux)" switch for WS and Direct: user connections share a few tunnel connections, so a new one skips the handshake with the main server (lower ping in client tests). Off by default.
+- Every method can be the starting method when adding a middle server: Direct, FRP, Backhaul and SSH too. FRP, Backhaul and SSH need the middle server's address (the main server dials it); the middle server downloads FRP or Backhaul from GitHub at that first start.
+- GRE on a middle server shared by two main servers: only one may use GRE there (both would use the same addresses inside it). The second sees GRE as not ready in its panel with the reason, rotation skips it, and an install that starts on GRE stops with a clear message.
+- Middle servers must be updated (run the install command again) for Direct, starting on FRP/Backhaul/SSH and the GRE check.
+- روش تانل تازهٔ «مستقیم»: VLESS رمزشده روی TCP ساده، مستقیم به IP سرور اصلی؛ سبک‌ترین و کم‌تأخیرترین روش، نزدیک به پورت‌فوروارد، و مثل بقیه در چرخش است. گزینهٔ «استفادهٔ دوباره از اتصال» برای WS و مستقیم پینگ تست را پایین می‌آورد. همهٔ روش‌ها در لیست شروع هستند. اگر GRE روی سرور میانی مال یک سرور اصلی باشد، سرور اصلی دوم آن را آماده‌نشده با دلیل می‌بیند. سرورهای میانی باید به‌روز شوند.
+
 ## v0.17.0
 - One middle server can serve several main servers. Run the second main server's install command on the middle server and choose "Add"; the first one keeps working unchanged. Each main server gets its own services, control port and links on the middle server.
 - The middle server reports every port in use (by other programs and by the other main servers' tunnels, even ones not listening right now) to each panel, which never puts a tunnel on them. When an inbound's own port is taken there, the panel picks a free one, from a suggested range per main server (20000-29999 for the first, 30000-39999 for the second); nothing is forced, and existing ports stay as they are.
